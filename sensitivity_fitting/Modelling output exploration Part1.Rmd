@@ -1,0 +1,191 @@
+---
+title: "Modelling output exploration Part1"
+author: "Wenyu"
+date: "1/15/2021"
+output: html_document
+---
+
+The aim of this notebook is to explore the prediction accuracy
+of different type of essentiality scores on drug sensitivity.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidymodels)
+```
+
+
+```{r}
+source("~/cluster_wrk/analysis/extract_and_transform_res_into_long_tibble.R")
+load("~/cluster_scratch/glmnet_modelling/result_largevm/res2_all4.RData")
+
+res2 <- res2 %>% 
+  mutate(NO_obs= map_dbl(.x = sensitivity, 
+                     .f = function(x){
+                       length(intersect(x = x %>% pull(DepMap_ID),
+                                        y = ces1_478$DepMap_ID)) }))
+
+perf_long <- get_acc_long_from_res(res2,ess_type = "ces1_perf") %>% 
+  left_join(get_acc_long_from_res(res2, ess_type = "ces2_perf")) %>%
+  left_join(get_acc_long_from_res(res2, ess_type = "ceres_perf")) %>% 
+  left_join(get_acc_long_from_res(res2, ess_type = "demeter2_perf")) %>% 
+  left_join(res2 %>% select(broad_cpd_id, NO_obs)) %>% 
+  pivot_longer(contains("perf"),
+               names_to= "ess", 
+               values_to="cor") %>% 
+  drop_na()
+
+# add perf from exp
+load("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/res_feature_imp_expseq2.RData")
+exp_seq_pca <- read_csv("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/exp_seq_pca.csv")
+res2 <- res2 %>% 
+  mutate(NO_obs= map_dbl(.x = sensitivity, 
+                     .f = function(x){
+                       length(intersect(x = x %>% pull(DepMap_ID),
+                                        y = exp_seq_pca$DepMap_ID)) }))
+
+perf_long1 <-get_acc_long_new(res2, ess_type = "exp_perf") %>%
+    pivot_longer(contains("perf"),
+               names_to= "ess", 
+               values_to="cor") %>%
+    left_join(res2 %>% select(broad_cpd_id, NO_obs)) %>% 
+    drop_na()
+
+
+perf_long2 <- bind_rows(
+  perf_long,
+  perf_long1 %>% filter(fold <6)
+  )
+```
+
+
+```{r}
+top_10_drugs_glm <- perf_long %>%   filter(NO_obs>150) %>% 
+  # filter(ess== "ces1_perf") %>% 
+  group_by(broad_cpd_id) %>% 
+  summarize(med_cor= median(cor)) %>% 
+  arrange(desc(med_cor)) %>% 
+  slice(1:10) %>% 
+  pull(broad_cpd_id)
+```
+
+```{r,fig_width= 3, fig.height=2}
+perf_long2 %>% 
+  ggplot(aes(x= ess , y= cor ))+
+  geom_boxplot(outlier.shape = NA)+
+  coord_flip()+
+  theme_classic()+
+  scale_x_discrete( labels= c("EXP", "DEMETER2", "CES2", "CES1", "CERES"))+
+  ylim(c(0,1))+
+  ylab("Spearman correlation")
+```
+
+
+```{r, fig.width=15,fig.height=5}
+perf_long %>% 
+  filter(broad_cpd_id %in% top_10_drugs) %>% 
+  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
+  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
+  ggplot(aes(x= broad_cpd_id , y= cor ,color= ess))+
+  geom_boxplot()+
+  geom_point(position = position_dodge(width = 0.8))
+```
+
+update previous plot 
+```{r}
+tmp <- perf_long %>% 
+  ggplot() +
+  geom_point(aes(x=NO_obs, y= cor, color= ess))
+  
+tmp
+```
+
+```{r}
+perf_long %>%
+  filter(NO_obs>150) %>% 
+  group_by(ess) %>% 
+  summarize(mean_cor= median(cor))
+
+tmp <- perf_long %>%
+  filter(NO_obs>150) %>% 
+  ggplot() +
+  geom_violin(aes(x=NO_obs, y= cor, color= ess))
+  
+tmp
+```
+
+
+lets now check again the reverselm result
+```{r}
+# source("get_acc.R")
+load("~/cluster_scratch/glmnet_modelling/result_largevm/reverse_lm_20q4.RData")
+
+res2 <- res2 %>% 
+  mutate(NO_obs= map_dbl(.x = sensitivity, 
+                     .f = function(x){
+                       length(intersect(x = x %>% pull(DepMap_ID),y = ces1_478$DepMap_ID)) }))
+
+perf_long <- get_acc_long_from_reverse(res2,ess_type = "ces1_perf") %>% 
+  left_join(get_acc_long_from_reverse(res2, ess_type = "ces2_perf")) %>% 
+  left_join(get_acc_long_from_reverse(res2, ess_type = "ceres_perf")) %>% 
+  left_join(get_acc_long_from_reverse(res2, ess_type = "demeter2_perf")) %>% 
+  left_join(res2 %>% select(broad_cpd_id, NO_obs)) %>% 
+  pivot_longer(contains("perf"),
+               names_to= "ess", 
+               values_to="cor") %>% 
+  drop_na()
+
+
+```
+```{r}
+tmp <- perf_long %>% 
+  ggplot() +
+  geom_point(aes(x=NO_obs, y= cor, color= ess))
+  
+tmp
+```
+
+```{r}
+perf_long %>%
+  filter(NO_obs>150) %>% 
+  group_by(ess) %>% 
+  summarize(mean_cor= median(cor))
+
+tmp <- perf_long %>%
+  filter(NO_obs>150) %>% 
+  ggplot() +
+  geom_violin(aes(x=NO_obs, y= cor, color= ess))
+  
+tmp
+```
+
+
+
+compare the reverse modeling with forward modeling
+merge two long table and everything is easy.
+```{r}
+perf_long %>%   filter(NO_obs>150) %>% 
+  filter(ess== "ces1_perf") %>% 
+  group_by(broad_cpd_id) %>% 
+  summarize(med_cor= median(cor)) %>% 
+  arrange(desc(med_cor))
+
+top_10_drugs <- perf_long %>%   filter(NO_obs>150) %>% 
+  # filter(ess== "ces1_perf") %>% 
+  group_by(broad_cpd_id) %>% 
+  summarize(med_cor= median(cor)) %>% 
+  arrange(desc(med_cor)) %>% 
+  slice(1:10) %>% 
+  pull(broad_cpd_id)
+```
+
+
+```{r, fig.width=15,fig.height=5}
+perf_long %>% 
+  filter(broad_cpd_id %in% top_10_drugs) %>% 
+  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
+  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
+  ggplot(aes(x= broad_cpd_id , y= cor ,color= ess))+
+  geom_boxplot()+
+  geom_point(position = position_dodge(width = 0.8))
+```
