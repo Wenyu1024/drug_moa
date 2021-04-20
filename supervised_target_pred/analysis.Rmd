@@ -759,6 +759,10 @@ Check prediction performance Summary
 # median(acc_sen_seqpca)
 ```
 
+
+## MOA 
+
+
 ## 5) Combine the result and plotting
 ```{r}
 rm(list = ls())
@@ -834,4 +838,11 @@ fig
 
 
 
-## 6)
+## 6) further explore the prediction result.
+
+drug category, Does perturbation data favor certain kind of drug comparing to chemical finger print?
+
+Continues binding score and prediction scatter plot.
+
+
+

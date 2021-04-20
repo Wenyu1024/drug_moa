@@ -15,12 +15,14 @@ return_acc_estimate_loocv <- function(target_tibble,predictors_tibble=NULL,cor_m
       arrange(drug) %>% 
       select(-drug) %>% 
       mutate_all(.funs = scale)
-    cor_mat = cor(t(predictors_mat)) %>% replace(is.na(.), 0)
+    cor_mat = cor(t(predictors_mat),method = "spearman") %>% replace(is.na(.), 0)
     cor_mat[cor_mat< 0 ] <- 0 
   }
   
   if (is.null(predictors_tibble)) {
-    overlapping_drug= intersect(target_tibble$drug, colnames(cor_mat))
+    overlapping_drug= sort(intersect(target_tibble$drug, colnames(cor_mat)))
+    idx <- match(overlapping_drug, colnames(cor_mat))
+    cor_mat <- cor_mat[idx,idx]
   }
     
   target_mat <- get_target_mat(target_tibble = 
@@ -38,3 +40,14 @@ return_acc_estimate_loocv <- function(target_tibble,predictors_tibble=NULL,cor_m
   return(res)
   }
 
+# for (i in 1:162){
+#   print(i)
+# 
+#   source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
+#   w <- no_tunning_weighted_averaging(target_mat = target_mat, cor_mat= cor_mat, test_idx= i)
+#   print(w)
+#     }
+# 
+# roc_obj <- pROC::roc(response = w$response, predictor = w$predictor,direction= "<") 
+# drug_auc <- pROC::auc(roc_obj )  
+# drug_auc
