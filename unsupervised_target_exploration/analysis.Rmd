@@ -349,8 +349,74 @@ estimate_performance_glmnet(sen_df = x,ess = exp_seq_imputed[,1:10])
 ```
 
 
+explore how ces1 feature importance correspond to drug perturbated gene expression?
+```{r}
+#first check the overlapping drugs available between ctrp and consensus signature.
+consensus_signature_shRNA <- read_csv("/home/cloud-user/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_shRNA.csv")
+# also check the overlapping genes between the gene vector and perturbed genes.
+consensus_signature_drugs <- read_csv("/home/cloud-user/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_drugs.csv")
+
+
+# 183 overlapping drugs
+overlapping_drug <- intersect(consensus_signature_drugs$X1, ctrpv2_data$broad_cpd_id)
+
+load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
+
+# 3562 overlapped perturved genes. 
+overlapping_gene <- intersect(consensus_signature_shRNA$X1,
+            colnames(feature_imp_ridge_ctrp_ces1))
+
+```
+
+show the drug perturbation at Pathway level:
+CES1 based features provided a way to establish a pathway perturbation score,
+
+Where we can map a bulk-level drug perturbation effect to perturbation of specific pathways.
+
+http://www.gsea-msigdb.org/gsea/downloads.jsp 
+ 
+```{r}
+library(fgsea)
+pathways <- gmtPathways("/home/cloud-user/cluster_scratch/prior/c5.go.v7.4.symbols.gmt")
+
+res_pathway <- vector(length = 365, mode = "list")
+for (i in 1:365){
+  rank <- unlist(feature_imp_ridge_ctrp_ces1[i,-1])
+  fgseaRes <- fgsea(pathways, rank, minSize=15, maxSize=500)
+  res_pathway[[i]] <- fgseaRes
+  print(i)
+}
+
+save(res_pathway,file =  "~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_go.RData")
+```
+
+```{r}
+pathways <- gmtPathways("/home/cloud-user/cluster_scratch/prior/c2.cp.kegg.v7.4.symbols.gmt")
+
+res_pathway <- vector(length = 365, mode = "list")
+
+for (i in 1:365){
+  rank <- unlist(feature_imp_ridge_ctrp_ces1[i,-1])
+  fgseaRes <- fgsea(pathways, rank, minSize=15, maxSize=500)
+  res_pathway[[i]] <- fgseaRes
+  print(i)
+}
+save(res_pathway,file =  "~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_kegg.RData")
+```
 
 
 
-
+```{r}
+pathways_df <- 
+  tibble(broad_cpd_id=feature_imp_ridge_ctrp_ces1$broad_cpd_id,res_pathway) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = ctrpv2_data %>% select_at(1:5),
+             by= "broad_cpd_id")
+  
+top_5drugs <- pathways_df %>% select(broad_cpd_id) %>% distinct() %>% slice(1:5)
+tmp  <- pathways_df %>% 
+  filter(broad_cpd_id %in% top_5drugs$broad_cpd_id) 
+  
+```
 

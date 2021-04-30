@@ -1,0 +1,111 @@
+---
+title: "Untitled"
+author: "Wenyu"
+date: "4/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+collect the screening drug and their target 
+I need additional annotation for plotting
+
+```{r}
+
+prism_drugs <- read_csv("~/cluster_scratch/prism/screened_drugs.csv")
+
+prism_sc_data <- read_csv("~/cluster_scratch/prism/secondary-screen-dose-response-curve-parameters.csv")
+
+sc_druglist <- unique(prism_sc_data$broad_id)
+prism_drugs <- prism_drugs %>% 
+  mutate(phase= case_when(
+  broad_id %in% sc_druglist ~ 2,
+    TRUE ~ 1
+))
+
+repurposinghub_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_nobroadid.csv")
+repurposinghub_sample <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_sample.csv")
+repurposinghub_drug <- repurposinghub_drug %>% 
+  left_join(repurposinghub_sample) %>% distinct()
+rm(repurposinghub_sample)
+prism_drugs <- prism_drugs %>% 
+  left_join(repurposinghub_drug) 
+  
+```
+Annotations proporations
+
+Non-Cancer drugs is poorly studied 
+even it is approved drugs
+
+(think of a better way of visualization to emphasize your point)
+```{r}
+
+tmp <- inner_join(
+  x = prism_drugs %>% 
+    filter(phase==2) %>% 
+    group_by(drug_category) %>% 
+    summarise(NA_count= sum(is.na(target)))
+  ,
+  y = prism_drugs %>% 
+    filter(phase==2) %>% 
+    group_by(drug_category) %>% 
+    summarise(all_count= n())
+  ) %>% 
+    drop_na() %>% 
+    mutate(annotate= all_count-NA_count) %>% 
+    mutate(NA_proportion= NA_count/all_count)
+
+
+tmp %>% 
+  select(-3,-5) %>% 
+  pivot_longer(cols= -drug_category, names_to = "type", values_to= "count" ) %>% 
+  ggplot(aes(x=drug_category, y=(count), fill=type)) +
+  # geom_col(position = "fill")
+  geom_bar(stat="identity")+
+  theme_minimal()
+```
+check specifically how many drug target pairs available for different target
+```{r}
+tmp <-  prism_sc_data %>% 
+  select(broad_id, target, phase) %>% 
+  left_join(prism_drugs %>% select(broad_id, drug_category)) %>% 
+  distinct() %>% 
+  separate_rows(target, sep = ",") %>% 
+  distinct()  %>% 
+  mutate(drug_phase= case_when(
+    phase %in%  c("Phase 1",  "Phase 1/Phase 2",  "Phase 2", "Phase 2/Phase 3", "Phase 3") ~  "In trail",
+    TRUE ~ phase
+  )) %>% 
+  mutate(target_annotated=is.na(target)) %>% 
+  select(-phase) %>% 
+  group_by(drug_phase, drug_category) %>% 
+  summarize(na_count= sum(target_annotated),
+            total_count= n()) %>% 
+  drop_na() %>% 
+  mutate(na_percentage= na_count/ total_count)
+
+```
+
+
+
+check how many drug*cell pair available for prism and ces1
+```{r}
+ces1_478 <- read_csv("~/cluster_scratch/impute_ess_20q4/ces1_478.csv")
+# tmp <- str_c(str_split(prism_sc_data$broad_id,pattern = "-",n = 3,simplify = T)[,1:2])
+# prism_sc_data %>% 
+#   mutate(broad_ID= prism)
+
+# 312 cells available!
+cell_overlap <- intersect(ces1_478$DepMap_ID, unique(prism_sc_data$depmap_id))
+```
+
+
+
+First prepare data to generate drug essentiality signatures.
+a 
+Then use the existing target information to check cv accuracy
+In the end predict target for the drugs without target annotation.
+
