@@ -192,6 +192,15 @@ for (i in 1:358){
     next } 
   # else {res_list[[i]] <- train_and_pred(data)}
 }
+
+
+res_list <- vector("list", length = 358)
+for (i in 1:358){
+  # i=2
+  print(i)
+  data <- reverse_modeling_CV$cv_split[[i]]
+  res_list[[i]] <- train_and_pred(data)}
+}
 ```
 
 now I have list with each element being the df I mentioned earlier
