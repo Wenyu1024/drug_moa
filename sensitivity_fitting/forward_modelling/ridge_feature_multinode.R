@@ -30,4 +30,4 @@ res_feature <- data %>%
 stopCluster(cl)
 print("success")
 save(res_feature, file = "/scratch/project_2003466/glmnet_modelling_cluster/ridge_feature_multinode2.RData")
-
+# THIS output was then used in the analysis in the supervised_target_pred folder.

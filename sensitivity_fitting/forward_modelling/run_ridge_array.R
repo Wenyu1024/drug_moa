@@ -10,7 +10,6 @@ args <- as.numeric( commandArgs( TRUE ) )
 job_id <- args[1]
 print(job_id)
 
-
 sen_df <- data %>% 
   slice(job_id) %>% 
   pull(sensitivity) 

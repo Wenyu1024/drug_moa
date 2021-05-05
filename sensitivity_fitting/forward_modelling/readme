@@ -1,0 +1,22 @@
+Two major computations in this folder:
+
+1) Estimate accuracy: 
+
+two layers of CV (both 5fold 3repeats), one for parameter tunning one for get estimate uncertainty.
+
+I used the array job design where for each drug I submit one array job. Each job contains an additional layer of parallelization within the called function (estimate_performance_par function object is defined in the estimate_performance.R function code).
+TO help this second layer of parallelization, I defined in my code 5cpus per task and 50 000 mb memory per cpu. Since it indeed need this much of memory. I still stick to partition small because such node has better avaliability than the huge mem node.
+
+
+2) Derive feature importance:
+One layer of CV (Still 5*3 CV), first search for the best hyperparameter, then fix the model, and apply to the whole dataset to derive the feature importance vector. 
+
+
+
+
+IO:
+IO is added in the analysis Rmd file
+Input data is the same for both two computations.
+output for feature imp is directly used in the next step.
+output for the performance estimation is evaluated here.
+

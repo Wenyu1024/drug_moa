@@ -16,6 +16,11 @@ library(tidymodels)
 
 
 ```{r}
+
+```
+
+
+```{r}
 source("~/cluster_wrk/analysis/extract_and_transform_res_into_long_tibble.R")
 load("~/cluster_scratch/glmnet_modelling/result_largevm/res2_all4.RData")
 

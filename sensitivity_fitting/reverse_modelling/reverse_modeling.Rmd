@@ -110,10 +110,7 @@ each row corresponding to 5 fold training data and 5 fold testing data
 
 I desiged a deep function to return a result df for each drug (15 rows for 3 matrics* 5 fold for three modeling strategy(3 columns)) 
 ```{r}
-lm_model <-
-  linear_reg() %>%
-  set_mode("regression") %>%
-  set_engine("lm")
+
 
 #note the further work is wrap the following steps(copied from my rnotebook2) as a function and map over all drugs
 
@@ -123,57 +120,6 @@ lm_model <-
 
 data = reverse_modeling_CV %>% filter(master_cpd_id== "687954") %>% pull(cv_split) 
 data <- data[[1]]
-
-train_and_pred <- function(df){
-  ceres_columns <- str_subset(string = colnames(df$training_data[[1]]), pattern = "_ceres")
-  demeter_columns <- str_subset(string = colnames(df$training_data[[1]]), pattern = "_demeter")
-  ces_columns <- str_subset(string = colnames(df$training_data[[1]]), pattern = "_ces")
-  # if (is_empty(ceres_columns) | is_empty(demeter_columns) )  next
-  formula_ceres <- as.formula(str_c("area_under_curve ~ ", str_c(ceres_columns, collapse = " + "), collapse = " "))
-  formula_demeter2 <- as.formula(str_c("area_under_curve ~ ", str_c(demeter_columns, collapse = " + "), collapse = " "))
-  formula_ces <- as.formula(str_c("area_under_curve ~ ", str_c(ces_columns, collapse = " + "), collapse = " "))
-  # formula_all <- as.formula(area_under_curve ~ .)
-
-  tmp <-   df %>% 
-    mutate(fit_lm_ceres  = map(training_data, ~fit(lm_model, formula_ceres, data = .x))) %>% 
-    mutate(fit_lm_demeter2  = map(training_data, ~fit(lm_model, formula_demeter2, data = .x))) %>% 
-    mutate(fit_lm_ces = map(training_data, ~fit(lm_model,  formula_ces, data = .x))) %>% 
-    mutate(model_pred_ceres = map2(fit_lm_ceres, testing_data, ~predict(.x, new_data = .y))) %>% 
-    mutate(model_pred_demeter2 = map2(fit_lm_demeter2, testing_data, ~predict(.x, new_data = .y))) %>% 
-    mutate(model_pred_ces = map2(fit_lm_ces, testing_data, ~predict(.x, new_data = .y))) %>% 
-    mutate(res= pmap(list(testing_data, model_pred_ceres, model_pred_demeter2,model_pred_ces),
-                     function(first, second, third,fourth){
-                       tibble(real = first$area_under_curve, 
-                             pred_ceres=second$.pred,
-                             pred_demeter2=third$.pred,
-                             pred_ces=fourth$.pred,                             
-                             )}
-                     )) 
-  
- 
-  get_perf <- function(x){
-    x1= enquo(x)
-    tmp %>%
-      select(id, res) %>%
-      unnest(res) %>%
-      group_by(id) %>%
-      metrics(truth = real, estimate = !!x1) %>%
-      ungroup() %>%
-      select(-3)
-}
-
-  perf_ceres <- get_perf("pred_ceres") %>% rename(ceres = .estimate)
-  perf_demeter2 <- get_perf("pred_demeter2") %>% rename(demeter = .estimate)
-  perf_ces<- get_perf("pred_ces") %>% rename(ces = .estimate)
-
-  res <-  perf_ceres %>%
-    inner_join(perf_demeter2,by = c("id", ".metric")) %>%
-    inner_join(perf_ces,by = c("id", ".metric"))
-  return(res)
-  
-   # tmp <- tmp %>% mutate(ceres= perf_cer)
-  # return(tmp)
-}
 
 
 tmp <- train_and_pred(df = data)
@@ -204,12 +150,12 @@ tmp <- train_and_pred(df = data)
 
 #this analysis is moved to server to accelerate.
 save.image("~/cluster_scratch/reverse_modelling/reverse_serverinput.RData")
-res_list <- vector("list", length = 354)
-for (i in 1:354){
-  # i=2
-  print(i)
-  data <- reverse_modeling_CV$cv_split[[i]]
-  res_list[[i]] <- train_and_pred(data)}
+# res_list <- vector("list", length = 354)
+# for (i in 1:354){
+#   # i=2
+#   print(i)
+#   data <- reverse_modeling_CV$cv_split[[i]]
+#   res_list[[i]] <- train_and_pred(data)}
 ```
 
 now I have list with each element being the df I mentioned earlier
