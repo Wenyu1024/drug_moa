@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+fig_res  <- "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res"
+
 ```
 
 ```{r}
@@ -119,12 +121,13 @@ lm_model <-
 # for a given drug: I am going to first generate formular object to represent different model design for linear regression models
 # since the data for a given drug is a df which has 
 
-data = reverse_modeling_CV$cv_split[[1]]
+data = reverse_modeling_CV %>% filter(master_cpd_id== "687954") %>% pull(cv_split) 
+data <- data[[1]]
 
 train_and_pred <- function(df){
   ceres_columns <- str_subset(string = colnames(df$training_data[[1]]), pattern = "_ceres")
   demeter_columns <- str_subset(string = colnames(df$training_data[[1]]), pattern = "_demeter")
-  ces_columns <- str_subset(string = colnames(df$training_data[[1]]), pattern = "_demeter")
+  ces_columns <- str_subset(string = colnames(df$training_data[[1]]), pattern = "_ces")
   # if (is_empty(ceres_columns) | is_empty(demeter_columns) )  next
   formula_ceres <- as.formula(str_c("area_under_curve ~ ", str_c(ceres_columns, collapse = " + "), collapse = " "))
   formula_demeter2 <- as.formula(str_c("area_under_curve ~ ", str_c(demeter_columns, collapse = " + "), collapse = " "))
@@ -146,29 +149,34 @@ train_and_pred <- function(df){
                              pred_ces=fourth$.pred,                             
                              )}
                      )) 
-
-get_perf <- function(x){
-  x1= enquo(x)
-  tmp %>% 
-    select(id, res) %>% 
-    unnest(res) %>% 
-    group_by(id) %>% 
-    metrics(truth = real, estimate = !!x1) %>% 
-    ungroup() %>% 
-    select(-3) 
-}
-
-perf_ceres <- get_perf("pred_ceres") %>% rename(ceres = .estimate)   
-perf_demeter2 <- get_perf("pred_demeter2") %>% rename(demeter = .estimate)   
-perf_ces<- get_perf("pred_ces") %>% rename(ces = .estimate)   
- 
   
-res= perf_ceres %>% left_join(perf_demeter2,by = c("id", ".metric")) %>% left_join(perf_ces,by = c("id", ".metric"))
-return(res)
+ 
+  get_perf <- function(x){
+    x1= enquo(x)
+    tmp %>%
+      select(id, res) %>%
+      unnest(res) %>%
+      group_by(id) %>%
+      metrics(truth = real, estimate = !!x1) %>%
+      ungroup() %>%
+      select(-3)
+}
+
+  perf_ceres <- get_perf("pred_ceres") %>% rename(ceres = .estimate)
+  perf_demeter2 <- get_perf("pred_demeter2") %>% rename(demeter = .estimate)
+  perf_ces<- get_perf("pred_ces") %>% rename(ces = .estimate)
+
+  res <-  perf_ceres %>%
+    inner_join(perf_demeter2,by = c("id", ".metric")) %>%
+    inner_join(perf_ces,by = c("id", ".metric"))
+  return(res)
+  
+   # tmp <- tmp %>% mutate(ceres= perf_cer)
+  # return(tmp)
 }
 
 
-train_and_pred(df = data)
+tmp <- train_and_pred(df = data)
 
 
 
@@ -195,9 +203,9 @@ train_and_pred(df = data)
 # }
 
 #this analysis is moved to server to accelerate.
-#save.image("~/cluster_scratch/reverse_modelling/reverse_serverinput.RData")
-res_list <- vector("list", length = 358)
-for (i in 1:358){
+save.image("~/cluster_scratch/reverse_modelling/reverse_serverinput.RData")
+res_list <- vector("list", length = 354)
+for (i in 1:354){
   # i=2
   print(i)
   data <- reverse_modeling_CV$cv_split[[i]]
@@ -208,13 +216,14 @@ now I have list with each element being the df I mentioned earlier
 Lets pull the result out so that it would be easier to check/compute the summary level statistics
 
 ```{r}
+load("~/cluster_scratch/reverse_modelling/reverse_modelling_res.RData")
 reverse_modeling_result <- reverse_modeling_CV %>% 
   mutate(res= res_list) %>% 
-  mutate(res= map(res, .f = function(df){df %>% gather(key= "modeling_strategy", value= "score", ceres:both)})) %>% 
+  mutate(res= map(res, .f = function(df){df %>% gather(key= "modeling_strategy", value= "score", ceres:ces)})) %>% 
   select(master_cpd_id,res)  
   # right_join(ctrpv2_compound, by= "master_cpd_id")
 
-df <- reverse_modeling_result$res[[1]]
+# df <- reverse_modeling_result$res[[1]]
 
 # provide a function to generate the summary level statistic for given metric
 # Is it possible to evaluate the value of the parameters input by users as a function object, and use that function object to do something? 
@@ -230,28 +239,56 @@ get_metric <-
   return(tmp1)
   }
 
-get_metric(df = df,metric = "rsq",strategy = "both")
+# df= reverse_modeling_result %>% filter(master_cpd_id == 687954) %>% pull(res)
+# df <- df[[1]]
+# get_metric(df = df,metric = "rsq",strategy = "ces")
 
 # note the null is problematic for processing in map function
 
 reverse_modeling_result <- reverse_modeling_result %>% 
-  # mutate(ind= map_lgl(reverse_modeling_result$res, is_null)) %>% 
   mutate(ceres_rsq_mean = map_dbl(.x = res, .f = get_metric, metric = "rsq", strategy = "ceres" )) %>% 
   mutate(demeter_rsq_mean = map_dbl(.x = res, .f = get_metric, metric = "rsq", strategy = "demeter" )) %>% 
-  mutate(both_rsq_mean = map_dbl(.x = res, .f = get_metric, metric = "rsq", strategy = "both" ))
-  # mutate_at(c("ceres_rsq", "demeter_rsq", "both_rsq"),.funs = unlist)
+  mutate(ces_rsq_mean = map_dbl(.x = res, .f = get_metric, metric = "rsq", strategy = "ces" )) %>% 
+  arrange(desc(ces_rsq_mean))
+  
+
 ```
+
+
+now  generate the images using the result
+```{r, fig.width=4,fig.height=2.5}
+tmp <- reverse_modeling_result %>% 
+  select(-res, -master_cpd_id) 
+  
+  
+colnames(tmp) <- c("CERES", "DEMETER2", "CES") 
+
+fig  <- tmp %>% 
+  pivot_longer(cols= 1:3, names_to = "Essentiality_score", values_to= "Rsq") %>% 
+  ggplot(aes(x= Essentiality_score, y= Rsq))+
+  geom_boxplot() +
+  theme_classic() +
+  coord_flip()+ 
+  xlab("Essentiality scoring metric")+
+  ylab(expression(R^2))
+
+ggsave(fig, filename = "fig2b.pdf",path = fig_res,width = 4,height = 2.5,units = "in")  
+```
+
+
+
+
 
 check the performance
 ```{r}
-# cor.test(reverse_modeling_result$ceres_rsq_mean, reverse_modeling_result$both_rsq_mean)
+# cor.test(reverse_modeling_result$ceres_rsq_mean, reverse_modeling_result$ces_rsq_mean)
 
 
-cor.test(reverse_modeling_result$ceres_rsq_mean, reverse_modeling_result$demeter_rsq_mean)
-t.test(x = (reverse_modeling_result$both_rsq_mean), y = (reverse_modeling_result$ceres_rsq_mean), paired = T)
+# cor.test(reverse_modeling_result$ceres_rsq_mean, reverse_modeling_result$demeter_rsq_mean)
+# t.test(x = (reverse_modeling_result$ces_rsq_mean), y = (reverse_modeling_result$ceres_rsq_mean), paired = T)
 
-t.test(x = (reverse_modeling_result$both_rsq_mean), y = (reverse_modeling_result$demeter_rsq_mean), paired = T)
-t.test(x = (reverse_modeling_result$ceres_rsq_mean), y = (reverse_modeling_result$demeter_rsq_mean), paired = T)
+t.test(x = (reverse_modeling_result$ces_rsq_mean), y = (reverse_modeling_result$demeter_rsq_mean), paired = T)
+t.test(x = (reverse_modeling_result$ces_rsq_mean), y = (reverse_modeling_result$ceres_rsq_mean), paired = T)
 
 # performance on test set are highly correlated between the model with ceres and demeter. And there is no significant difference on the global scale, suggesting the variance of the performance among drugs may due to the quality of the drug target infomation
 # on the other hand, combining ceres and demeter2 together did improve the performance. 
@@ -260,4 +297,58 @@ reverse_modeling_result <- reverse_modeling_result %>%
     right_join(ctrpv2_compound, by= "master_cpd_id")
 ```
 
+dabrafenib 687954 targeting braf
 
+several other braf inhibitors seems all have quite good performance
+```{r}
+tmp <- inner_join(ctrpv2_data %>% select(-sensitivity),reverse_modeling_result %>% select(-res) ) %>% arrange(ces_rsq_mean)
+```
+
+```{r}
+# braf <- read_csv("https://depmap.org/portal/partials/entity_summary/download?entity_id=2110&dep_enum_name=Avana&size_biom_enum_name=expression&color=mutation")
+
+# braf <- ceres %>% select(one_of("DepMap_ID", "BRAF"))
+braf <- ces %>% select(one_of("DepMap_ID", "BRAF"))
+dabrafenib <- ctrpv2_data %>% filter(master_cpd_id== "687954") %>% pull(sensitivity) 
+dabrafenib <- dabrafenib[[1]]
+
+data <- inner_join(braf, dabrafenib)#,by=c("Depmap ID"="DepMap_ID")) 
+colnames(data)[2] <- "braf"
+```
+
+
+```{r,fig.width=2.5,fig.height=2.5}
+cor.test(data$braf, y = data$area_under_curve)#,method = "spearman")
+fig  <- data %>% ggplot(aes(x= braf, y = area_under_curve/15)) +
+  geom_point(size=0.2)+
+  theme_classic()+
+  xlab("BRAF inhibition effect (CES)")+
+  ylab("Drug sensitivity (AUC)")+
+  ggtitle("Dabrafenib cor  0.79")
+fig
+ggsave(fig, filename = "fig2c.pdf",path = fig_res,width = 2.5,height = 2.5,units = "in")  
+```
+
+628408 Repligen 136 	
+inhibitor of HDAC3
+
+```{r}
+
+hdac3 <- ces %>% select(one_of("DepMap_ID", "BRAF"))
+repligen_136 <- ctrpv2_data %>% filter(master_cpd_id== "628408") %>% pull(sensitivity) 
+repligen_136 <- repligen_136[[1]]
+
+data <- inner_join(hdac3, repligen_136)#,by=c("Depmap ID"="DepMap_ID")) 
+colnames(data)[2] <- "hdac3"
+```
+```{r,fig.width=2.5,fig.height=2.5}
+cor.test(data$hdac3, y = data$area_under_curve)#,method = "spearman")
+fig  <- data %>% ggplot(aes(x= hdac3, y = area_under_curve/15)) +
+  geom_point(size=0.2)+
+  theme_classic()+
+  xlab("HDAC3 inhibition effect (CES)")+
+  ylab("Drug sensitivity (AUC)")+
+  ggtitle("Repligen136 cor  0.05")
+fig
+ggsave(fig, filename = "fig2d.pdf",path = fig_res,width = 2.5,height = 2.5,units = "in")  
+```
