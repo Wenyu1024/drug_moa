@@ -1,5 +1,5 @@
 ---
-title: "Modelling output exploration Part1"
+title: "Drug sensitivity prediction forward modellin"
 author: "Wenyu"
 date: "1/15/2021"
 output: html_document
@@ -34,7 +34,10 @@ perf_long <- get_acc_long_from_res(res2,ess_type = "ces1_perf") %>%
                names_to= "ess", 
                values_to="cor") %>% 
   drop_na()
+```
 
+
+```{r}
 # add perf from exp
 load("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/res_feature_imp_expseq2.RData")
 exp_seq_pca <- read_csv("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/exp_seq_pca.csv")
@@ -50,8 +53,10 @@ perf_long1 <-get_acc_long_new(res2, ess_type = "exp_perf") %>%
                values_to="cor") %>%
     left_join(res2 %>% select(broad_cpd_id, NO_obs)) %>% 
     drop_na()
+```
 
 
+```{r}
 perf_long2 <- bind_rows(
   perf_long,
   perf_long1 %>% filter(fold <6)

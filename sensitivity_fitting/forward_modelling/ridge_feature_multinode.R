@@ -1,5 +1,5 @@
-source('/projappl/project_2003466/function/get_fixed_glmnet.R')
-source('/projappl/project_2003466/function/get_feature_imp.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_fixed_glmnet.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_feature_imp.R')
 load("/scratch/project_2003466/glmnet_modelling_cluster/input.RData")
 library(tidyverse, quietly = T)
 library(furrr, quietly = T)

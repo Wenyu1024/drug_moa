@@ -1,8 +1,8 @@
-source('/projappl/project_2003466/function/get_fixed_glmnet.R')
-source('/projappl/project_2003466/function/estimate_performance.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_fixed_glmnet.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/estimate_performance.R')
 load("/scratch/project_2003466/glmnet_modelling_cluster/input.RData")
 library(tidyverse, quietly = T)
-library(furrr)
+library(furrr, quietly = T)
 print("start")
 
 args <- as.numeric( commandArgs( TRUE ) )
