@@ -55,34 +55,12 @@ ctrpv2_reverse_modeling <- ctrpv2_data %>%
 ```
 
 
-```{r,eval=F}
-ctrpv2_reverse_modeling <- ctrpv2_reverse_modeling %>% 
-  ungroup() %>% 
-  mutate(target_num= map_int(target, nrow)) %>% 
-  # mutate(model_possibility= map_lgl(reverse_modelling_data, ~ncol(.x)>1)) %>% 
-  mutate(target_ceres_avaliability = map_int(reverse_modelling_data, ~sum(str_count(string = colnames(.x), pattern= "_ceres")) )) %>% 
-  mutate(target_demeter2_avaliability = map_int(reverse_modelling_data, ~sum(str_count(colnames(.x), pattern= "_demeter2")) )) %>%
-  mutate(model_possibility = ((target_ceres_avaliability > 0) & (target_demeter2_avaliability > 0)))
-# mutate(ceres_demeter2 = .data$target_ceres_avaliability - .data$target_demeter2_avaliability)  
-
-# tmp <- ctrpv2_reverse_modeling %>% 
-#   select(3,9:13) 
-
-ctrpv2_reverse_modeling <- ctrpv2_reverse_modeling %>% 
-  mutate(avaliable_obs= map_int(reverse_modelling_data, nrow))
-```
-
-
-
+characterize avaliablity and sample size, generate the cv structure
 ```{r}
-reverse_modeling_CV <- ctrpv2_reverse_modeling %>%
-  select(master_cpd_id, reverse_modelling_data,  model_possibility) %>%
-  filter(model_possibility) %>%
-  select(-model_possibility) %>%
-  mutate(cv_split =
-           map(reverse_modelling_data, ~vfold_cv(.x, v = 5) ) ) %>%
-  select(-reverse_modelling_data)
+# ctrpv2_reverse_modeling <- ctrpv2_reverse_modeling %>% 
+#   mutate(avaliable_obs= map_int(reverse_modelling_data, nrow))
 
+#mark those whose target is not avaliable from ess data
 
 get_train_test <- 
   function(df){
@@ -92,7 +70,21 @@ get_train_test <-
   }
 
 
-reverse_modeling_CV <-  reverse_modeling_CV %>%
+reverse_modeling_CV <- ctrpv2_reverse_modeling %>%
+  ungroup() %>% 
+  mutate(avaliable_obs= map_int(reverse_modelling_data, nrow)) %>% 
+  mutate(model_possibility= map_lgl(.x = reverse_modelling_data, 
+                               .f = function(x){
+                                 # length(intersect(x %>% pull(DepMap_ID), ces$DepMap_ID))
+                                 ncol(x) > 2
+                                 }
+                               )) %>% 
+  select(master_cpd_id, reverse_modelling_data,  model_possibility) %>%
+  filter(model_possibility) %>%
+  select(-model_possibility) %>%
+  mutate(cv_split =
+           map(reverse_modelling_data, ~vfold_cv(.x, v = 5) ) ) %>%
+  select(-reverse_modelling_data)%>%
   mutate(cv_split = map(cv_split, get_train_test))
 
 # what is the difference between training&testing function and analysis&assessment function?
@@ -100,7 +92,9 @@ reverse_modeling_CV <-  reverse_modeling_CV %>%
 # tmp <- df %>% mutate(training_data = map(splits, ~training(.x)))
 # tmp1 <- df %>% mutate(training_data = map(splits, ~analysis(.x)))
 # identical(tmp, tmp1)
+
 ```
+
 
 Now I have a deeply nested df:
 in reverse_modeling_cv, each line is a drug, 
@@ -108,28 +102,16 @@ in the cv_split column, each element is a dataframe with 5 rows,
 each row corresponding to 5 fold training data and 5 fold testing data
 
 
-I desiged a deep function to return a result df for each drug (15 rows for 3 matrics* 5 fold for three modeling strategy(3 columns)) 
+I desiged a deep function termed train_and_test to return a result df for each drug (15 rows for 3 matrics* 5 fold for three modeling strategy(3 columns)) 
 ```{r}
+#testing the function
+# data = reverse_modeling_CV %>% filter(master_cpd_id== "687954") %>% pull(cv_split) 
+# data <- data[[1]]
+# 
+# tmp <- train_and_pred(df = data)
 
 
-#note the further work is wrap the following steps(copied from my rnotebook2) as a function and map over all drugs
-
-
-# for a given drug: I am going to first generate formular object to represent different model design for linear regression models
-# since the data for a given drug is a df which has 
-
-data = reverse_modeling_CV %>% filter(master_cpd_id== "687954") %>% pull(cv_split) 
-data <- data[[1]]
-
-
-tmp <- train_and_pred(df = data)
-
-
-
-```
-
-
-```{r}
+######################### debugging code
 # res_list <- vector("list", length = 358)
 # for (i in 1:358){
 #   # i=2
@@ -148,7 +130,7 @@ tmp <- train_and_pred(df = data)
 #   # else {res_list[[i]] <- train_and_pred(data)}
 # }
 
-#this analysis is moved to server to accelerate.
+############## analysis is moved to server to accelerate.
 save.image("~/cluster_scratch/reverse_modelling/reverse_serverinput.RData")
 # res_list <- vector("list", length = 354)
 # for (i in 1:354){
@@ -165,136 +147,94 @@ Lets pull the result out so that it would be easier to check/compute the summary
 load("~/cluster_scratch/reverse_modelling/reverse_modelling_res.RData")
 reverse_modeling_result <- reverse_modeling_CV %>% 
   mutate(res= res_list) %>% 
-  mutate(res= map(res, .f = function(df){df %>% gather(key= "modeling_strategy", value= "score", ceres:ces)})) %>% 
-  select(master_cpd_id,res)  
-  # right_join(ctrpv2_compound, by= "master_cpd_id")
+  select(master_cpd_id,res) %>% 
+  unnest() %>% 
+  group_by(master_cpd_id, method) %>% 
+  summarise(mean_cor_estimate= median(cor)) %>% 
+  ungroup()
 
-# df <- reverse_modeling_result$res[[1]]
-
-# provide a function to generate the summary level statistic for given metric
-# Is it possible to evaluate the value of the parameters input by users as a function object, and use that function object to do something? 
-get_metric <- 
-  function(df, metric, strategy, summary_statistics = "mean"){
-    # method= vars(method)
-    tmp <- df %>% 
-      filter(.metric == !!metric) %>%
-      filter(modeling_strategy == !!strategy) %>% 
-      pull(score) 
-  if (summary_statistics == "mean") tmp1 <- mean(tmp)
-  if (summary_statistics == "median") tmp1 <- median(tmp)
-  return(tmp1)
-  }
-
-# df= reverse_modeling_result %>% filter(master_cpd_id == 687954) %>% pull(res)
-# df <- df[[1]]
-# get_metric(df = df,metric = "rsq",strategy = "ces")
-
-# note the null is problematic for processing in map function
-
-reverse_modeling_result <- reverse_modeling_result %>% 
-  mutate(ceres_rsq_mean = map_dbl(.x = res, .f = get_metric, metric = "rsq", strategy = "ceres" )) %>% 
-  mutate(demeter_rsq_mean = map_dbl(.x = res, .f = get_metric, metric = "rsq", strategy = "demeter" )) %>% 
-  mutate(ces_rsq_mean = map_dbl(.x = res, .f = get_metric, metric = "rsq", strategy = "ces" )) %>% 
-  arrange(desc(ces_rsq_mean))
-  
-
+reverse_modeling_result %>% 
+  group_by(method) %>% 
+  summarise(mean_perf= median(mean_cor_estimate))
 ```
 
 
 now  generate the images using the result
-```{r, fig.width=4,fig.height=2.5}
-tmp <- reverse_modeling_result %>% 
-  select(-res, -master_cpd_id) 
-  
-  
-colnames(tmp) <- c("CERES", "DEMETER2", "CES") 
-
-fig  <- tmp %>% 
-  pivot_longer(cols= 1:3, names_to = "Essentiality_score", values_to= "Rsq") %>% 
-  ggplot(aes(x= Essentiality_score, y= Rsq))+
-  geom_boxplot() +
+```{r, fig.width=3,fig.height=2.5}
+fig  <- reverse_modeling_result %>% 
+  ggplot(aes(x= method, y= mean_cor_estimate))+
+  geom_boxplot(outlier.size = 0.3) +
   theme_classic() +
-  coord_flip()+ 
+  coord_flip()+
+  scale_x_discrete(labels=c("DEMETER", "CES", "CERES"))+
   xlab("Essentiality scoring metric")+
-  ylab(expression(R^2))
-
-ggsave(fig, filename = "fig2b.pdf",path = fig_res,width = 4,height = 2.5,units = "in")  
+  ylab("Accuracy (spearman cor)")
+fig
 ```
 
-
-
-
-
-check the performance
-```{r}
-# cor.test(reverse_modeling_result$ceres_rsq_mean, reverse_modeling_result$ces_rsq_mean)
-
-
-# cor.test(reverse_modeling_result$ceres_rsq_mean, reverse_modeling_result$demeter_rsq_mean)
-# t.test(x = (reverse_modeling_result$ces_rsq_mean), y = (reverse_modeling_result$ceres_rsq_mean), paired = T)
-
-t.test(x = (reverse_modeling_result$ces_rsq_mean), y = (reverse_modeling_result$demeter_rsq_mean), paired = T)
-t.test(x = (reverse_modeling_result$ces_rsq_mean), y = (reverse_modeling_result$ceres_rsq_mean), paired = T)
-
-# performance on test set are highly correlated between the model with ceres and demeter. And there is no significant difference on the global scale, suggesting the variance of the performance among drugs may due to the quality of the drug target infomation
-# on the other hand, combining ceres and demeter2 together did improve the performance. 
-
-reverse_modeling_result <- reverse_modeling_result %>%  
-    right_join(ctrpv2_compound, by= "master_cpd_id")
-```
-
-dabrafenib 687954 targeting braf
-
-several other braf inhibitors seems all have quite good performance
-```{r}
-tmp <- inner_join(ctrpv2_data %>% select(-sensitivity),reverse_modeling_result %>% select(-res) ) %>% arrange(ces_rsq_mean)
-```
 
 ```{r}
-# braf <- read_csv("https://depmap.org/portal/partials/entity_summary/download?entity_id=2110&dep_enum_name=Avana&size_biom_enum_name=expression&color=mutation")
-
-# braf <- ceres %>% select(one_of("DepMap_ID", "BRAF"))
-braf <- ces %>% select(one_of("DepMap_ID", "BRAF"))
-dabrafenib <- ctrpv2_data %>% filter(master_cpd_id== "687954") %>% pull(sensitivity) 
-dabrafenib <- dabrafenib[[1]]
-
-data <- inner_join(braf, dabrafenib)#,by=c("Depmap ID"="DepMap_ID")) 
-colnames(data)[2] <- "braf"
+ggsave(fig, filename = "fig2b.pdf",path = fig_res,width = 3,height = 2.5,units = "in")  
 ```
 
 
-```{r,fig.width=2.5,fig.height=2.5}
-cor.test(data$braf, y = data$area_under_curve)#,method = "spearman")
-fig  <- data %>% ggplot(aes(x= braf, y = area_under_curve/15)) +
+Several EGFR inhibitors for
+
+BRD-K70401845 52928
+```{r}
+
+ess <- ces %>% select(one_of("DepMap_ID", "EGFR", "ERBB2"))
+	
+erlotinib <- ctrpv2_data %>% filter(master_cpd_id== "52928") %>% pull(sensitivity) 
+	
+erlotinib <- 	erlotinib[[1]]
+
+data <- inner_join(ess, erlotinib)#,by=c("Depmap ID"="DepMap_ID")) 
+```
+
+
+```{r,fig.width=3,fig.height=2.5}
+cor.test(x = data$EGFR, y = data$area_under_curve)#,method = "spearman")
+fig  <- data %>% ggplot(aes(x= EGFR, y = area_under_curve/15)) +
   geom_point(size=0.2)+
   theme_classic()+
-  xlab("BRAF inhibition effect (CES)")+
+  xlab("EGFR inhibition effect (CES)")+
   ylab("Drug sensitivity (AUC)")+
-  ggtitle("Dabrafenib cor  0.79")
+  ggtitle("Erlotinib cor  0.48")
+
+
 fig
-ggsave(fig, filename = "fig2c.pdf",path = fig_res,width = 2.5,height = 2.5,units = "in")  
+
+ggsave(fig, filename = "fig2d.pdf",path = fig_res,width = 2.5,height = 2.5,units = "in")  
 ```
 
-628408 Repligen 136 	
-inhibitor of HDAC3
 
+HDAC3 	
+Repligen 136
+BRD-K47503321
+628408
 ```{r}
 
-hdac3 <- ces %>% select(one_of("DepMap_ID", "BRAF"))
-repligen_136 <- ctrpv2_data %>% filter(master_cpd_id== "628408") %>% pull(sensitivity) 
-repligen_136 <- repligen_136[[1]]
+ess <- ces %>% select(one_of("DepMap_ID", "HDAC3"))
+	
+repligen136 <- ctrpv2_data %>% filter(master_cpd_id== "628408") %>% pull(sensitivity) 
+	
+repligen136 <- 	repligen136[[1]]
 
-data <- inner_join(hdac3, repligen_136)#,by=c("Depmap ID"="DepMap_ID")) 
-colnames(data)[2] <- "hdac3"
+data <- inner_join(ess, repligen136)#,by=c("Depmap ID"="DepMap_ID")) 
 ```
-```{r,fig.width=2.5,fig.height=2.5}
-cor.test(data$hdac3, y = data$area_under_curve)#,method = "spearman")
-fig  <- data %>% ggplot(aes(x= hdac3, y = area_under_curve/15)) +
+
+
+```{r,fig.width=3,fig.height=2.5}
+cor.test(x = data$HDAC3, y = data$area_under_curve)#,method = "spearman")
+fig  <- data %>% ggplot(aes(x= HDAC3, y = area_under_curve/15)) +
   geom_point(size=0.2)+
   theme_classic()+
   xlab("HDAC3 inhibition effect (CES)")+
   ylab("Drug sensitivity (AUC)")+
-  ggtitle("Repligen136 cor  0.05")
+  ggtitle("Repligen136 cor  -0.01")
+
 fig
+
 ggsave(fig, filename = "fig2d.pdf",path = fig_res,width = 2.5,height = 2.5,units = "in")  
 ```

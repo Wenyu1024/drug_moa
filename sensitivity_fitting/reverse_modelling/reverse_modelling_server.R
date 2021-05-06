@@ -1,7 +1,7 @@
 library(tidyverse)
 library(tidymodels)
 library(furrr)
-source("/projappl/project_2003466/drug_moa/sensitivity_fitting/function/train_and_predict.R")
+source("/projappl/project_2003466/drug_moa/sensitivity_fitting/function/train_and_pred.R")
 load ("/scratch/project_2003466/reverse_modelling/reverse_serverinput.RData")
 plan(multicore)
 res_list <- future_map(.x = 1:354,.f = ~train_and_pred(reverse_modeling_CV$cv_split[[.x]]))
