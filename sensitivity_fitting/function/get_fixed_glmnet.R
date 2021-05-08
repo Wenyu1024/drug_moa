@@ -17,7 +17,7 @@ glm_grid <- grid_latin_hypercube(glm_param,size = 20)
 get_fixed_glmnet <- function(training_data,training_vfold,par= F){
   glm_recipe <- recipe( training_data  ) %>%
     update_role(everything()) %>%
-    update_role(area_under_curve, new_role = "outcome") %>% 
+    update_role(y, new_role = "outcome") %>% 
     step_normalize(all_predictors())
   
   glm_wflow <- workflow( ) %>% 
