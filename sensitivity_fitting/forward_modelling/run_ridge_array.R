@@ -26,7 +26,7 @@ print("demeter2 success")
 exp_perf= estimate_performance_par(sen_df = sen_df, predictor_df = exp_seq_pca,fun_name = get_fixed_glmnet)
 print("exp success")
 
-file_name = paste0( '/scratch/project_2003466/glmnet_modelling_cluster/array_job/res/drug_' ,job_id,".RData" )
+file_name = paste0( '/scratch/project_2003466/forward_modelling/drug_' ,job_id,".RData" )
 # save(list = c('ces1_perf'), file = file_name)
 
 save(list = c('ces1_perf', 'ces2_perf',"ceres_perf", "demeter2_perf","exp_perf"), file = file_name)

@@ -1,14 +1,14 @@
 #!/bin/bash -l
 #SBATCH --job-name=run_array
 #SBATCH --account=project_2003466
-#SBATCH --output=output_%j.txt
-#SBATCH --error=error_%j.txt
+#SBATCH --output=./message/output_%j.txt
+#SBATCH --error=./message/error_%j.txt
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH -p small
 #SBATCH --cpus-per-task=5      
-#SBATCH --mem-per-cpu=50000
-#SBATCH --array=1-365
+#SBATCH --mem-per-cpu=60000
+#SBATCH --array=166
 
 
 # module purge
@@ -23,7 +23,7 @@ fi
 # Specify a temp folder path
 echo "TMPDIR=/scratch/project_2003466/glmnet_modelling_cluster/tmp" >> ~/.Renviron
 
-srun singularity_wrapper exec Rscript --no-save /projappl/project_2003466/drug_moa/sensitivity_fitting/run_ridge_array.R ${SLURM_ARRAY_TASK_ID}
+srun singularity_wrapper exec Rscript --no-save /projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/run_ridge_array.R ${SLURM_ARRAY_TASK_ID}
 seff $SLURM_JOBID
 
 
