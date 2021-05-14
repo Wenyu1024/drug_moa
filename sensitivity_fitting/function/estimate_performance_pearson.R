@@ -40,7 +40,7 @@ estimate_performance_par <- function(sen_df, predictor_df, fun_name){
       .f= function(x,y){
         cor(x = x %>% pull(.pred), 
             y = y %>% pull(y), 
-            method = "spearman")},
+            method = "pearson")},
       .options = furrr_options(seed = 0000))) %>% 
     pull(spearman_cor)
   plan(sequential)
@@ -85,7 +85,7 @@ estimate_performance_par_gdsc <- function(sen_df, predictor_df, fun_name){
       .f= function(x,y){
         cor(x = x %>% pull(.pred), 
             y = y %>% pull(y), 
-            method = "spearman")},
+            method = "pearson")},
       .options = furrr_options(seed = 0000))) %>% 
     pull(spearman_cor)
   plan(sequential)

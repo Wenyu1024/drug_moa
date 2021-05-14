@@ -16,7 +16,7 @@ One layer of CV (Still 5*3 CV), first search for the best hyperparameter, then f
 
 IO:
 IO is added in the analysis Rmd file
-Input data is the same for both two computations.
+Input data is the same for both two computations. using prepare_inputRdata.R
 output for feature imp is directly used in the next step.
-output for the performance estimation is evaluated here.
+output for the performance estimation is evaluated here in the Rmd file
 

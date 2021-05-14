@@ -16,186 +16,188 @@ library(tidymodels)
 
 
 ```{r}
+res <- map_dfr(c(1:365), .f = function(x){
+  
+  # drug <- paste("~/cluster_scratch/forward_modelling/ctrp_pearson/", x, ".RData", sep = "")
+    drug <- paste("~/cluster_scratch/forward_modelling/ctrp_spearman/drug_", x, ".RData", sep = "")
+  load(drug)
+  df <- bind_cols(ceres= ceres_perf, ces= ces1_perf, demeter2= demeter2_perf, exp= exp_perf, drug= x)
+  
+})
+
 
 ```
 
 
+
 ```{r}
-source("~/cluster_wrk/analysis/extract_and_transform_res_into_long_tibble.R")
-load("~/cluster_scratch/glmnet_modelling/result_largevm/res2_all4.RData")
+res1 <- res %>% 
+  group_by(drug) %>% 
+  summarise_all(.funs = median) 
 
-res2 <- res2 %>% 
-  mutate(NO_obs= map_dbl(.x = sensitivity, 
-                     .f = function(x){
-                       length(intersect(x = x %>% pull(DepMap_ID),
-                                        y = ces1_478$DepMap_ID)) }))
 
-perf_long <- get_acc_long_from_res(res2,ess_type = "ces1_perf") %>% 
-  left_join(get_acc_long_from_res(res2, ess_type = "ces2_perf")) %>%
-  left_join(get_acc_long_from_res(res2, ess_type = "ceres_perf")) %>% 
-  left_join(get_acc_long_from_res(res2, ess_type = "demeter2_perf")) %>% 
-  left_join(res2 %>% select(broad_cpd_id, NO_obs)) %>% 
-  pivot_longer(contains("perf"),
-               names_to= "ess", 
-               values_to="cor") %>% 
-  drop_na()
+res1 %>%   
+  select(-drug)%>%   
+  pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
+  group_by(predictor) %>% 
+  summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
+```
+
+
+```{r,fig.width=3,fig.height=2}
+fig <- res1 %>%   
+  select(-drug) %>%
+  pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
+  ggplot(aes(x= predictor , y= spearman_cor ))+
+  geom_boxplot(outlier.size = 0.2)+
+  theme_classic()+
+  xlab("")+
+  ylab("Accuracy (Spearman Cor)")+
+  scale_x_discrete(labels = c("CERES", "CES", "DEMETER2","EXP"))+
+  coord_flip()
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.pdf",width = 3,height = 2)
+
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.tiff",width = 3,height = 2)
 ```
 
 
 ```{r}
-# add perf from exp
-load("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/res_feature_imp_expseq2.RData")
-exp_seq_pca <- read_csv("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/exp_seq_pca.csv")
-res2 <- res2 %>% 
-  mutate(NO_obs= map_dbl(.x = sensitivity, 
-                     .f = function(x){
-                       length(intersect(x = x %>% pull(DepMap_ID),
-                                        y = exp_seq_pca$DepMap_ID)) }))
-
-perf_long1 <-get_acc_long_new(res2, ess_type = "exp_perf") %>%
-    pivot_longer(contains("perf"),
-               names_to= "ess", 
-               values_to="cor") %>%
-    left_join(res2 %>% select(broad_cpd_id, NO_obs)) %>% 
-    drop_na()
-```
-
-
-```{r}
-perf_long2 <- bind_rows(
-  perf_long,
-  perf_long1 %>% filter(fold <6)
+load("~/cluster_scratch/glmnet_modelling_cluster/input.RData")
+res2 <- res1 %>% 
+  select(-drug) %>% 
+  bind_cols(data) %>% 
+  mutate(sample_size= map_int(.x=sensitivity, 
+                              .f=function(x){sum(x %>% pull(DepMap_ID) %in% ces1$DepMap_ID)})) %>%
+  select(-target, -sensitivity) %>% 
+  bind_cols(
+    res %>% 
+      select(ces,drug) %>%
+      group_by(drug) %>% 
+      summarize(ces_variance= var(ces)) %>% 
+      ungroup() %>% 
+      arrange(drug) %>% 
+      select(-drug)
   )
 ```
 
 
-```{r}
-top_10_drugs_glm <- perf_long %>%   filter(NO_obs>150) %>% 
-  # filter(ess== "ces1_perf") %>% 
-  group_by(broad_cpd_id) %>% 
-  summarize(med_cor= median(cor)) %>% 
-  arrange(desc(med_cor)) %>% 
-  slice(1:10) %>% 
-  pull(broad_cpd_id)
-```
-
-```{r,fig_width= 3, fig.height=2}
-perf_long2 %>% 
-  ggplot(aes(x= ess , y= cor ))+
-  geom_boxplot(outlier.shape = NA)+
-  coord_flip()+
+```{r,fig.width=2.5, fig.height=2.5}
+res2 %>%
+  select(ces,sample_size) %>% 
+  ggplot(aes(x=sample_size,y= ces)) +
+  geom_point(size=0.5)+
   theme_classic()+
-  scale_x_discrete( labels= c("EXP", "DEMETER2", "CES2", "CES1", "CERES"))+
-  ylim(c(0,1))+
-  ylab("Spearman correlation")
-```
+  xlab("Sample Size")+
+  ylab("Median Accuracy")
 
-
-```{r, fig.width=15,fig.height=5}
-perf_long %>% 
-  filter(broad_cpd_id %in% top_10_drugs) %>% 
-  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
-  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
-  ggplot(aes(x= broad_cpd_id , y= cor ,color= ess))+
-  geom_boxplot()+
-  geom_point(position = position_dodge(width = 0.8))
-```
-
-update previous plot 
-```{r}
-tmp <- perf_long %>% 
-  ggplot() +
-  geom_point(aes(x=NO_obs, y= cor, color= ess))
+res2 %>% 
+  ggplot(aes(x=sample_size,y= ces_variance)) +
+  geom_point(size=0.5)+
+  theme_classic()+
+  xlab("Sample Size")+
+  ylab("Accuracy Variance")
   
-tmp
 ```
 
-```{r}
-perf_long %>%
-  filter(NO_obs>150) %>% 
-  group_by(ess) %>% 
-  summarize(mean_cor= median(cor))
 
-tmp <- perf_long %>%
-  filter(NO_obs>150) %>% 
-  ggplot() +
-  geom_violin(aes(x=NO_obs, y= cor, color= ess))
+
+what about GDSC data?
+```{r}
+
+tmp <- gdsc_df %>% 
+  mutate(n= map_int(.x = sensitivity,
+                    .f = function(x){
+                      length(intersect(x = x %>% pull(DepMap_ID),y= ces1$DepMap_ID))})) %>% 
+  select(DRUG_NAME, n)
+
+res_gdsc <- map_dfr(1:518, .f = function(x){
+  # drug <- paste("~/cluster_scratch/glmnet_modelling_cluster/array_job/res/drug_", x, ".RData", sep = "")
+    drug <- paste("~/cluster_scratch/forward_modelling/gdsc_spearman/drug_gdsc", x, ".RData", sep = "")
+  load(drug)
+  df <- bind_cols( ces= ces1_perf, drug= x)
   
-tmp
+})
+
+res_gdsc1 <- res_gdsc %>% 
+  group_by(drug) %>% 
+  summarise_all(.funs = median) 
+
+
+summary(res_gdsc1)
 ```
 
-
-lets now check again the reverselm result
+why is performance so poor in GDSC?
 ```{r}
-# source("get_acc.R")
-load("~/cluster_scratch/glmnet_modelling/result_largevm/reverse_lm_20q4.RData")
-
-res2 <- res2 %>% 
-  mutate(NO_obs= map_dbl(.x = sensitivity, 
-                     .f = function(x){
-                       length(intersect(x = x %>% pull(DepMap_ID),y = ces1_478$DepMap_ID)) }))
-
-perf_long <- get_acc_long_from_reverse(res2,ess_type = "ces1_perf") %>% 
-  left_join(get_acc_long_from_reverse(res2, ess_type = "ces2_perf")) %>% 
-  left_join(get_acc_long_from_reverse(res2, ess_type = "ceres_perf")) %>% 
-  left_join(get_acc_long_from_reverse(res2, ess_type = "demeter2_perf")) %>% 
-  left_join(res2 %>% select(broad_cpd_id, NO_obs)) %>% 
-  pivot_longer(contains("perf"),
-               names_to= "ess", 
-               values_to="cor") %>% 
-  drop_na()
-
-
+gdsc_df %>% 
+  ggplot(aes(x= sample_size, y= ces))+
+  geom_point()
 ```
+
+
+Combine the gdsc id back to compare with the ctrp
 ```{r}
-tmp <- perf_long %>% 
-  ggplot() +
-  geom_point(aes(x=NO_obs, y= cor, color= ess))
-  
-tmp
+load("~/cluster_scratch/gdsc/gdsc.RData")
+gdsc_df <- gdsc_df %>% 
+  bind_cols(res_gdsc1 %>% select(ces)) %>% 
+  mutate(sample_size= map_int(sensitivity, .f=
+                                function(x){
+                                  length(intersect( x$DepMap_ID,ces1$DepMap_ID)) 
+                                  
+                                })) %>% 
+  select(- sensitivity, -target)
+
+gdsc_drug_list <- read_csv("~/cluster_scratch/gdsc/Drug_list.csv")
+
+id_mapping_gdsc <- read_tsv("~/cluster_scratch/gdsc/pubchem_cid_to_smiles.txt",
+                       col_names = c("PubCHEM", "smiles"),col_types = "cc")
+id_mapping_ctrp <- read_csv("~/cluster_scratch/ctrp/ctrpv2_smiles.csv",
+                       col_types = "ccc")
+
+comparison <- id_mapping %>% 
+  inner_join(gdsc_drug_list %>% mutate(PubCHEM= as.character(PubCHEM))) %>% 
+  inner_join(gdsc_df ,by= c("drug_id"= "DRUG_ID")) %>% 
+  inner_join(
+    y= res2 %>% 
+      inner_join(id_mapping_ctrp , by= c("broad_cpd_id")) %>%
+      select(broad_cpd_id,ces, cid, sample_size),
+    by= c("PubCHEM"="cid"))
 ```
 
 ```{r}
-perf_long %>%
-  filter(NO_obs>150) %>% 
-  group_by(ess) %>% 
-  summarize(mean_cor= median(cor))
+comparison %>% 
+  ggplot(aes(x = ces.x, y = ces.y))+
+  geom_point()
 
-tmp <- perf_long %>%
-  filter(NO_obs>150) %>% 
-  ggplot() +
-  geom_violin(aes(x=NO_obs, y= cor, color= ess))
-  
-tmp
+cor(comparison$ces.x, comparison$ces.y,method = "pearson")
+cor(comparison$ces.x, comparison$ces.y,method = "spearman")
+
+tmp <- comparison %>% 
+  mutate(sample_size_diff= abs(sample_size.x-sample_size.y)) %>% 
+  filter(sample_size_diff < 100) 
+tmp %>% 
+  ggplot(aes(x = ces.x, y = ces.y))+
+  geom_point()+
+  theme_classic()+
+  xlab("Performance GDSC")+
+  ylab("Performance CTRP")+
+  ggtitle("Spearman COR 0.57")
+
+cor(tmp$ces.x, tmp$ces.y,method = "pearson")
+cor.test(tmp$ces.x, tmp$ces.y,method = "spearman")
+```
+
+```{r,fig.width=2.5, fig.height=2.5}
+tmp %>% 
+  ggplot(aes(x = ces.x, y = ces.y))+
+  geom_point()+
+  theme_classic()+
+  xlab("Performance GDSC")+
+  ylab("Performance CTRP")+
+  ggtitle("spearman cor=0.57, 
+          p= 0.027")
 ```
 
 
 
-compare the reverse modeling with forward modeling
-merge two long table and everything is easy.
-```{r}
-perf_long %>%   filter(NO_obs>150) %>% 
-  filter(ess== "ces1_perf") %>% 
-  group_by(broad_cpd_id) %>% 
-  summarize(med_cor= median(cor)) %>% 
-  arrange(desc(med_cor))
 
-top_10_drugs <- perf_long %>%   filter(NO_obs>150) %>% 
-  # filter(ess== "ces1_perf") %>% 
-  group_by(broad_cpd_id) %>% 
-  summarize(med_cor= median(cor)) %>% 
-  arrange(desc(med_cor)) %>% 
-  slice(1:10) %>% 
-  pull(broad_cpd_id)
-```
-
-
-```{r, fig.width=15,fig.height=5}
-perf_long %>% 
-  filter(broad_cpd_id %in% top_10_drugs) %>% 
-  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
-  mutate(broad_cpd_id=factor(broad_cpd_id, levels=top_10_drugs)) %>%
-  ggplot(aes(x= broad_cpd_id , y= cor ,color= ess))+
-  geom_boxplot()+
-  geom_point(position = position_dodge(width = 0.8))
-```
