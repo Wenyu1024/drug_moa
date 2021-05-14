@@ -1,0 +1,65 @@
+---
+title: "analysis_new"
+author: "Wenyu"
+date: "5/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidymodels)
+
+```
+
+
+```{r}
+feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces1.csv")
+
+
+load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
+source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
+source('~/cluster_wrk/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
+target_tibble_drugbank= ctrp_target_tibble %>%
+  ungroup() %>%
+  select(broad_cpd_id, gene_symbol_of_protein_target) %>%
+  rename(drug=broad_cpd_id, target_gene=gene_symbol_of_protein_target) %>% 
+  mutate(binding_score= 1)
+
+target_tibble_dtc <- ctrp_target_dtc %>% 
+  select(standard_inchi_key, gene_name, interaction_strength) %>%
+  filter(interaction_strength!= 0) %>% 
+  drop_na() %>% 
+  group_by(standard_inchi_key, gene_name) %>% 
+  summarize(interaction_strength= median(interaction_strength,na.rm = T)) %>% 
+  ungroup() %>% 
+  inner_join(ctrpv2_list_to_zia,by= c("standard_inchi_key"= "InChIKey")) %>% 
+  select(broad_cpd_id, gene_name, interaction_strength) %>% 
+  group_by(broad_cpd_id, gene_name) %>% 
+  summarize(interaction_strength= max(interaction_strength,na.rm = T)) %>% 
+  ungroup() %>%   rename(drug=broad_cpd_id, target_gene=gene_name, binding_score= interaction_strength) 
+
+# length(unique(target_tibble$drug))
+```
+
+use dtc target as a base to join drugbank and feature importance
+```{r}
+res <- target_tibble_dtc %>% 
+  left_join(target_tibble_drugbank %>% rename(drug_bank_target= binding_score)) %>% 
+  inner_join(
+    y=feature_imp_ridge_ctrp_ces1 %>% 
+      pivot_longer(cols= -broad_cpd_id, names_to= "gene", values_to= "feature_imp"),
+    by= c("drug" = "broad_cpd_id", "target_gene" = "gene")) %>% 
+  mutate(drug_bank_target= replace_na(drug_bank_target, 0) )
+    
+    
+```
+
+
+```{r}
+res %>% 
+  # filter(feature_imp!=0) %>% 
+  ggplot(aes(y= log10((feature_imp)), x=binding_score)) + 
+  geom_point(aes(shape= factor(drug_bank_target)),size= 0.01)
+```
+
