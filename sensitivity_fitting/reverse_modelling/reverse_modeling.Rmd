@@ -55,13 +55,13 @@ ctrpv2_reverse_modeling <- ctrpv2_data %>%
 ```
 
 
-characterize avaliablity and sample size, generate the cv structure
+characterize availability and sample size, generate the cv structure
 ```{r}
 # ctrpv2_reverse_modeling <- ctrpv2_reverse_modeling %>% 
 #   mutate(avaliable_obs= map_int(reverse_modelling_data, nrow))
 
 #mark those whose target is not avaliable from ess data
-
+set.seed(0000)
 get_train_test <- 
   function(df){
     df <- df %>% 
@@ -92,7 +92,7 @@ reverse_modeling_CV <- ctrpv2_reverse_modeling %>%
 # tmp <- df %>% mutate(training_data = map(splits, ~training(.x)))
 # tmp1 <- df %>% mutate(training_data = map(splits, ~analysis(.x)))
 # identical(tmp, tmp1)
-
+save.image("~/cluster_scratch/reverse_modelling/reverse_serverinput.RData")
 ```
 
 
@@ -103,6 +103,8 @@ each row corresponding to 5 fold training data and 5 fold testing data
 
 
 I desiged a deep function termed train_and_test to return a result df for each drug (15 rows for 3 matrics* 5 fold for three modeling strategy(3 columns)) 
+
+analysis is moved to server to accelerate.
 ```{r}
 #testing the function
 # data = reverse_modeling_CV %>% filter(master_cpd_id== "687954") %>% pull(cv_split) 
@@ -131,7 +133,7 @@ I desiged a deep function termed train_and_test to return a result df for each d
 # }
 
 ############## analysis is moved to server to accelerate.
-save.image("~/cluster_scratch/reverse_modelling/reverse_serverinput.RData")
+
 # res_list <- vector("list", length = 354)
 # for (i in 1:354){
 #   # i=2
@@ -144,6 +146,7 @@ now I have list with each element being the df I mentioned earlier
 Lets pull the result out so that it would be easier to check/compute the summary level statistics
 
 ```{r}
+load("~/cluster_scratch/reverse_modelling/reverse_serverinput.RData")
 load("~/cluster_scratch/reverse_modelling/reverse_modelling_res.RData")
 reverse_modeling_result <- reverse_modeling_CV %>% 
   mutate(res= res_list) %>% 
@@ -157,24 +160,32 @@ reverse_modeling_result %>%
   group_by(method) %>% 
   summarise(mean_perf= median(mean_cor_estimate))
 ```
+check which data point is actually drug pair rather than single drug
+```{r}
+drugpair_data <- ctrpv2_data %>% filter(str_detect(cpd_smiles, "\\."))
+drugpair_idlist <- drugpair_data$master_cpd_id
+
+# drugpair_data %>% filter(cpd_name %in% "BRD-M00053801") %>% pull(cpd_smiles)
+```
 
 
 now  generate the images using the result
-```{r, fig.width=3,fig.height=2.5}
+```{r, fig.width=2.5,fig.height=2}
 fig  <- reverse_modeling_result %>% 
+  filter(master_cpd_id %in% drugpair_idlist) %>% 
   ggplot(aes(x= method, y= mean_cor_estimate))+
   geom_boxplot(outlier.size = 0.3) +
   theme_classic() +
   coord_flip()+
   scale_x_discrete(labels=c("DEMETER", "CES", "CERES"))+
-  xlab("Essentiality scoring metric")+
-  ylab("Accuracy (spearman cor)")
+  # xlab("Essentiality scoring metric")+
+  ylab("Accuracy (Spearman Cor)")
 fig
 ```
 
 
 ```{r}
-ggsave(fig, filename = "fig2b.pdf",path = fig_res,width = 3,height = 2.5,units = "in")  
+ggsave(fig, filename = "fig2b.pdf",path = fig_res,width = 2.5,height = 2.5,units = "in")  
 ```
 
 
@@ -238,3 +249,7 @@ fig
 
 ggsave(fig, filename = "fig2d.pdf",path = fig_res,width = 2.5,height = 2.5,units = "in")  
 ```
+
+
+
+

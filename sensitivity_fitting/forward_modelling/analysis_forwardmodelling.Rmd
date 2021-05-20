@@ -25,7 +25,6 @@ res <- map_dfr(c(1:365), .f = function(x){
   
 })
 
-
 ```
 
 
@@ -35,34 +34,6 @@ res1 <- res %>%
   group_by(drug) %>% 
   summarise_all(.funs = median) 
 
-
-res1 %>%   
-  select(-drug)%>%   
-  pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
-  group_by(predictor) %>% 
-  summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
-```
-
-
-```{r,fig.width=3,fig.height=2}
-fig <- res1 %>%   
-  select(-drug) %>%
-  pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
-  ggplot(aes(x= predictor , y= spearman_cor ))+
-  geom_boxplot(outlier.size = 0.2)+
-  theme_classic()+
-  xlab("")+
-  ylab("Accuracy (Spearman Cor)")+
-  scale_x_discrete(labels = c("CERES", "CES", "DEMETER2","EXP"))+
-  coord_flip()
-fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.pdf",width = 3,height = 2)
-
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.tiff",width = 3,height = 2)
-```
-
-
-```{r}
 load("~/cluster_scratch/glmnet_modelling_cluster/input.RData")
 res2 <- res1 %>% 
   select(-drug) %>% 
@@ -78,8 +49,45 @@ res2 <- res1 %>%
       ungroup() %>% 
       arrange(drug) %>% 
       select(-drug)
-  )
+  ) %>% 
+  mutate(drug_pair= str_detect(cpd_smiles, "\\."))
+  
+
+# res1 %>%   
+#   select(-drug)%>%   
+#   pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
+#   group_by(predictor) %>% 
+#   summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
+
+res2 %>% filter(!drug_pair) %>% 
+  select_at(c(1:4)) %>% 
+  summary()
+
+res2 %>% arrange(desc(ces))
 ```
+
+
+```{r,fig.width=3,fig.height=2}
+fig <- res2 %>%
+  filter(!drug_pair) %>% 
+  select_at(c(1:4)) %>% 
+  pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>%
+  ggplot(aes(x= predictor , y= spearman_cor ))+
+  geom_boxplot(outlier.size = 0.2)+
+  theme_classic()+
+  xlab("")+
+  ylab("Accuracy (Spearman Cor)")+
+  scale_x_discrete(labels = c("CERES", "CES", "DEMETER2","EXP"))+
+  coord_flip()
+fig
+
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.pdf",width = 3,height = 2)
+
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.tiff",width = 3,height = 2)
+```
+
+
+
 
 
 ```{r,fig.width=2.5, fig.height=2.5}
