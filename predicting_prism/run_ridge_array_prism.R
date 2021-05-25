@@ -1,5 +1,5 @@
 # 1 load data, function and packages
-source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_fixed_glmnet.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_fixed_elasticnet.R')
 source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/estimate_performance_uniform.R')
 load("/scratch/project_2003466/prism/prism_sensitivityfitting_serverinput.RData")
 library(tidyverse, quietly = T)
