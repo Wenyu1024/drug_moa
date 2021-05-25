@@ -1,14 +1,14 @@
 #!/bin/bash -l
 #SBATCH --job-name=run_array
 #SBATCH --account=project_2003466
-#SBATCH --output=./message/output_%j.txt
-#SBATCH --error=./message/error_%j.txt
+#SBATCH --output=./message/output_%A_%a.txt
+#SBATCH --error=./message/error_%A_%a.txt
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH -p small
-#SBATCH --cpus-per-task=10      
-#SBATCH --mem-per-cpu=10000
-#SBATCH --array=1-3
+#SBATCH --cpus-per-task=5      
+#SBATCH --mem-per-cpu=20000
+#SBATCH --array=1
 
 
 # module purge
