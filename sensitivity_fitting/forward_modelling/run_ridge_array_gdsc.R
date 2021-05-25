@@ -15,22 +15,23 @@ print(job_id)
 sen_df <- gdsc_df %>% 
   slice(job_id) %>% 
   pull(sensitivity) 
+
 sen_df <- sen_df[[1]]
+typeof(sen_df)
 ces1_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = ces1,fun_name = get_fixed_glmnet)
 print("ces1 success")
 # ces2_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = ces2,fun_name = get_fixed_glmnet)
 # print("ces2 success")
-ceres_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = ceres,fun_name = get_fixed_glmnet)
-print("ceres success")
-demeter2_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = demeter2,fun_name = get_fixed_glmnet)
-print("demeter2 success")
-exp_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = exp_seq_pca,fun_name = get_fixed_glmnet)
-print("exp success")
+# ceres_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = ceres,fun_name = get_fixed_glmnet)
+# print("ceres success")
+# demeter2_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = demeter2,fun_name = get_fixed_glmnet)
+# print("demeter2 success")
+# exp_perf= estimate_performance_par_gdsc(sen_df = sen_df, predictor_df = exp_seq_pca,fun_name = get_fixed_glmnet)
+# print("exp success")
 
 file_name = paste0( '/scratch/project_2003466/forward_modelling/gdsc_spearman/drug_gdsc_' ,job_id,".RData" )
-# save(list = c('ces1_perf'), file = file_name)
 
-save(list = c('ces1_perf', "ceres_perf", "demeter2_perf","exp_perf"), file = file_name)
-# save(list = c('ces1_perf'), file = file_name)
+# save(list = c('ces1_perf', "ceres_perf", "demeter2_perf","exp_perf"), file = file_name)
+save(list = c('ces1_perf'), file = file_name)
 
 print("all success")
