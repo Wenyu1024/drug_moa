@@ -9,21 +9,24 @@ data = data.frame(FK866[, c(11:10578)])
 y = FK866$ic50
 y[is.na(y)] = mean(y, na.rm = T)
 
-cor_res = cor(y, data, use="complete.obs")
-select = which(cor_res > 0.15 | cor_res< -0.15) # focus only on the correlated genes
 
 res = mat.or.vec(20,2)
+i=1
 for(i in 1:20){
   set.seed(i)
   print(i)
   trainIndex <- createDataPartition(y, p = 0.8, list = F) # 80% training 20% testing
   train.data = data[trainIndex,]
   test.data = data[-trainIndex,]
+  cor_res = cor(y[trainIndex], train.data, use="complete.obs")
+  select = which(cor_res > 0.15 | cor_res< -0.15) # focus only on the correlated genes
+  
   
   trctrl <- trainControl(method = "cv", number = 5, verboseIter = F)
   fit1 = train(x = train.data[, select], y = y[trainIndex], method = "glmnet", trControl = trctrl, verbose = FALSE, trace = FALSE) 
   
-  fit1
+  
+  # fit1
   pred = predict(fit1, test.data[,select])
   
   res[i,1] = cor(pred, y[-trainIndex])
