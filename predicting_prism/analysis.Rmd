@@ -19,6 +19,8 @@ prism_drugs <- read_csv("~/cluster_scratch/prism/screened_drugs.csv")
 
 prism_sc_data <- read_csv("~/cluster_scratch/prism/secondary-screen-dose-response-curve-parameters.csv")
 
+
+
 sc_druglist <- unique(prism_sc_data$broad_id)
 prism_drugs <- prism_drugs %>% 
   mutate(phase= case_when(
@@ -41,8 +43,7 @@ Non-Cancer drugs is poorly studied
 even it is approved drugs
 
 (think of a better way of visualization to emphasize your point)
-```{r}
-
+```{r,fig.height=3, fig.width=6}
 tmp <- inner_join(
   x = prism_drugs %>% 
     filter(phase==2) %>% 
@@ -59,13 +60,22 @@ tmp <- inner_join(
     mutate(NA_proportion= NA_count/all_count)
 
 
-tmp %>% 
+
+
+fig <- tmp %>% 
   select(-3,-5) %>% 
   pivot_longer(cols= -drug_category, names_to = "type", values_to= "count" ) %>% 
-  ggplot(aes(x=drug_category, y=(count), fill=type)) +
+  ggplot(aes(x=factor(drug_category, level = c('chemo', 'targeted cancer', 'noncancer')), y=log2(count), fill=type)) +
   # geom_col(position = "fill")
-  geom_bar(stat="identity")+
-  theme_minimal()
+  geom_bar(stat="identity",position = position_dodge())+
+  scale_fill_manual(values = c("red", "blue"),labels = c("Target annotated", "Target not annotated"))+
+  theme_classic()+
+  xlab("Drug Category")
+```
+
+
+```{r,fig.height=3, fig.width=6}
+fig
 ```
 check specifically how many drug target pairs available for different target
 ```{r}
@@ -79,13 +89,20 @@ tmp <-  prism_sc_data %>%
     phase %in%  c("Phase 1",  "Phase 1/Phase 2",  "Phase 2", "Phase 2/Phase 3", "Phase 3") ~  "In trail",
     TRUE ~ phase
   )) %>% 
+  filter(phase!="Withdrawn") %>% 
   mutate(target_annotated=is.na(target)) %>% 
   select(-phase) %>% 
   group_by(drug_phase, drug_category) %>% 
   summarize(na_count= sum(target_annotated),
             total_count= n()) %>% 
   drop_na() %>% 
-  mutate(na_percentage= na_count/ total_count)
+  mutate(na_percentage= na_count/ total_count) %>% 
+  mutate(drug_category= fct_relevel(drug_category, levels= c("targeted cancer", "chemo", "noncancer") )) %>% 
+  mutate(drug_phase= fct_relevel(drug_phase, levels= c("Preclinical", "In trail", "Launched") )) %>% 
+  arrange(drug_category, drug_phase) %>% 
+  mutate(na_percentage=scales::percent(na_percentage)) %>% 
+  select(drug_category, drug_phase,total_count,na_count,  na_percentage)
+
 
 ```
 
@@ -99,7 +116,7 @@ ces1_478 <- read_csv("~/cluster_scratch/impute_ess_20q4/ces1_478.csv")
 #   mutate(broad_ID= prism)
 
 # 312 cells available!
-cell_overlap <- intersect(ces1_478$DepMap_ID, unique(prism_sc_data$depmap_id))
+# cell_overlap <- intersect(ces1_478$DepMap_ID, unique(prism_sc_data$depmap_id))
 ```
 
 
@@ -108,4 +125,251 @@ First prepare data to generate drug essentiality signatures.
 a 
 Then use the existing target information to check cv accuracy
 In the end predict target for the drugs without target annotation.
+
+```{r}
+sensitivity <- prism_sc_data %>% select(broad_id:ic50)
+prism_data <- prism_drugs %>% 
+  filter(broad_id %in% sc_druglist) %>% 
+  nest_join(sensitivity,by= "broad_id") 
+
+prism_data <- prism_data %>% 
+  mutate(obs_num_auc= map_int(
+    .x = sensitivity,
+    .f= function(x){
+      x %>% 
+        select(depmap_id, auc) %>% 
+        drop_na() %>% 
+        select(depmap_id) %>%
+        distinct() %>% 
+        filter(depmap_id %in% ces1_478$DepMap_ID) %>%
+        nrow()
+        })) %>%
+  mutate(obs_num_ic50= map_int(
+    .x = sensitivity,
+    .f= function(x){
+      x %>% 
+        select(depmap_id, ic50) %>% 
+        drop_na() %>% 
+        select(depmap_id) %>%
+        distinct() %>% 
+        filter(depmap_id %in% ces1_478$DepMap_ID) %>%
+        nrow()
+        })) 
+  # filter(obs_num >250)
+  
+  
+
+# save(list = c("prism_data", "ces1_478"), file = "~/cluster_scratch/prism/prism_sensitivityfitting_serverinput.RData")  
+```
+
+
+
+lets check the accuracy
+```{r}
+res <- map_dfr(c(1:1284), .f = function(x){
+  
+    drug <- paste("~/cluster_scratch/forward_modelling/prism_spearman/drug_prism_", x, ".RData", sep = "")
+  load(drug)
+  df <- bind_cols( ces= ces1_perf, drug= x)
+  
+})
+```
+
+
+check the failed jobs and generate a list to rerun
+```{r}
+# tmp <- str_subset(string = list.files(path = "/home/cloud-user/cluster_scratch/forward_modelling/prism_spearman"),pattern = "feature" )
+# tmp  <- str_split(tmp,pattern = "drug_prism_featureimp",n = 2,simplify = T) 
+# tmp <-  str_split(tmp[,2],pattern = ".RData",n = 2,simplify = T) 
+# error_idx <- setdiff(x= 1:1284, y = as.integer(tmp[,1]))
+# write(error_idx, file = "test_write.txt")
+```
+
+
+```{r}
+res1 <- res %>% 
+  group_by(drug) %>% 
+  summarise_all(.funs = median) 
+load( file = "~/cluster_scratch/prism/prism_sensitivityfitting_serverinput.RData")  
+load("~/cluster_scratch/glmnet_modelling_cluster/input.RData")
+res2 <- res1 %>% 
+  select(-drug) %>% 
+  bind_cols(prism_data) %>% 
+  mutate(sample_size= map_int(.x=sensitivity, 
+                              .f=function(x){sum(x %>% pull(depmap_id) %in% ces1_478$DepMap_ID)})) %>%
+  select(-target, -sensitivity) %>% 
+  bind_cols(
+    res %>% 
+      select(ces,drug) %>%
+      group_by(drug) %>% 
+      summarize(ces_variance= var(ces)) %>% 
+      ungroup() %>% 
+      arrange(drug) %>% 
+      select(-drug)
+  ) 
+  
+
+# res1 %>%   
+#   select(-drug)%>%   
+#   pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
+#   group_by(predictor) %>% 
+#   summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
+
+summary(res2$ces)
+
+res2 %>% arrange(desc(ces))
+```
+
+
+
+```{r,fig.width=2.5, fig.height=2.5}
+res2 %>%
+  ggplot(aes(x=obs_num,y= ces)) +
+  geom_point(size=0.5)+
+  theme_classic()+
+  xlab("Sample Size")+
+  ylab("Median Accuracy")
+
+res2 %>% 
+  ggplot(aes(x=obs_num,y= ces_variance)) +
+  geom_point(size=0.5)+
+  theme_classic()+
+  xlab("Sample Size")+
+  ylab("Accuracy Variance")
+```
+
+
+```{r,fig.width=4, fig.height=2.5}
+res2 %>% 
+  ggplot(aes(x=drug_category,y= ces)) +
+  geom_boxplot()+
+  theme_classic()+
+  coord_flip()+
+  xlab("Sample Size")+
+  ylab("Accuracy Variance")
+  
+```
+
+Lets try to predict targets for a small group of non-cancer drugs where
+1) sensitivity was well fitted
+2) lacking target information
+
+
+EGFR inhibitor, VEGFR inhibitor
+
+target
+EGFR, EPHB4, ERBB2, FLT4, KDR
+```{r}
+xl647 <- prism_data %>% filter(broad_id == 'BRD-K03765900-001-01-9') %>% 
+  pull(sensitivity) 
+
+xl647 <- xl647[[1]] 
+
+
+xl647 <- xl647 %>% 
+  inner_join(ces1_478, by=c('depmap_id'= 'DepMap_ID' )) %>% 
+  group_by(depmap_id) %>% 
+  distinct()
+
+cor_auc_ess <- xl647 %>% 
+  select_at(c(1,8, 11:10578) ) %>% 
+  pivot_longer(cols= 3:10570,names_to= 'genes', values_to= 'ces')
+
+cor_auc_ess_res <- cor_auc_ess %>% 
+  group_by(genes) %>% 
+  summarize(cor= cor(auc, ces))
+```
+
+	
+FK-866 NAMPT niacinamide phosphoribosyltransferase inhibitor
+BRD-K58550667-001-08-7
+```{r}
+FK866 <- prism_data %>% filter(broad_id == 'BRD-K58550667-001-08-7') %>% 
+  pull(sensitivity) 
+
+FK866 <- FK866[[1]] 
+
+
+FK866 <- FK866 %>% 
+  inner_join(ces1_478, by=c('depmap_id'= 'DepMap_ID' )) %>% 
+  group_by(depmap_id) %>% 
+  distinct()
+
+colnames(FK866)[1:20]
+cor_auc_ess <- FK866 %>% 
+  select_at(c(1,10, 11:10578) ) %>% 
+  pivot_longer(cols= 3:10570,names_to= 'genes', values_to= 'ces')
+
+cor_auc_ess_res <- cor_auc_ess %>% 
+  drop_na() %>% 
+  group_by(genes) %>% 
+  summarize(cor= cor(ic50, ces))
+
+cor_auc_ess_res %>% filter(genes== 'NAMPT')
+hist(FK866$auc)
+hist(FK866$NAMPT)
+
+save(FK866, file = "FK866.RData")
+```
+
+
+check Jing's prediction code
+```{r}
+
+load("FK866.RData")
+FK866 = FK866[which(duplicated(FK866$ccle_name)==F),] # remove duplicate
+
+data = data.frame(FK866[, c(11:10578)])
+y = FK866$ic50
+y[is.na(y)] = mean(y, na.rm = T)
+
+cor_res = cor(y, data, use="complete.obs")
+select = which(cor_res > 0.15 | cor_res< -0.15) # focus only on the correlated genes
+
+res = mat.or.vec(20,2)
+
+i=1 
+```
+
+```{r}
+library(caret)
+# for(i in 1:20){
+  set.seed(i)
+  print(i)
+  trainIndex <- createDataPartition(y, p = 0.8, list = F) # 80% training 20% testing
+  train.data = data[trainIndex,]
+  test.data = data[-trainIndex,]
+  
+  trctrl <- trainControl(method = "cv", number = 5, verboseIter = F)
+  fit1 = train(x = train.data[, select], y = y[trainIndex], method = "glmnet", trControl = trctrl, verbose = FALSE, trace = FALSE) 
+  
+  fit1
+  pred = predict(fit1, test.data[,select])
+  
+  res[i,1] = cor(pred, y[-trainIndex])
+  # mean(abs(pred-y[-trainIndex]))
+  # plot(pred, y[-trainIndex])
+  
+  # fit2 = train(x = train.data[, select], y = y[trainIndex], method = "avNNet", trControl = trctrl, verbose = FALSE, trace = FALSE) 
+  fit2 = train(x = train.data[, select], y = y[trainIndex], method = "glmnet", trControl = trctrl, verbose = FALSE, trace = FALSE, tuneGrid = expand.grid(alpha = 0, lambda = seq(0,1,0.1))) 
+  fit2
+  pred2 = predict(fit2, test.data[,select])
+  
+  res[i,2] = cor(pred2, y[-trainIndex])
+  # mean(abs(pred2 - y[-trainIndex]))
+  # plot(pred2, y[-trainIndex])
+  
+  
+  # fit3 = train(x = train.data[, select], y = y[trainIndex], method = "avNNet", trControl = trctrl, verbose = FALSE, trace = FALSE) 
+  # fit3
+  # pred3 = predict(fit3, test.data[,select])
+  # 
+  # res[i,3] = cor(pred3, y[-trainIndex])
+  # mean(abs(pred3 - y[-trainIndex]))
+  # plot(pred3, y[-trainIndex])
+}
+
+colnames(res) = c("glmnet","ridge")
+res
+```
 

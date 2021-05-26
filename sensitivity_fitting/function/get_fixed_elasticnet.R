@@ -9,6 +9,8 @@ glm_model <- linear_reg(penalty = tune(), mixture =tune()) %>%
   set_engine("glmnet") %>% 
   set_mode("regression")
 
+
+
 glm_param <- parameters(
   penalty(range = c(-4,0), trans = log10_trans()),
                         mixture(range = c(0,1))
@@ -16,11 +18,17 @@ glm_param <- parameters(
 
 glm_grid <- grid_latin_hypercube(glm_param,size = 20)
 
+# training_data= FK866 %>% select_at(10:10578) %>% slice(1:200) %>% rename(y=ic50)
 get_fixed_glmnet <- function(training_data,training_vfold,par= F){
+  cor_res = cor(x = training_data$y, y = training_data %>% select(-y), use="complete.obs")
+  predictors_selected = colnames(cor_res)[which(abs(cor_res)  > quantile(abs(cor_res),0.9)) ]
+  
   glm_recipe <- recipe( training_data  ) %>%
-    update_role(everything()) %>%
+    # update_role(everything()) %>%
+    update_role(all_of(predictors_selected), new_role = "predictor") %>%
     update_role(y, new_role = "outcome") %>% 
     step_normalize(all_predictors())
+    
   
   glm_wflow <- workflow( ) %>% 
     add_model(glm_model) %>% 

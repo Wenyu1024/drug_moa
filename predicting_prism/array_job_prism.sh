@@ -6,9 +6,9 @@
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH -p small
-#SBATCH --cpus-per-task=5      
+#SBATCH --cpus-per-task=15  
 #SBATCH --mem-per-cpu=20000
-#SBATCH --array=1
+#SBATCH --array=1-10
 
 
 # module purge
