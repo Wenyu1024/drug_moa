@@ -1,5 +1,5 @@
 source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_fixed_glmnet.R')
-source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/estimate_performance.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/estimate_performance_uniform.R')
 load("/scratch/project_2003466/glmnet_modelling_cluster/input.RData")
 library(tidyverse, quietly = T)
 library(furrr, quietly = T)
@@ -14,6 +14,15 @@ sen_df <- data %>%
   slice(job_id) %>% 
   pull(sensitivity) 
 sen_df <- sen_df[[1]]
+
+sen_df <- sen_df  %>% 
+  as_tibble() %>% 
+  inner_join( 
+    y= clean_names(predictor_df)%>% 
+      rename_at(vars(!contains("dep_map_id")), .fun= ~paste0(., "_predictors")), 
+    by= c("DepMap_ID"="dep_map_id")) %>% 
+  select(-master_ccl_id, -apparent_ec50_umol, -DepMap_ID) %>% 
+  rename(y= area_under_curve)
 
 ces1_perf= estimate_performance_par(sen_df = sen_df, predictor_df = ces1,fun_name = get_fixed_glmnet)
 print("ces1 success")

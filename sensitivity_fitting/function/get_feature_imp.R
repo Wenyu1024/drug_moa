@@ -20,7 +20,7 @@ get_feature_imp <- function(sen_df, predictor_df){
         rename_at(vars(!contains("dep_map_id")), .fun= ~paste0(., "_predictors")), 
       by= c("DepMap_ID"="dep_map_id")) %>% 
     select(-master_ccl_id, -apparent_ec50_umol, -DepMap_ID) 
-  
+  set.seed(0000)
   df1 <-  df %>% vfold_cv(v = 5,repeats = 3)
   
   glm_wflow_final_fit = get_fixed_glmnet(

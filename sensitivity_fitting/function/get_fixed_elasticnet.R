@@ -13,14 +13,19 @@ glm_model <- linear_reg(penalty = tune(), mixture =tune()) %>%
 
 glm_param <- parameters(
   penalty(range = c(-4,0), trans = log10_trans()),
-                        mixture(range = c(0,1))
+  mixture(range = c(0,1))
                         )
 
 glm_grid <- grid_latin_hypercube(glm_param,size = 20)
 
 # training_data= FK866 %>% select_at(10:10578) %>% slice(1:200) %>% rename(y=ic50)
 get_fixed_glmnet <- function(training_data,training_vfold,par= F){
-  cor_res = cor(x = training_data$y, y = training_data %>% select(-y), use="complete.obs")
+  cor_res = cor(
+    x = training_data$y, 
+    y = training_data %>% select(-y), 
+    use="complete.obs"
+    )
+  
   predictors_selected = colnames(cor_res)[which(abs(cor_res)  > quantile(abs(cor_res),0.9)) ]
   
   glm_recipe <- recipe( training_data  ) %>%
