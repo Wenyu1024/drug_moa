@@ -13,6 +13,7 @@
 
 estimate_performance_par <- function(df, fun_name){
   # .libPaths(c("/projappl/project_2003466/project_rpackages", .libPaths()))
+  set.seed(0000)
   library(tidyverse, quietly = T)
   library(tidymodels, quietly = T)
   library(furrr, quietly = T)
