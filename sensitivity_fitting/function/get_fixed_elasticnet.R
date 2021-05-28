@@ -5,17 +5,22 @@ library(tidyverse,quietly = T)
 library(tidymodels,quietly = T)
 options(expressions = 5e5)
 
-glm_model <- linear_reg(penalty = tune(), mixture =tune()) %>% 
+# glm_model <- linear_reg(penalty = tune(), mixture =tune()) %>% 
+#   set_engine("glmnet") %>% 
+#   set_mode("regression")
+# 
+# glm_param <- parameters(
+#   penalty(range = c(-4,0), trans = log10_trans()),
+#   mixture(range = c(0,1))
+#                         )
+
+glm_model <- linear_reg(penalty = tune(), mixture =0) %>% 
   set_engine("glmnet") %>% 
   set_mode("regression")
 
-
-
-glm_param <- parameters(
-  penalty(range = c(-4,0), trans = log10_trans()),
-  mixture(range = c(0,1))
-                        )
-
+glm_param <- parameters(penalty(range = c(-4,0), 
+                                trans = log10_trans()))
+set.seed(0000)
 glm_grid <- grid_latin_hypercube(glm_param,size = 20)
 
 # training_data= FK866 %>% select_at(10:10578) %>% slice(1:200) %>% rename(y=ic50)
