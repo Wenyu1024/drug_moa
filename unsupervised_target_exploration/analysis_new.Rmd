@@ -16,10 +16,13 @@ library(tidymodels)
 ```{r}
 feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces1.csv")
 
+kegg_tibble <- read_csv("~/cluster_scratch/prior/kegg_tibble.csv")
 
 load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
-source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
-source('~/cluster_wrk/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
+
+source('~/cluster_wrk/drug_moa/unsupervised_target_exploration/get_target_matrix_from_long_target_tibble.R')
+source('~/cluster_wrk/drug_moa/unsupervised_target_exploration/annotate_feature_matrix.R')
+
 target_tibble_drugbank= ctrp_target_tibble %>%
   ungroup() %>%
   select(broad_cpd_id, gene_symbol_of_protein_target) %>%
@@ -42,6 +45,14 @@ target_tibble_dtc <- ctrp_target_dtc %>%
 # length(unique(target_tibble$drug))
 ```
 
+
+
+
+
+
+
+
+Plotting feature_imp vs dtc target binding plot
 use dtc target as a base to join drugbank and feature importance
 ```{r}
 res <- target_tibble_dtc %>% 
@@ -58,8 +69,81 @@ res <- target_tibble_dtc %>%
 
 ```{r}
 res %>% 
-  # filter(feature_imp!=0) %>% 
-  ggplot(aes(y= log10((feature_imp)), x=binding_score)) + 
-  geom_point(aes(shape= factor(drug_bank_target)),size= 0.01)
+  # filter(drug_bank_target ==1) %>% 
+  ggplot(aes(y= log10(abs(feature_imp)), x=binding_score)) + 
+  geom_point(aes(shape= factor(drug_bank_target)),size= 0.01)+
+  theme_classic()
+```
+
+
+
+
+
+```{r}
+load("~/cluster_scratch/ctrp/ctrpv2_data.RData")
+load("~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_go.RData")
+feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces1.csv")
+
+pathways_df <- 
+  tibble(
+    broad_cpd_id=feature_imp_ridge_ctrp_ces1$broad_cpd_id,res_pathway) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = ctrpv2_data %>% select_at(1:5),
+             by= "broad_cpd_id")
+  
+doxorubicin <- pathways_df %>% filter(cpd_name=="doxorubicin") #topoisomerase II
+# Trametinib <- pathways_df %>% filter(cpd_name=="trametinib")
+dinaciclib <- pathways_df %>% filter(cpd_name=="dinaciclib")
+alvocidib <- pathways_df %>% filter(cpd_name=="alvocidib")
+
+# check which pathway are enriched in a category of drug
+# tmp <- pathways_df %>% 
+#   filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") %>%
+#   group_by(pathway) %>% 
+#   summarise(mean_p =mean(padj))
+
+tmp <- pathways_df %>% 
+  filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") %>%
+  # filter(broad_cpd_id == "BRD-K64800655") %>% 
+  filter(pathway== "GOCC_CHROMOSOME_CENTROMERIC_REGION")
+
+
+# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4156313/
+tmp <- res2 %>% 
+  filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") 
+
+
+
+top_5drugs <- pathways_df %>% select(broad_cpd_id) %>% distinct() %>% slice(1:5)
+
+tmp  <- pathways_df %>% 
+  filter(broad_cpd_id %in% top_5drugs$broad_cpd_id) 
+  
+```
+
+```{r}
+ces1_glm_feature_annotated <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_ces1%>%
+      rename(drug= broad_cpd_id),
+    target=  target_tibble_drugbank
+    )
+```
+
+```{r}
+ces1_glm_feature_annotated %>% 
+  # filter(imp!=0) %>% 
+  ggplot(aes(x= target_cat, y= -log10(abs(imp)))) +
+  geom_violin(outlier.size = 0.01)+
+  theme_classic()+
+    theme_classic()+
+  xlab("Gene type")+
+  ylab("Feature importance -log10")+
+  labs(fill= "Essentiality") +
+  scale_x_discrete(breaks=c("0","1","2","3","4"),
+        labels=c("Nomial target", "1st neighbour", "2nd neigbour", "3rd neighbour", "Others"))
+
 ```
 

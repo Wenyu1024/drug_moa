@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 use network long table, target long table and feature long table to generate a full long table with at least 5 columns
 
 
-Now I am deriving the feature importance matrix for all four types of data to see how it performs (the job was run using run_glm_cluster.R and glmfit_onenode.sh in the glmnet_modelling_cluster module)
+Now I derive the ces based feature importance vector to see 
 
 ```{r}
 kegg_tibble <- read_csv("~/cluster_scratch/prior/kegg_tibble.csv")
@@ -25,39 +25,7 @@ target_tibble <- ctrp_target_tibble %>%
   mutate(binding_score= 1)
 
 
-ces1_glm_feature_annotated <- 
-  annotate_feature_matrix(
-    network = kegg_tibble,
-    feature_imp_mat = feature_imp_glmnet_ctrp_ces1%>% 
-      rename(drug= broad_cpd_id),
-    target=  target_tibble
-    )
-
-ces2_glm_feature_annotated <- 
-  annotate_feature_matrix(
-    network = kegg_tibble,
-    feature_imp_mat = feature_imp_glmnet_ctrp_ces2%>% 
-      rename(drug= broad_cpd_id),
-    target=  target_tibble
-    )
-  
-ceres_glm_feature_annotated <- 
-    annotate_feature_matrix(
-    network = kegg_tibble,
-    feature_imp_mat = feature_imp_glmnet_ctrp_ceres %>% 
-      rename(drug= broad_cpd_id),
-    target=  target_tibble
-    )
-
-demeter_glm_feature_annotated <- 
-    annotate_feature_matrix(
-    network = kegg_tibble,
-    feature_imp_mat = feature_imp_glmnet_ctrp_demeter2 %>% 
-      rename(drug= broad_cpd_id),
-    target=  target_tibble
-    )
-
-save(list = c("ces1_glm_feature_annotated","ces2_glm_feature_annotated","ceres_glm_feature_annotated","demeter_glm_feature_annotated"),
+save(ces1_glm_feature_annotated,
      file = "~/cluster_scratch/glmnet_modelling/drugbank_annotated_feature_importance.RData"
      )
 ```
@@ -68,7 +36,8 @@ load("~/cluster_scratch/glmnet_modelling/drugbank_annotated_feature_importance.R
 
 drugbank_annotated_feature_importance <- 
   ces1_glm_feature_annotated %>% 
-  mutate(ess= "ces1") %>% 
+  mutate(ess= "ces1") 
+%>% 
   bind_rows(ces2_glm_feature_annotated %>% mutate(ess= "ces2")) %>% 
   bind_rows(ceres_glm_feature_annotated %>% mutate(ess= "ceres")) %>%   
   bind_rows(demeter_glm_feature_annotated %>% mutate(ess= "demeter")) 
@@ -148,7 +117,7 @@ tmp <- drugbank_annotated_feature_importance %>%
 # or maybe tailer a threshold?
 
 
-#How many target has been identified by the postive feature importance?
+#How many target has been identified by the positive feature importance?
 tmp <- drugbank_annotated_feature_importance %>% 
   # filter(target_cat==0) %>% 
   filter(imp > 0) %>%
@@ -368,41 +337,11 @@ overlapping_gene <- intersect(consensus_signature_shRNA$X1,
 
 ```
 
-show the drug perturbation at Pathway level:
-CES1 based features provided a way to establish a pathway perturbation score,
 
-Where we can map a bulk-level drug perturbation effect to perturbation of specific pathways.
 
-http://www.gsea-msigdb.org/gsea/downloads.jsp 
+
  
-```{r}
-library(fgsea)
-pathways <- gmtPathways("/home/cloud-user/cluster_scratch/prior/c5.go.v7.4.symbols.gmt")
 
-res_pathway <- vector(length = 365, mode = "list")
-for (i in 1:365){
-  rank <- unlist(feature_imp_ridge_ctrp_ces1[i,-1])
-  fgseaRes <- fgsea(pathways, rank, minSize=15, maxSize=500)
-  res_pathway[[i]] <- fgseaRes
-  print(i)
-}
-
-save(res_pathway,file =  "~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_go.RData")
-```
-
-```{r}
-pathways <- gmtPathways("/home/cloud-user/cluster_scratch/prior/c2.cp.kegg.v7.4.symbols.gmt")
-
-res_pathway <- vector(length = 365, mode = "list")
-
-for (i in 1:365){
-  rank <- unlist(feature_imp_ridge_ctrp_ces1[i,-1])
-  fgseaRes <- fgsea(pathways, rank, minSize=15, maxSize=500)
-  res_pathway[[i]] <- fgseaRes
-  print(i)
-}
-save(res_pathway,file =  "~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_kegg.RData")
-```
 
 
 

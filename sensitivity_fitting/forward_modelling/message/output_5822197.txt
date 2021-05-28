@@ -1,0 +1,25 @@
+[1] "start"
+[1] 29
+[1] "ces1 success"
+[1] "ces2 success"
+[1] "ceres success"
+[1] "demeter2 success"
+[1] "exp success"
+[1] "all success"
+Job ID: 5822197
+Array Job ID: 5820805_29
+Cluster: puhti
+User/Group: wangweny/wangweny
+State: RUNNING
+Nodes: 1
+Cores per node: 5
+CPU Utilized: 01:47:54
+CPU Efficiency: 71.81% of 02:30:15 core-walltime
+Job Wall-clock time: 00:30:03
+Memory Utilized: 198.01 GB
+Memory Efficiency: 81.11% of 244.14 GB
+Job consumed 14.73 CSC billing units based on following used resources
+Billed project: project_2003466
+CPU BU: 2.50
+Mem BU: 12.23
+WARNING: Efficiency statistics may be misleading for RUNNING jobs.

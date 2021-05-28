@@ -128,6 +128,7 @@ extended_cor <- feature_extended_finger_print %>%
 
 maccs_cor <- feature_maccs_finger_print %>% 
   pivot_longer(cols = -broad_cpd_id,names_to= "name", values_to= "value") %>% 
+  arrange(broad_cpd_id) %>% 
   pivot_wider(id_cols = name, names_from= broad_cpd_id,  values_from= value) %>% 
   select(-name) %>% 
   as.matrix() %>% 
@@ -996,5 +997,81 @@ drug category, Does perturbation data favor certain kind of drug comparing to ch
 
 Continues binding score and prediction scatter plot.
 
+
+## 7)
+
+Exploring whether similiarity matrix calculated on the ess signature is a better representation of drug target based similiarity matrix
+```{r}
+load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
+
+source('~/cluster_wrk/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
+
+target_tibble_drugbank= ctrp_target_tibble %>%
+  ungroup() %>%
+  select(broad_cpd_id, gene_symbol_of_protein_target) %>%
+  rename(drug=broad_cpd_id, target_gene=gene_symbol_of_protein_target) %>% 
+  mutate(binding_score= 1)
+
+target_tibble_dtc <- ctrp_target_dtc %>% 
+  select(standard_inchi_key, gene_name, interaction_strength) %>%
+  filter(interaction_strength!= 0) %>% 
+  drop_na() %>% 
+  group_by(standard_inchi_key, gene_name) %>% 
+  summarize(interaction_strength= median(interaction_strength,na.rm = T)) %>% 
+  ungroup() %>% 
+  inner_join(ctrpv2_list_to_zia,by= c("standard_inchi_key"= "InChIKey")) %>% 
+  select(broad_cpd_id, gene_name, interaction_strength) %>% 
+  group_by(broad_cpd_id, gene_name) %>% 
+  summarize(interaction_strength= max(interaction_strength,na.rm = T)) %>% 
+  ungroup() %>%   rename(drug=broad_cpd_id, target_gene=gene_name, binding_score= interaction_strength) %>% 
+  filter(binding_score>0.4) %>% 
+    mutate(binding_score= 1)
+
+target_mat_ctrp <- get_target_mat(target_tibble_drugbank)
+
+target_mat_dtc <- get_target_mat(target_tibble_dtc)
+```
+
+```{r}
+target_drugbank_cor <- t(target_mat_ctrp) %>% 
+  prabclus::jaccard()
+
+consensusexp_cor <- t(drug_consensus %>% filter(X1 %in% colnames(ces1_cor 
+get_long_tibble_from_mat <- function(mat){
+  tmp <- as_tibble(mat) %>% 
+  mutate(drug1= colnames(mat)) %>% 
+  pivot_longer(cols = - drug1,names_to= 'drug2', values_to='similiarity') %>% 
+    distinct()
+  return(tmp)
+}
+
+
+
+
+
+res <- get_long_tibble_from_mat(target_drugbank_cor) %>%
+  rename(targetdrugbank_similiarity= similiarity) %>% 
+  inner_join(get_long_tibble_from_mat(maccs_cor) %>% 
+               rename(maccs_similiarity= similiarity)) %>% 
+  inner_join(get_long_tibble_from_mat(ces1_cor) %>% 
+                rename(ces1_similiarity= similiarity)) 
+
+  # inner_join(get_long_tibble_from_mat(ces1_cor))   
+
+
+cor(res$targetdrugbank_similiarity, res$maccs_similiarity,method = "spearman") #0.26
+
+cor(res$targetdrugbank_similiarity, res$ces1_similiarity,method = "spearman")
+#-0.48
+
+res %>% 
+  ggplot(mapping = aes(y= targetdrugbank_similiarity, x= maccs_similiarity)) +
+  geom_point(size=0.1)
+
+
+res %>% 
+  ggplot(mapping = aes(y= targetdrugbank_similiarity, x= ces1_similiarity)) +
+  geom_point(size=0.1)
+```
 
 

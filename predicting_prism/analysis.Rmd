@@ -37,7 +37,7 @@ prism_drugs <- prism_drugs %>%
   left_join(repurposinghub_drug) 
   
 ```
-Annotations proporations
+Annotations proportions
 
 Non-Cancer drugs is poorly studied 
 even it is approved drugs
@@ -166,9 +166,11 @@ prism_data <- prism_data %>%
 
 lets check the accuracy
 ```{r}
-res <- map_dfr(c(1:1284), .f = function(x){
+load( file = "~/cluster_scratch/prism/prism_sensitivityfitting_serverinput.RData")  
+# load("~/cluster_scratch/glmnet_modelling_cluster/input.RData")
+res <- map_dfr(c(1:1453), .f = function(x){
   
-    drug <- paste("~/cluster_scratch/forward_modelling/prism_spearman/drug_prism_", x, ".RData", sep = "")
+    drug <- paste("~/cluster_scratch/forward_modelling/prism_auc_spearman_nofiltering/drug_", x, ".RData", sep = "")
   load(drug)
   df <- bind_cols( ces= ces1_perf, drug= x)
   
@@ -178,10 +180,10 @@ res <- map_dfr(c(1:1284), .f = function(x){
 
 check the failed jobs and generate a list to rerun
 ```{r}
-# tmp <- str_subset(string = list.files(path = "/home/cloud-user/cluster_scratch/forward_modelling/prism_spearman"),pattern = "feature" )
-# tmp  <- str_split(tmp,pattern = "drug_prism_featureimp",n = 2,simplify = T) 
-# tmp <-  str_split(tmp[,2],pattern = ".RData",n = 2,simplify = T) 
-# error_idx <- setdiff(x= 1:1284, y = as.integer(tmp[,1]))
+# tmp <- str_subset(string = list.files(path =  "/home/cloud-user/cluster_scratch/forward_modelling/prism_auc_spearman_filtering/"),pattern = "drug_" )
+# tmp  <- str_split(tmp,pattern = "_",n = 2,simplify = T)
+# tmp <-  str_split(tmp[,2],pattern = ".RData",n = 2,simplify = T)
+# error_idx <- setdiff(x= 1:1453, y = as.integer(tmp[,1]))
 # write(error_idx, file = "test_write.txt")
 ```
 
@@ -190,8 +192,7 @@ check the failed jobs and generate a list to rerun
 res1 <- res %>% 
   group_by(drug) %>% 
   summarise_all(.funs = median) 
-load( file = "~/cluster_scratch/prism/prism_sensitivityfitting_serverinput.RData")  
-load("~/cluster_scratch/glmnet_modelling_cluster/input.RData")
+
 res2 <- res1 %>% 
   select(-drug) %>% 
   bind_cols(prism_data) %>% 
@@ -224,14 +225,14 @@ res2 %>% arrange(desc(ces))
 
 ```{r,fig.width=2.5, fig.height=2.5}
 res2 %>%
-  ggplot(aes(x=obs_num,y= ces)) +
+  ggplot(aes(x=obs_num_auc,y= ces)) +
   geom_point(size=0.5)+
   theme_classic()+
   xlab("Sample Size")+
   ylab("Median Accuracy")
 
 res2 %>% 
-  ggplot(aes(x=obs_num,y= ces_variance)) +
+  ggplot(aes(x=obs_num_auc,y= ces_variance)) +
   geom_point(size=0.5)+
   theme_classic()+
   xlab("Sample Size")+
@@ -246,7 +247,7 @@ res2 %>%
   theme_classic()+
   coord_flip()+
   xlab("Sample Size")+
-  ylab("Accuracy Variance")
+  ylab("Accuracy")
   
 ```
 
@@ -314,7 +315,7 @@ save(FK866, file = "FK866.RData")
 
 
 check Jing's prediction code
-```{r}
+```{r,eval=F}
 
 load("FK866.RData")
 FK866 = FK866[which(duplicated(FK866$ccle_name)==F),] # remove duplicate
@@ -329,9 +330,7 @@ select = which(cor_res > 0.15 | cor_res< -0.15) # focus only on the correlated g
 res = mat.or.vec(20,2)
 
 i=1 
-```
 
-```{r}
 library(caret)
 # for(i in 1:20){
   set.seed(i)
@@ -343,7 +342,7 @@ library(caret)
   trctrl <- trainControl(method = "cv", number = 5, verboseIter = F)
   fit1 = train(x = train.data[, select], y = y[trainIndex], method = "glmnet", trControl = trctrl, verbose = FALSE, trace = FALSE) 
   
-  fit1
+  # fit1
   pred = predict(fit1, test.data[,select])
   
   res[i,1] = cor(pred, y[-trainIndex])
@@ -352,7 +351,7 @@ library(caret)
   
   # fit2 = train(x = train.data[, select], y = y[trainIndex], method = "avNNet", trControl = trctrl, verbose = FALSE, trace = FALSE) 
   fit2 = train(x = train.data[, select], y = y[trainIndex], method = "glmnet", trControl = trctrl, verbose = FALSE, trace = FALSE, tuneGrid = expand.grid(alpha = 0, lambda = seq(0,1,0.1))) 
-  fit2
+  # fit2
   pred2 = predict(fit2, test.data[,select])
   
   res[i,2] = cor(pred2, y[-trainIndex])
@@ -372,4 +371,139 @@ library(caret)
 colnames(res) = c("glmnet","ridge")
 res
 ```
+
+
+```{r}
+
+df <- sen_df_ic50
+
+
+set.seed(0000)
+library(tidyverse, quietly = T)
+library(tidymodels, quietly = T)
+library(furrr, quietly = T)
+res <-  df %>% 
+  nested_cv(outside=vfold_cv(v = 5,repeats = 3), 
+            inside= vfold_cv(v = 5,repeats = 3)) %>% 
+  mutate(train_data= future_map(.x = splits, .f = training,.options = furrr_options(seed = 0000))) %>% 
+  mutate(test_data= future_map(.x = splits, .f = ~testing(.x),.options = furrr_options(seed = 0000)))
+```
+
+
+```{r}
+sen_df <- FK866  %>% 
+  # select(depmap_id,auc) %>% 
+  select(depmap_id, ic50 ) %>% 
+  as_tibble() %>% 
+  rename(y= ic50) %>%
+  drop_na() %>% 
+  group_by(depmap_id) %>% 
+  summarize(y= mean(y)) %>% 
+  ungroup() %>% 
+  inner_join( 
+    y= clean_names(ces1_478)%>% 
+      rename_at(vars(!contains("dep_map_id")), .fun= ~paste0(., "_predictors")), 
+    by= c("depmap_id"="dep_map_id")) %>% 
+  # rename(y= auc) %>% 
+  select(-depmap_id)
+
+```
+
+
+lets now check what is the prediction accuracy of filtering
+
+```{r}
+
+res_variablefiltered <- map_dfr(c(1:1453), .f = function(x){
+  
+    drug <- paste("~/cluster_scratch/forward_modelling/prism_auc_spearman_filtering/drug_", x, ".RData", sep = "")
+  load(drug)
+  df <- bind_cols( ces= ces1_perf, drug= x)
+  
+})
+```
+
+
+```{r}
+res_variablefiltered1 <- res_variablefiltered %>% 
+  group_by(drug) %>% 
+  summarise_all(.funs = median) 
+
+res_variablefiltered2 <- res_variablefiltered1 %>% 
+  select(-drug) %>% 
+  bind_cols(prism_data) %>% 
+  mutate(sample_size= map_int(.x=sensitivity, 
+                              .f=function(x){sum(x %>% pull(depmap_id) %in% ces1_478$DepMap_ID)})) %>%
+  select(-target, -sensitivity) %>% 
+  bind_cols(
+    res_variablefiltered %>% 
+      select(ces,drug) %>%
+      group_by(drug) %>% 
+      summarize(ces_variance= var(ces)) %>% 
+      ungroup() %>% 
+      arrange(drug) %>% 
+      select(-drug)
+  ) 
+  
+
+# res_variablefiltered1 %>%   
+#   select(-drug)%>%   
+#   pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
+#   group_by(predictor) %>% 
+#   summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
+
+summary(res_variablefiltered2$ces)
+
+res_variablefiltered2 %>% arrange(desc(ces))
+```
+
+
+```{r,fig.width=2.5, fig.height=2.5}
+res_variablefiltered2 %>%
+  ggplot(aes(x=obs_num_auc,y= ces)) +
+  geom_point(size=0.5)+
+  theme_classic()+
+  xlab("Sample Size")+
+  ylab("Median Accuracy")
+
+res_variablefiltered2 %>% 
+  ggplot(aes(x=obs_num_auc,y= ces_variance)) +
+  geom_point(size=0.5)+
+  theme_classic()+
+  xlab("Sample Size")+
+  ylab("Accuracy Variance")
+```
+
+
+```{r,fig.width=4, fig.height=2.5}
+res_variablefiltered2 %>% 
+  ggplot(aes(x=drug_category,y= ces)) +
+  geom_boxplot()+
+  theme_classic()+
+  coord_flip()+
+  xlab("Sample Size")+
+  ylab("Accuracy")
+  
+```
+
+
+compare
+```{r}
+res_ridge_spearman <- inner_join(
+  x = res2 %>% rename(no_filtering= ces),
+  y= res_variablefiltered2 %>% 
+    select(ces,broad_id) %>% 
+    rename(filtering=ces)
+  )
+
+t.test(res_ridge_spearman$no_filtering, res_ridge_spearman$filtering,paired = T)
+
+cor.test(res_ridge_spearman$no_filtering, res_ridge_spearman$filtering)
+
+res_ridge_spearman %>% 
+  ggplot(aes(x=no_filtering, y=filtering))+
+  geom_point()+
+  theme_classic()
+```
+
 

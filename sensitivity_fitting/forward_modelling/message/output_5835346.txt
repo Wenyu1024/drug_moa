@@ -1,0 +1,19 @@
+[1] "start"
+[1] 184
+Job ID: 5835346
+Array Job ID: 5835112_184
+Cluster: puhti
+User/Group: wangweny/wangweny
+State: RUNNING
+Nodes: 1
+Cores per node: 20
+CPU Utilized: 00:05:22
+CPU Efficiency: 25.56% of 00:21:00 core-walltime
+Job Wall-clock time: 00:01:03
+Memory Utilized: 23.78 GB
+Memory Efficiency: 121.74% of 19.53 GB
+Job consumed 0.38 CSC billing units based on following used resources
+Billed project: project_2003466
+CPU BU: 0.35
+Mem BU: 0.03
+WARNING: Efficiency statistics may be misleading for RUNNING jobs.

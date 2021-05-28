@@ -28,7 +28,6 @@ res <- map_dfr(c(1:365), .f = function(x){
 ```
 
 
-
 ```{r}
 res1 <- res %>% 
   group_by(drug) %>% 
