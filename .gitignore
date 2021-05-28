@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+predicting_prism/message/
+sensitivity_fitting/forward_modelling/message/	
+*message/
+*txt
+*RData
+*.csv
+*pdf
+*tif
+*svg
