@@ -6,7 +6,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
-#SBATCH --mem-per-cpu=20000
+#SBATCH --mem-per-cpu=30000
 
 # Load r-env-singularity
 module load r-env-singularity/4.0.2

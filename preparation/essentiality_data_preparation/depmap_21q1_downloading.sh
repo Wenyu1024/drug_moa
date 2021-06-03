@@ -1,11 +1,10 @@
 # This DepMap release contains data from CRISPR knockout screens from project Achilles, as well as genomic characterization data from the CCLE project.
 cd /home/cloud-user/cluster_scratch/depmap_21q1/
 
-# 1ceres
-# _Post-CERES_ Probability that knocking out the gene has a real depletion effect using gene_effect. - Columns: genes in the format "HUGO (Entrez)" - Rows: cell lines (Broad IDs)
-# DepMap Public 21Q1
-# wget "https://ndownloader.figshare.com/files/26261290" -P /home/cloud-user/cluster_scratch/depmap_21q1/
-# mv 26261290 ceres
+# 1ceres (Achilles_gene_effect.csv)
+# _Post-CERES_ CERES data with principle components strongly related to known batch effects removed, then shifted and scaled per cell line so the median nonessential KO effect is 0 and the median essential KO effect is -1. - Columns: genes in the format "HUGO (Entrez)" - Rows: cell lines (Broad IDs)
+# wget "https://ndownloader.figshare.com/files/26261293" -P /home/cloud-user/cluster_scratch/depmap_21q1/
+# mv 26261293 ceres
 
 
 #3 exp_seq
