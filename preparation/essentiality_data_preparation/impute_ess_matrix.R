@@ -3,9 +3,9 @@
 # data as well.
 
 
-# load("new_ess_modeling.RData")
-load("/home/cloud-user/cluster_scratch/impute_ess_20q4/ess_to_be_imputed_20q4.RData")
+
 library(tidyverse)
+setwd("/home/cloud-user/cluster_scratch/ces_io/")
 
 impute_ess_df <- 
   function(df){
@@ -22,11 +22,10 @@ set.seed(1234)
 tmp1 <- impute_ess_df(ceres)
 tmp2 <- impute_ess_df(demeter2)
 tmp3 <- impute_ess_df(ces1)
-tmp4 <- impute_ess_df(ces2)
 
-setwd("/home/cloud-user/cluster_scratch/impute_ess_20q4/")
-write_csv(tmp1, "ceres_478.csv")
-write_csv(tmp2, "demeter2_478.csv")
-write_csv(tmp3, "ces1_478.csv")
-write_csv(tmp4, "ces2_478.csv")
+
+write_csv(tmp1, "ceres_21q1_imputed.csv")
+write_csv(tmp2, "demeter2_21q1_imputed.csv")
+write_csv(tmp3, "ces1_21q1_imputed.csv")
+
 
