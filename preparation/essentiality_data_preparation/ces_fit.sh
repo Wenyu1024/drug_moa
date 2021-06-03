@@ -12,14 +12,14 @@
 module load r-env-singularity/4.0.2
 
 # Clean up .Renviron file in home directory
-if test -f ~/.Renviron; then
-    sed -i '/TMPDIR/d' ~/.Renviron
-    sed -i '/OMP_NUM_THREADS/d' ~/.Renviron
-fi
+# if test -f ~/.Renviron; then
+#     sed -i '/TMPDIR/d' ~/.Renviron
+#     sed -i '/OMP_NUM_THREADS/d' ~/.Renviron
+# fi
 
 # Specify a temp folder path
-echo "TMPDIR=/scratch/<project>" >> ~/.Renviron
+# echo "TMPDIR=/scratch/<project>" >> ~/.Renviron
 
 # Run the R script
-srun singularity_wrapper exec Rscript --no-save fit_ces.R
+srun singularity_wrapper exec Rscript --no-save fit_ces_and_impute.R
 seff $SLURM_JOBID

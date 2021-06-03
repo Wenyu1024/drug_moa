@@ -9,7 +9,7 @@ mut <- read_csv("mut")
 demeter2 <- read_csv("demeter2")
 
 # array-based mRNA expression data is quite old. 
-exp_array <- data.table::fread("/home/cloud-user/cluster_scratch/depmap_static/exp_array")
+exp_array <- data.table::fread("/scratch/project_2003466/depmap_static/exp_array")
 
 
 # setwd("/home/cloud-user/cluster_scratch/depmap_static//")
