@@ -1,16 +1,16 @@
 setwd("/scratch/project_2003466/ces_21q1_io/")
 library(tidyverse)
-# data <- read_csv("ces_input_21q1.csv")
+data <- read_csv("ces_input_21q1.csv")
 
 # install.packages("speedglm")
 #cells <- unique(data$DepMap_ID)
 #data1 <- data %>% dplyr::filter(DepMap_ID %in% cells[1:20])
 
 # ptm <- proc.time()
-# lm <- lm(ceres~ demeter2+mut+exp_seq+cn+exp_array+DepMap_ID ,data = data)
-# pred <- predict.lm(lm)
+lm <- lm(ceres~ demeter2+mut+exp_seq+cn+exp_array+DepMap_ID ,data = data)
+pred <- predict.lm(lm)
 # 
-# save.image("tmp.RData")
+save.image("tmp.RData")
 load("tmp.RData")
 # tmp = proc.time() - ptm
 # print(tmp)
@@ -45,10 +45,10 @@ impute_ess_df <-
 
 save.image("tmp1.RData")
 set.seed(1234)
-# ces1_437 <- impute_ess_df(ces1_437)
-# write_csv(ces1_437, "ces1_21q1_imputed.csv")
-# ceres_437 <- impute_ess_df(ceres_437)
-# write_csv(ceres_437, "ceres_21q1_imputed.csv")
+ces1_437 <- impute_ess_df(ces1_437)
+write_csv(ces1_437, "ces1_21q1_imputed.csv")
+ceres_437 <- impute_ess_df(ceres_437)
+write_csv(ceres_437, "ceres_21q1_imputed.csv")
 demeter2_437 <- impute_ess_df(demeter2_437)
 write_csv(demeter2_437, "demeter2_21q1_imputed.csv")
 expseq_437 <-  impute_ess_df(expseq_437)
