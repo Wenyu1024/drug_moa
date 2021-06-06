@@ -20,7 +20,8 @@ estimate_performance_par <- function(df, fun_name){
   plan(multicore)
   res <-  df %>% 
     nested_cv(outside=vfold_cv(v = 5,repeats = 3), 
-              inside= vfold_cv(v = 5,repeats = 3)) %>% 
+              # inside= vfold_cv(v = 5,repeats = 3)) %>% 
+              inside= bootstraps(times = 10)) %>% 
     mutate(train_data= future_map(.x = splits, .f = training,.options = furrr_options(seed = 0000))) %>% 
     mutate(test_data= future_map(.x = splits, .f = ~testing(.x),.options = furrr_options(seed = 0000))) %>% 
     mutate(final_fit = future_map2(
