@@ -102,10 +102,13 @@ prism_data <- prism_drugs %>%
   filter(BROAD_ID %in% sc_druglist) %>% 
   select(-screen_ids, -phase) %>%
   distinct() %>% 
+  separate_rows(target) %>%
+  group_by(BROAD_ID, name, drug_category, moa, smiles ) %>%
+  nest() %>%
+  ungroup() %>%
+  rename(target= data) %>% 
   nest_join(y=sensitivity ,by= "BROAD_ID") %>% 
   mutate(n_forward_modelling= map_int(.x=sensitivity, 
                                       .f=function(x){sum(x %>% pull(depmap_id) %in% predictor_df$DepMap_ID)}))
-
-
 
 save(prism_data, file = "prism_data.RData")
