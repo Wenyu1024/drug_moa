@@ -8,7 +8,7 @@
 #SBATCH -p small
 #SBATCH --cpus-per-task=5      
 #SBATCH --mem-per-cpu=50000
-#SBATCH --array=1-3
+#SBATCH --array=301-545
 
 
 # module purge
@@ -23,7 +23,7 @@ module load r-env-singularity/4.0.3
 # Specify a temp folder path
 #echo "TMPDIR=/scratch/project_2003466/glmnet_modelling_cluster/tmp" >> ~/.Renviron
 
-srun singularity_wrapper exec Rscript --no-save /projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/run_ridge_array.R ${SLURM_ARRAY_TASK_ID}
+srun singularity_wrapper exec Rscript --no-save /projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/run_ridge_array_ctrp.R ${SLURM_ARRAY_TASK_ID}
 seff $SLURM_JOBID
 
 
