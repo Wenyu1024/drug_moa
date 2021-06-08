@@ -47,7 +47,7 @@ rm(sensitivity)
 
 # add indicator columns
 # add columns to indicate the number of obs available for reverse and forward modelling
-predictor_df <- read_csv("~/cluster_scratch/ces_21q1_io/ces_tmp.csv")
+predictor_df <- read_csv("~/cluster_scratch/ces_21q1_io/ces1_21q1_imputed.csv")
 
 ctrpv2_data <- ctrpv2_data %>%
   mutate(drug_type= case_when(  str_detect(cpd_smiles, "\\.")~ "drug pair",
