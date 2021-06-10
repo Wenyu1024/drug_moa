@@ -11,8 +11,12 @@ job_id <- args[1]
 # print(job_id)
 # array job does not allow id over 999
 # job_id <- 1
-id_list <- scan("/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/test_write.txt")
-job_id <- id_list[job_id]
+# some of the jobs failed due to lack of memory, these failure is 
+# detected and recored in the test_write.txt,
+# I then use it to rerun analysis with larger memory setting
+# 
+# id_list <- scan("/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/test_write.txt")
+# job_id <- id_list[job_id]
 print(job_id)
 
 # 2 generate the input format of the sensitivity data for a specific drug

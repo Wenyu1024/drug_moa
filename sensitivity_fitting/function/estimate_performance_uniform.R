@@ -10,14 +10,15 @@
 
 # This function only provides a standardized frame for 
 # estimating the accuracy (5-fold 3 replicate cv, 15 estimates)
+.libPaths(c("/projappl/project_2003466/project_rpackages", .libPaths()))
+library(tidyverse, quietly = T)
+library(tidymodels, quietly = T)
+library(furrr, quietly = T)
 
 estimate_performance_par <- function(df, fun_name){
-  # .libPaths(c("/projappl/project_2003466/project_rpackages", .libPaths()))
+
   set.seed(0000)
-  library(tidyverse, quietly = T)
-  library(tidymodels, quietly = T)
-  library(furrr, quietly = T)
-  plan(multicore)
+  # plan(multicore)
   res <-  df %>% 
     nested_cv(outside=vfold_cv(v = 5,repeats = 3), 
               # inside= vfold_cv(v = 5,repeats = 3)) %>% 
@@ -43,6 +44,6 @@ estimate_performance_par <- function(df, fun_name){
             method = "spearman")},
       .options = furrr_options(seed = 0000))) %>% 
     pull(spearman_cor)
-  plan(sequential)
+  # plan(sequential)
   return(res)
 }

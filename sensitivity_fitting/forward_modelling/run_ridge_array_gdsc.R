@@ -34,6 +34,7 @@ demeter2_df <- get_df_gdsc(predictor_df = demeter2)
 exp_df <- get_df_gdsc(predictor_df = exp_seq)
 rm(ces1, ceres,demeter2, exp_seq,data, sen_drug)
 
+plan(multicore)
 ces1_perf= estimate_performance_par(df= ces1_df,fun_name = get_fixed_glmnet)
 print("ces1 success")
 rm(ces1_df)
@@ -46,6 +47,8 @@ rm(demeter2_df)
 exp_perf= estimate_performance_par(df= exp_df,fun_name = get_fixed_glmnet)
 print("exp success")
 rm(exp_df)
+plan(sequential)
+
 file_name = paste0( '/scratch/project_2003466/forward_modelling/gdsc_spearman/drug_' ,job_id,".RData" )
 # save(list = c('ces1_perf'), file = file_name)
 
