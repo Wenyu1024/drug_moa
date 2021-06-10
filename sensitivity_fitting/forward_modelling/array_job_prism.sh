@@ -7,8 +7,8 @@
 #SBATCH --ntasks=1
 #SBATCH -p small
 #SBATCH --cpus-per-task=5  
-#SBATCH --mem-per-cpu=20000
-#SBATCH --array=401-650
+#SBATCH --mem-per-cpu=40000
+#SBATCH --array=1-350
 
 
 # module purge

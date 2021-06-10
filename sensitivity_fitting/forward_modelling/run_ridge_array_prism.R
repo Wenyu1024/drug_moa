@@ -7,13 +7,13 @@ library(tidyverse, quietly = T)
 print("start")
 
 args <- as.numeric( commandArgs( TRUE ) )
-job_id <- args[1] +800
-print(job_id)
+job_id <- args[1] 
+# print(job_id)
 # array job does not allow id over 999
 # job_id <- 1
-# id_list <- scan("/projappl/project_2003466/drug_moa/predicting_prism/test_write.txt")
-# job_id <- id_list[job_id]
-# print(prism_data$name[job_id])
+id_list <- scan("/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/test_write.txt")
+job_id <- id_list[job_id]
+print(job_id)
 
 # 2 generate the input format of the sensitivity data for a specific drug
 sen_drug <- data %>% 
