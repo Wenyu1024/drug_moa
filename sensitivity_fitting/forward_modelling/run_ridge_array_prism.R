@@ -46,7 +46,7 @@ demeter2_df <- get_df_prism(predictor_df = demeter2)
 exp_df <- get_df_prism(predictor_df = exp_seq)
 rm(ces1, ceres,demeter2, exp_seq,data, sen_drug)
 
-
+plan(multicore)
 ces1_perf= estimate_performance_par(df= ces1_df,fun_name = get_fixed_glmnet)
 print("ces1 success")
 rm(ces1_df)
@@ -59,7 +59,7 @@ rm(demeter2_df)
 exp_perf= estimate_performance_par(df= exp_df,fun_name = get_fixed_glmnet)
 print("exp success")
 rm(exp_df)
-
+plan(sequential)
 
 # 4 Fix model and derive feature importance
 # return_feature_importance <- function(fit){
