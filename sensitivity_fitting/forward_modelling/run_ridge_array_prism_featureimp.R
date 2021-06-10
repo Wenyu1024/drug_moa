@@ -7,7 +7,7 @@ library(furrr, quietly = T)
 print("start")
 
 args <- as.numeric( commandArgs( TRUE ) )
-job_id <- args[1] +800
+job_id <- args[1]
 # print(job_id)
 # array job does not allow id over 999
 # job_id <- 1
