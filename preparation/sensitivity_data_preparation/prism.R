@@ -17,12 +17,14 @@ prism_drugs <- prism_drugs %>%
   unite("BROAD_ID",BROAD_ID:id, sep= "-",remove = T) %>% 
   distinct()
 
+# if there are more than one smiles, only the first smile is kept
 get_unique_smiles <- function(x){
   tmp  <- x %>% str_split(pattern = ",",simplify = F) %>% unlist()
-  y= unique(trimws(tmp))
+  y= unique(unlist(trimws(tmp)))
   # if (y == ""){y <-  NA}
-  if (length(y)>1){y <-  str_c(y,collapse = ",")}
+  # if (length(y)>1){y <-  str_c(y,collapse = ",")}
   # print(y)
+  y= y[1]
   return(y)
 }
 
@@ -47,13 +49,13 @@ prism_drugs$name[prism_drugs$BROAD_ID == "BRD-K35952844"] <- "gluceptate"
 prism_drugs$name[prism_drugs$BROAD_ID == "BRD-K97799481"] <- "theophylline"
 # prism_drugs$smiles[prism_drugs$BROAD_ID == "BRD-K97799481"] <- "Cn1c2nc[nH]c2c(=O)n(C)c1=O"
 prism_drugs$target[prism_drugs$BROAD_ID == "BRD-K97799481"] <- "ADORA1, ADORA2A, ADORA2B, ADORA3, HDAC2, PDE3A, PDE3B, PDE4A, PDE4B, PDE4C, PDE4D"
+
 # If there are multiples smiles only the first one is kept
 # prism_drugs_smiles <- prism_drugs %>% 
 #   select(smiles) %>% 
 #   separate_rows(smiles, sep= ",") %>% 
 #   mutate_all(trimws) %>% 
 #   distinct()
-
 
 sensitivity <- prism_sc_data %>% 
   select(depmap_id,auc,ec50, broad_id) %>% 
