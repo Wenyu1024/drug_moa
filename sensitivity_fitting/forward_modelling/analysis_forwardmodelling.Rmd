@@ -15,9 +15,12 @@ library(tidymodels)
 ```
 
 
+# 1 CTRP
 ```{r}
-res <- map_dfr(c(1:365), .f = function(x){
-  
+load("~/cluster_scratch/forward_modelling/ctrp_input.RData")
+ctrp_data <- data
+res_ctrp <- map_dfr(c(1:545), .f = function(x){
+
   # drug <- paste("~/cluster_scratch/forward_modelling/ctrp_pearson/", x, ".RData", sep = "")
     drug <- paste("~/cluster_scratch/forward_modelling/ctrp_spearman/drug_", x, ".RData", sep = "")
   load(drug)
@@ -25,23 +28,23 @@ res <- map_dfr(c(1:365), .f = function(x){
   
 })
 
+
 ```
 
 
 ```{r}
-res1 <- res %>% 
+res_ctrp1 <- res_ctrp %>% 
   group_by(drug) %>% 
   summarise_all(.funs = median) 
 
-load("~/cluster_scratch/glmnet_modelling_cluster/input.RData")
-res2 <- res1 %>% 
+res_ctrp2 <- res_ctrp1 %>% 
   select(-drug) %>% 
-  bind_cols(data) %>% 
+  bind_cols(ctrp_data) %>% 
   mutate(sample_size= map_int(.x=sensitivity, 
                               .f=function(x){sum(x %>% pull(DepMap_ID) %in% ces1$DepMap_ID)})) %>%
   select(-target, -sensitivity) %>% 
   bind_cols(
-    res %>% 
+    res_ctrp %>% 
       select(ces,drug) %>%
       group_by(drug) %>% 
       summarize(ces_variance= var(ces)) %>% 
@@ -52,22 +55,22 @@ res2 <- res1 %>%
   mutate(drug_pair= str_detect(cpd_smiles, "\\."))
   
 
-# res1 %>%   
+# res_ctrp1 %>%   
 #   select(-drug)%>%   
 #   pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
 #   group_by(predictor) %>% 
 #   summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
 
-res2 %>% filter(!drug_pair) %>% 
+res_ctrp2 %>% filter(!drug_pair) %>% 
   select_at(c(1:4)) %>% 
   summary()
 
-res2 %>% arrange(desc(ces))
+res_ctrp2 %>% arrange(desc(ces))
 ```
 
 
 ```{r,fig.width=3,fig.height=2}
-fig <- res2 %>%
+res_ctrp2 %>%
   filter(!drug_pair) %>% 
   select_at(c(1:4)) %>% 
   pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>%
@@ -78,11 +81,11 @@ fig <- res2 %>%
   ylab("Accuracy (Spearman Cor)")+
   scale_x_discrete(labels = c("CERES", "CES", "DEMETER2","EXP"))+
   coord_flip()
-fig
+# fig
 
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.pdf",width = 3,height = 2)
-
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.tiff",width = 3,height = 2)
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.pdf",width = 3,height = 2)
+# 
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.tiff",width = 3,height = 2)
 ```
 
 
@@ -90,7 +93,7 @@ ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2
 
 
 ```{r,fig.width=2.5, fig.height=2.5}
-res2 %>%
+res_ctrp2 %>%
   select(ces,sample_size) %>% 
   ggplot(aes(x=sample_size,y= ces)) +
   geom_point(size=0.5)+
@@ -98,7 +101,7 @@ res2 %>%
   xlab("Sample Size")+
   ylab("Median Accuracy")
 
-res2 %>% 
+res_ctrp2 %>% 
   ggplot(aes(x=sample_size,y= ces_variance)) +
   geom_point(size=0.5)+
   theme_classic()+
@@ -109,42 +112,166 @@ res2 %>%
 
 
 
-what about GDSC data?
+
+# 2 GDSC data
 ```{r}
+#load data
+load("~/cluster_scratch/forward_modelling/gdsc_input.RData")
+gdsc_data <- data
+# tmp <- gdsc_df %>% 
+#       mutate(n= map_int(.x = sensitivity,
+#                         .f = function(x){
+#                           length(intersect(x = x %>% pull(DepMap_ID),y= ces1$DepMap_ID))})) %>% 
+#       select(DRUG_NAME, n)
 
-tmp <- gdsc_df %>% 
-  mutate(n= map_int(.x = sensitivity,
-                    .f = function(x){
-                      length(intersect(x = x %>% pull(DepMap_ID),y= ces1$DepMap_ID))})) %>% 
-  select(DRUG_NAME, n)
-
-res_gdsc <- map_dfr(1:518, .f = function(x){
+res_gdsc <- map_dfr(1:198, .f = function(x){
   # drug <- paste("~/cluster_scratch/glmnet_modelling_cluster/array_job/res/drug_", x, ".RData", sep = "")
-    drug <- paste("~/cluster_scratch/forward_modelling/gdsc_spearman/drug_gdsc", x, ".RData", sep = "")
+    drug <- paste("~/cluster_scratch/forward_modelling/gdsc_spearman/drug_", x, ".RData", sep = "")
   load(drug)
-  df <- bind_cols( ces= ces1_perf, drug= x)
+  df <- bind_cols(ceres= ceres_perf, ces= ces1_perf, demeter2= demeter2_perf, exp= exp_perf, drug= x)
   
 })
 
+```
+
+
+```{r}
 res_gdsc1 <- res_gdsc %>% 
   group_by(drug) %>% 
   summarise_all(.funs = median) 
 
+res_gdsc2 <- res_gdsc1 %>% 
+  select(-drug) %>% 
+  bind_cols(gdsc_data) %>% 
+  mutate(sample_size= map_int(.x=sensitivity, 
+                              .f=function(x){sum(x %>% pull(DepMap_ID) %in% ces1$DepMap_ID)})) %>%
+  select(-target, -sensitivity) %>% 
+  bind_cols(
+    res_gdsc %>% 
+      select(ces,drug) %>%
+      group_by(drug) %>% 
+      summarize(ces_variance= var(ces)) %>% 
+      ungroup() %>% 
+      arrange(drug) %>% 
+      select(-drug)
+  ) 
+  
 
-summary(res_gdsc1)
+# res1 %>%   
+#   select(-drug)%>%   
+#   pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>% 
+#   group_by(predictor) %>% 
+#   summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
+
+res_gdsc2 %>% 
+  select_at(c(1:4)) %>% 
+  summary()
+
+# res_gdsc2 %>% arrange(desc(ces))
 ```
 
-why is performance so poor in GDSC?
+
+
+
+
+# 3 prism
+
+lets check the accuracy
 ```{r}
-gdsc_df %>% 
-  ggplot(aes(x= sample_size, y= ces))+
-  geom_point()
+load( file = "~/cluster_scratch/forward_modelling/prism_input.RData")
+prism_data <- data
+
+res_prism <- map_dfr(c(1:1448), .f = function(x){
+    drug <- paste("~/cluster_scratch/forward_modelling/prism_spearman/drug_", x, ".RData", sep = "")
+  load(drug)
+  df <- bind_cols(ceres= ceres_perf, ces= ces1_perf, demeter2= demeter2_perf, exp= exp_perf, drug= x)
+  
+})
 ```
 
+
+check the failed jobs and generate a list to rerun
+```{r}
+# tmp <- str_subset(string = list.files(path =  "/home/cloud-user/cluster_scratch/forward_modelling/prism_spearman/"),pattern = "drug_" )
+# tmp  <- str_split(tmp,pattern = "_",n = 2,simplify = T)
+# tmp <-  str_split(tmp[,2],pattern = ".RData",n = 2,simplify = T)
+# error_idx <- setdiff(x= 1:1448, y = as.integer(tmp[,1]))
+# write(error_idx, file = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/test_write.txt")
+```
+
+
+```{r}
+res_prism1 <- res_prism %>% 
+  group_by(drug) %>% 
+  summarise_all(.funs = median) 
+
+res_prism2 <- res_prism1 %>% 
+  select(-drug) %>% 
+  bind_cols(prism_data) %>% 
+  mutate(sample_size= map_int(.x=sensitivity, 
+                              .f=function(x){sum(x %>% pull(depmap_id) %in% ces1$DepMap_ID)})) %>%
+  select(-target, -sensitivity) %>% 
+  bind_cols(
+    res_prism %>% 
+      select(ces,drug) %>%
+      group_by(drug) %>% 
+      summarize(ces_variance= var(ces)) %>% 
+      ungroup() %>% 
+      arrange(drug) %>% 
+      select(-drug)
+  ) 
+  
+
+res_prism1 %>%
+  select(-drug)%>%
+  pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>%
+  group_by(predictor) %>%
+  summarise(mean_cor= mean(spearman_cor), median_cor= median(spearman_cor))
+
+summary(res_prism1)
+```
+
+
+
+```{r,fig.width=2.5, fig.height=2.5}
+res_prism2 %>%
+  ggplot(aes(x=sample_size,y= ces)) +
+  geom_point(size=0.5)+
+  theme_classic()+
+  xlab("Sample Size")+
+  ylab("Median Accuracy")
+
+res_prism2 %>% 
+  ggplot(aes(x=sample_size,y= ces_variance)) +
+  geom_point(size=0.5)+
+  theme_classic()+
+  xlab("Sample Size")+
+  ylab("Accuracy Variance")
+```
+
+
+```{r,fig.width=4, fig.height=2.5}
+res_prism2 %>% 
+  ggplot(aes(x=drug_category,y= ces)) +
+  geom_boxplot()+
+  theme_classic()+
+  coord_flip()+
+  xlab("Sample Size")+
+  ylab("Accuracy")
+  
+```
+
+```{r}
+rm(data)
+save.image("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
+```
+
+
+
+# 4 cross dataset comparison
 
 Combine the gdsc id back to compare with the ctrp
 ```{r}
-load("~/cluster_scratch/gdsc/gdsc.RData")
 gdsc_df <- gdsc_df %>% 
   bind_cols(res_gdsc1 %>% select(ces)) %>% 
   mutate(sample_size= map_int(sensitivity, .f=
@@ -170,6 +297,8 @@ comparison <- id_mapping %>%
       select(broad_cpd_id,ces, cid, sample_size),
     by= c("PubCHEM"="cid"))
 ```
+
+
 
 ```{r}
 comparison %>% 
