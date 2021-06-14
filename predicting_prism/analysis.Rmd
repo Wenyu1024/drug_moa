@@ -19,8 +19,6 @@ prism_drugs <- read_csv("~/cluster_scratch/prism/screened_drugs.csv")
 
 prism_sc_data <- read_csv("~/cluster_scratch/prism/secondary-screen-dose-response-curve-parameters.csv")
 
-
-
 sc_druglist <- unique(prism_sc_data$broad_id)
 prism_drugs <- prism_drugs %>% 
   mutate(phase= case_when(

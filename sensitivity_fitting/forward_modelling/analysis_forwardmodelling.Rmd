@@ -19,6 +19,7 @@ library(tidymodels)
 ```{r}
 load("~/cluster_scratch/forward_modelling/ctrp_input.RData")
 ctrp_data <- data
+rm(data)
 res_ctrp <- map_dfr(c(1:545), .f = function(x){
 
   # drug <- paste("~/cluster_scratch/forward_modelling/ctrp_pearson/", x, ".RData", sep = "")
@@ -118,6 +119,7 @@ res_ctrp2 %>%
 #load data
 load("~/cluster_scratch/forward_modelling/gdsc_input.RData")
 gdsc_data <- data
+rm(data)
 # tmp <- gdsc_df %>% 
 #       mutate(n= map_int(.x = sensitivity,
 #                         .f = function(x){
@@ -180,7 +182,7 @@ lets check the accuracy
 ```{r}
 load( file = "~/cluster_scratch/forward_modelling/prism_input.RData")
 prism_data <- data
-
+rm(data)
 res_prism <- map_dfr(c(1:1448), .f = function(x){
     drug <- paste("~/cluster_scratch/forward_modelling/prism_spearman/drug_", x, ".RData", sep = "")
   load(drug)
@@ -262,7 +264,6 @@ res_prism2 %>%
 ```
 
 ```{r}
-rm(data)
 save.image("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
 ```
 
