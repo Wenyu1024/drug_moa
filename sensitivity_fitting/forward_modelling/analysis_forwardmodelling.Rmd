@@ -277,7 +277,6 @@ gdsc_df <- gdsc_df %>%
   mutate(sample_size= map_int(sensitivity, .f=
                                 function(x){
                                   length(intersect( x$DepMap_ID,ces1$DepMap_ID)) 
-                                  
                                 })) %>% 
   select(- sensitivity, -target)
 

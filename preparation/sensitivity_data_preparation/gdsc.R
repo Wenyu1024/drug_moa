@@ -14,40 +14,15 @@ drug_info <- read_csv("Drug_list.csv")
 id_mapping_gdsc <- read_tsv("~/cluster_scratch/gdsc/pubchem_cid_to_smiles.txt",
                             col_names = c("PubCHEM", "smiles"),col_types = "cc")
 
+GDSC_binarytarget <- read_csv("~/cluster_scratch/prior/GDSC_binarytarget_ids.csv") %>% select_at(c(1,4,5))
+colnames(GDSC_binarytarget) <- c("DRUG_ID", "gene_target", "DRUG_TYPE")
+
 predictor_df <- read_csv("~/cluster_scratch/ces_21q1_io/ces1_21q1_imputed.csv")
 
 
-# gdsc_sen <- bind_rows(gdsc1, gdsc2) %>% 
-#   select("CELL_LINE_NAME" , "SANGER_MODEL_ID","DRUG_ID" , "DRUG_NAME","PUTATIVE_TARGET","AUC","LN_IC50") %>% 
-#   group_by(SANGER_MODEL_ID , DRUG_ID) %>% 
-#   summarise(AUC= mean(AUC), LN_IC50= mean(LN_IC50)) %>% 
-#   ungroup() %>% 
-#   inner_join(
-#     y = sample_info %>% select(DepMap_ID, Sanger_Model_ID) %>% distinct() %>% drop_na(), 
-#     by= c("SANGER_MODEL_ID" = "Sanger_Model_ID")) %>%
-#   select(-SANGER_MODEL_ID) %>% 
-#   group_by(DRUG_ID) %>% 
-#   nest() %>% 
-#   ungroup()
-# 
-# gdsc_df <- 
-#   bind_rows(gdsc1, gdsc2) %>%
-#   select("DRUG_ID" , "DRUG_NAME","PUTATIVE_TARGET", "PATHWAY_NAME") %>%
-#   distinct() %>%
-#   separate_rows(PUTATIVE_TARGET) %>%
-#   group_by(DRUG_ID , DRUG_NAME, PATHWAY_NAME) %>%
-#   nest() %>%
-#   ungroup() %>%
-#   inner_join(gdsc_sen,by= "DRUG_ID") %>% 
-#   rename( target=data.x, sensitivity=data.y)
-# 
-# save(gdsc_df, file = "gdsc.RData")  
-
-
-# test if analyzing gdsc 1 and 2 separately can improve prediction accuracy
-# rm(gdsc_df, gdsc_sen)
+#correct a target naming to make it easier for subsequent splitting
 gdsc_sen <- gdsc2 %>% 
-  select("CELL_LINE_NAME" , "SANGER_MODEL_ID","DRUG_ID" , "DRUG_NAME","PUTATIVE_TARGET","AUC","LN_IC50") %>% 
+  select("CELL_LINE_NAME" , "SANGER_MODEL_ID","DRUG_ID" , "DRUG_NAME","AUC","LN_IC50") %>% 
   group_by(SANGER_MODEL_ID , DRUG_ID) %>% 
   summarise(AUC= mean(AUC), LN_IC50= mean(LN_IC50)) %>% 
   ungroup() %>% 
@@ -55,32 +30,41 @@ gdsc_sen <- gdsc2 %>%
     y = sample_info %>% select(DepMap_ID, Sanger_Model_ID) %>% distinct() %>% drop_na(), 
     by= c("SANGER_MODEL_ID" = "Sanger_Model_ID")) %>%
   select(-SANGER_MODEL_ID) %>% 
-  group_by(DRUG_ID) %>% 
-  nest() %>% 
-  ungroup()
+  # group_by(DRUG_ID) %>% 
+  nest(sensitivity=-DRUG_ID)
+  # ungroup()
 
 gdsc_df <- 
   gdsc2 %>% 
-  select("DRUG_ID" , "DRUG_NAME","PUTATIVE_TARGET", "PATHWAY_NAME") %>%
+  select("DRUG_ID" , "DRUG_NAME", "PATHWAY_NAME") %>%
   distinct() %>%
-  separate_rows(PUTATIVE_TARGET) %>%
-  group_by(DRUG_ID , DRUG_NAME, PATHWAY_NAME) %>%
-  nest() %>%
-  ungroup() %>%
-  inner_join(gdsc_sen,by= "DRUG_ID") %>% 
-  rename( target=data.x, sensitivity=data.y)
-
+  left_join(GDSC_binarytarget , by= "DRUG_ID") %>% 
+  separate_rows(gene_target) %>%
+  # group_by(DRUG_ID , DRUG_NAME, PATHWAY_NAME, DRUG_TYPE) %>%
+  nest(target= contains("gene_target")) %>%
+  # ungroup() %>%
+  inner_join(gdsc_sen,by= "DRUG_ID") 
 
 # adding ids to gdsc drugs
+# in case there are multiple PubCHEM ids, only the first one is kept
+get_unique_id <- function(x, sep =","){
+  tmp  <- x %>% str_split(pattern = sep,simplify = F) %>% unlist()
+  y= unique(unlist(trimws(tmp)))
+  # if (y == ""){y <-  NA}
+  # if (length(y)>1){y <-  str_c(y,collapse = ",")}
+  # print(y)
+  y= y[1]
+  return(y)
+}
+
 
 gdsc_df <- gdsc_df %>% 
   left_join(y = drug_info %>%  select(drug_id, PubCHEM) %>% distinct(),
             by = c("DRUG_ID"="drug_id")) %>% 
   left_join(id_mapping_gdsc)  %>% 
-  mutate(drug_type= case_when(  str_detect(DRUG_NAME, ",")~ "drug pair",
-                                                            TRUE ~ "single drug")) %>% 
   mutate(n_forward_modelling= map_int(.x=sensitivity, 
-                                      .f=function(x){sum(x %>% pull(DepMap_ID) %in% predictor_df$DepMap_ID)}))
+                                      .f=function(x){sum(x %>% pull(DepMap_ID) %in% predictor_df$DepMap_ID)})) %>% 
+  mutate(PubCHEM= map_chr(PubCHEM,get_unique_id) )
 
 
 # Note that drugs with same structure 

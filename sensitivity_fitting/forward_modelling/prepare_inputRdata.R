@@ -24,13 +24,13 @@ exp_seq <- read_csv("./expseq_21q1_imputed.csv")
 
 # load("~/cluster_scratch/gdsc/gdsc2.RData")
 # data <- gdsc_df %>%
-#   ungroup() 
+#   ungroup()
 # rm(gdsc_df)
 # save.image("~/cluster_scratch/forward_modelling/gdsc_input.RData")
 
 
-load("~/cluster_scratch/prism/prism_data.RData")
-data <- prism_data %>%
-  ungroup()
-rm(prism_data)
-save.image("~/cluster_scratch/forward_modelling/prism_input.RData")
+# load("~/cluster_scratch/prism/prism_data.RData")
+# data <- prism_data %>%
+#   ungroup()
+# rm(prism_data)
+# save.image("~/cluster_scratch/forward_modelling/prism_input.RData")
