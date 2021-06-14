@@ -1,13 +1,24 @@
-return_acc_estimate_foldcv <- function(target_tibble,predictors_tibble=NULL,cor_mat= NULL){
+return_acc_estimate_foldcv <- function(target_tibble,predictors_tibble=NULL,cor_mat= NULL, similiarity= "spearman"){
+  set.seed(0000)
   if (is.null(cor_mat) ){
     overlapping_drug= intersect(target_tibble$drug, predictors_tibble$drug)
-    predictors_mat <- predictors_tibble %>% 
-      filter(drug %in% overlapping_drug) %>% 
-      arrange(drug) %>% 
-      select(-drug) %>% 
-      mutate_all(.funs = scale)
-    cor_mat = cor(t(predictors_mat),method = "spearman") %>% replace(is.na(.), 0)
-    cor_mat[cor_mat< 0 ] <- 0 
+
+    if (similiarity == "tahimoto"){
+      predictors_mat <- predictors_tibble %>% 
+        filter(drug %in% overlapping_drug) %>% 
+        arrange(drug) %>% 
+        select(-drug) 
+      cor_mat = 1- as.matrix(vegan::vegdist(x = (predictors_mat),method = "jaccard",upper = F))
+      
+    } else{
+      predictors_mat <- predictors_tibble %>% 
+        filter(drug %in% overlapping_drug) %>% 
+        arrange(drug) %>% 
+        select(-drug) %>% 
+        mutate_all(.funs = scale)
+      cor_mat = cor(t(predictors_mat),method = similiarity) %>% replace(is.na(.), 0)
+      cor_mat[cor_mat< 0 ] <- 0 
+    }
   }
   
   if (is.null(predictors_tibble)) {
