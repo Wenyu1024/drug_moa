@@ -34,10 +34,10 @@ gdsc_imp_ces1 <- gdsc_imp_ceres <-gdsc_imp_demeter2 <-gdsc_imp_exp <- matrix(nro
 for (job_id in 1:198){
   file_name <- paste0( '~/cluster_scratch/forward_modelling/gdsc_spearman_feature_imp/drug_' ,job_id,".RData" )
   load(file_name)
-  gdsc_imp_ces1[job_id,] <- ces1_imp
-  gdsc_imp_ceres[job_id,] <- ceres_imp
-  gdsc_imp_demeter2[job_id,] <- demeter2_imp
-  gdsc_imp_exp[job_id,] <- exp_imp
+  gdsc_imp_ces1[job_id,] <- ces1_perf
+  gdsc_imp_ceres[job_id,] <- ceres_perf
+  gdsc_imp_demeter2[job_id,] <- demeter2_perf
+  gdsc_imp_exp[job_id,] <- exp_perf
 }
 
 write_csv(transform_mat_to_tibble(gdsc_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ces1.csv")
@@ -53,10 +53,10 @@ prism_imp_ces1 <- prism_imp_ceres <-prism_imp_demeter2 <-prism_imp_exp <- matrix
 for (job_id in 1:1448){
   file_name <- paste0( '~/cluster_scratch/forward_modelling/prism_spearman_feature_imp/drug_' ,job_id,".RData" )
   load(file_name)
-  prism_imp_ces1[job_id,] <- ces1_imp
-  prism_imp_ceres[job_id,] <- ceres_imp
-  prism_imp_demeter2[job_id,] <- demeter2_imp
-  prism_imp_exp[job_id,] <- exp_imp
+  prism_imp_ces1[job_id,] <- ces1_perf
+  prism_imp_ceres[job_id,] <- ceres_perf
+  prism_imp_demeter2[job_id,] <- demeter2_perf
+  prism_imp_exp[job_id,] <- exp_perf
 }
 
 write_csv(transform_mat_to_tibble(prism_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ces1.csv")
