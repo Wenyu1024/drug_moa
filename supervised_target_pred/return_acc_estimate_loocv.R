@@ -7,7 +7,7 @@
 #   mutate(binding_score= 1)
 
 
-return_acc_estimate_loocv <- function(target_tibble,predictors_tibble=NULL,cor_mat= NULL){
+return_acc_estimate_cv <- function(target_tibble,predictors_tibble=NULL,cor_mat= NULL){
   if (is.null(cor_mat) ){
     overlapping_drug= intersect(target_tibble$drug, predictors_tibble$drug)
     predictors_mat <- predictors_tibble %>% 
