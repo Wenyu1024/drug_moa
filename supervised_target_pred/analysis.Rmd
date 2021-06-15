@@ -13,111 +13,226 @@ The aim of this nootbook is to explore whether the extracted model importances f
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tidymodels)
-
+load("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
 ```
 
 
 ## 1) Extract and reformat the feature importance from the glmnet model
-```{r, eval= F}
+
+```{r}
+transform_mat_to_tibble <- function(mat){as_tibble(mat, rownames= "drug")}
 #confirm whether the gene is matched
-ces1 <- read_csv("~/cluster_scratch/impute_ess_20q4/ces1_478.csv")
-load("~/cluster_scratch/glmnet_modelling_cluster/ridge_feature_multinode2.RData")
-
-# extract the vector from the list from the list column and combine with 
-# gene names and drug broad id into a square matrix. then perhaps transform to 
-# long table for further exploration. 
-
-gene <- sort(colnames(ces1)[2:10569])
-
 # tmp <- tibble(gene)
 # tmp <- map(res_feature$ces1_perf,function(x){bind_cols(tmp, tibble(x))} )
-tmp <- matrix(nrow = 365,ncol = 10568)
-colnames(tmp) <- gene
-for (i in 1:365){
-    tmp[i,] <- res_feature$ces1_perf[[i]]
+gene <- sort(colnames(ces1)[-1])
+```
+
+
+### 1.1 CTRP
+```{r}
+ctrp_imp_ces1 <- ctrp_imp_ceres <-ctrp_imp_demeter2 <-ctrp_imp_exp <- matrix(nrow = 545,ncol = length(gene),dimnames = list(ctrp_data$broad_cpd_id, gene))
+
+for (job_id in 1:545){
+    file_name <- paste0( '~/cluster_scratch/forward_modelling/ctrp_spearman_feature_imp/drug_' ,job_id,".RData" )
+    load(file_name)
+    ctrp_imp_ces1[job_id,] <- ces1_imp
+    ctrp_imp_ceres[job_id,] <- ceres_imp
+    ctrp_imp_demeter2[job_id,] <- demeter2_imp
+    ctrp_imp_exp[job_id,] <- exp_imp
 }
-feature_imp <- bind_cols(res_feature %>% select(broad_cpd_id), data.frame(tmp) %>% as_tibble()) 
-write_csv(feature_imp,"~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces1.csv")
 
-for (i in 1:365){
-    tmp[i,] <- res_feature$ces2_perf[[i]]
-}
-feature_imp <- bind_cols(res_feature %>% select(broad_cpd_id), data.frame(tmp) %>% as_tibble()) 
-  
-write_csv(feature_imp,"~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces2.csv")
-
-for (i in 1:365){
-    tmp[i,] <- res_feature$ceres_perf[[i]]
-}
-feature_imp <- bind_cols(res_feature %>% select(broad_cpd_id), data.frame(tmp) %>% as_tibble()) 
-
-write_csv(feature_imp,"~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ceres.csv")
-
-for (i in 1:365){
-    tmp[i,] <- res_feature$demeter2_perf[[i]]
-}
-feature_imp <- bind_cols(res_feature %>% select(broad_cpd_id), data.frame(tmp) %>% as_tibble()) 
-
-write_csv(feature_imp,"~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_demeter2.csv")
-
-
-load("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/res_feature_imp_expseq2.RData")
-exp_seq_pca <- read_csv("~/cluster_scratch/impute_and_derive_exp_based_feature_importance/exp_seq_pca.csv")
-
-gene <- sort(colnames(exp_seq_pca)[2:1204])
-tmp <- matrix(nrow = 365,ncol = 1203)
-colnames(tmp) <- gene
-
-for (i in 1:365){
-    tmp[i,] <- res_feature$exp_perf[[i]]
-}
-feature_imp <- bind_cols(res_feature %>% select(broad_cpd_id), data.frame(tmp) %>% as_tibble())
-
-write_csv(feature_imp,"~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_seq_pca.csv")
-rm(list = ls())
-
+write_csv(transform_mat_to_tibble(ctrp_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ces1.csv")
+write_csv(transform_mat_to_tibble(ctrp_imp_ceres),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ceres.csv")
+write_csv(transform_mat_to_tibble(ctrp_imp_demeter2),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_demeter2.csv")
+write_csv(transform_mat_to_tibble(ctrp_imp_exp),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_exp.csv")
 
 ```
 
-## 2) Read in the data you write out by the previous chunk
+### 1.2 GDSC
+```{r}
+gdsc_imp_ces1 <- gdsc_imp_ceres <-gdsc_imp_demeter2 <-gdsc_imp_exp <- matrix(nrow = 198,ncol = length(gene),dimnames = list(gdsc_data$DRUG_ID, gene))
+
+for (job_id in 1:198){
+    file_name <- paste0( '~/cluster_scratch/forward_modelling/gdsc_spearman_feature_imp/drug_' ,job_id,".RData" )
+    load(file_name)
+    gdsc_imp_ces1[job_id,] <- ces1_imp
+    gdsc_imp_ceres[job_id,] <- ceres_imp
+    gdsc_imp_demeter2[job_id,] <- demeter2_imp
+    gdsc_imp_exp[job_id,] <- exp_imp
+}
+
+write_csv(transform_mat_to_tibble(gdsc_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ces1.csv")
+write_csv(transform_mat_to_tibble(gdsc_imp_ceres),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ceres.csv")
+write_csv(transform_mat_to_tibble(gdsc_imp_demeter2),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_demeter2.csv")
+write_csv(transform_mat_to_tibble(gdsc_imp_exp),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_exp.csv")
+```
+
+### 1.3 PRISM
+```{r}
+prism_imp_ces1 <- prism_imp_ceres <-prism_imp_demeter2 <-prism_imp_exp <- matrix(nrow = 1448,ncol = length(gene),dimnames = list(prism_data$BROAD_ID, gene))
+
+for (job_id in 1:1448){
+    file_name <- paste0( '~/cluster_scratch/forward_modelling/prism_spearman_feature_imp/drug_' ,job_id,".RData" )
+    load(file_name)
+    prism_imp_ces1[job_id,] <- ces1_imp
+    prism_imp_ceres[job_id,] <- ceres_imp
+    prism_imp_demeter2[job_id,] <- demeter2_imp
+    prism_imp_exp[job_id,] <- exp_imp
+}
+
+write_csv(transform_mat_to_tibble(prism_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ces1.csv")
+write_csv(transform_mat_to_tibble(prism_imp_ceres),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ceres.csv")
+write_csv(transform_mat_to_tibble(prism_imp_demeter2),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_demeter2.csv")
+write_csv(transform_mat_to_tibble(prism_imp_exp),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_exp.csv")
+```
+
+### 1.4 Additional ID cleaning
+prepare the ids for Zia and Yinyin to extract DTC and fingerprint
+
+DTC is target is extracted from Zia 
+CTRP target is extracted using inchikey
+GDSC target is extracted using PubChem id 
+PRISM drug is first mapped to drug repurposing hub to get Pubchem id and inchikeys by using broad_id as a reference.
+
+All three dataset have smiles directly available, which is prepared during the sensitivity preparation steps.
+```{r}
+# Use Drugrepurposinghub 
+DRH <-  read_csv("/home/cloud-user/cluster_scratch/prior/drug_repurposing_hub_sample.csv") %>% 
+  select(-vendor_name, -deprecated_broad_id, -smiles, -pert_iname) %>% 
+  separate(col = broad_id,into = c("BRD", "id", NA, NA, NA),sep = "-", remove = T) %>% 
+  unite(BRD, id, col = "BROAD_ID",  remove = T,sep= "-" ) %>% 
+  distinct()%>% 
+  arrange(BROAD_ID, pubchem_cid)
+
+#In case there is two inchikeys only the first one is kept
+DRH <- DRH[!duplicated(DRH$BROAD_ID),]
+
+
+
+
+ctrp_id <- ctrp_data %>% 
+  filter(drug_type == "single drug")%>%
+  select(broad_cpd_id,cpd_smiles) %>% 
+  left_join(DRH,by = c("broad_cpd_id"= "BROAD_ID"))
+
+gdsc2_id <- gdsc_data %>% 
+  select(DRUG_ID, PubCHEM, smiles) 
+
+  
+prism_id <- prism_data %>% 
+  select(BROAD_ID, smiles) %>% 
+  left_join(DRH,by = "BROAD_ID")
+
+setwd("~/cluster_scratch/prior/drug_id_list")
+write_csv(ctrp_id, path = "ctrp_idlist.csv")
+write_csv(gdsc2_id, path = "gdsc2_idlist.csv")
+write_csv(prism_id, path = "prism_idlist.csv")
+```
+
+
+## 2) prepare labels and additional features. 
 
 read in all the needed csv file for drug target prediction using various predictors and then save an RData file as input for modelscript
 
 ```{r,warning = FALSE, message=FALSE}
-feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces1.csv")
+feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ces1.csv")
 
-feature_imp_ridge_ctrp_ces2 <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces2.csv")
+feature_imp_ridge_ctrp_ceres <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ceres.csv")
 
-feature_imp_ridge_ctrp_ceres <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ceres.csv")
+feature_imp_ridge_ctrp_demeter2 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ces1.csv")
 
-feature_imp_ridge_ctrp_demeter2 <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_demeter2.csv")
+feature_imp_ridge_ctrp_exp <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_exp.csv")
 
-feature_sen_ctrp <- read_csv("~/cluster_scratch/impute_ctrp/ctrp_imputed.csv")
+feature_imp_ridge_gdsc_ces1 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ces1.csv")
 
-feature_imp_ridge_ctrp_seqpca <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_seq_pca.csv")
+feature_imp_ridge_gdsc_ceres <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ceres.csv")
 
-# update the analysis now (normalize the vector after merging)
-feature_sen_ces1_ctrp <- inner_join(feature_imp_ridge_ctrp_ces1, feature_sen_ctrp,by = "broad_cpd_id") %>% 
-  mutate_at(-1, .funs = scale )
+feature_imp_ridge_gdsc_demeter2 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ces1.csv")
 
-feature_sen_seqpca_ctrp <- inner_join(feature_imp_ridge_ctrp_seqpca, feature_sen_ctrp,by = "broad_cpd_id") %>% 
-    mutate_at(-1, .funs = scale )
+feature_imp_ridge_gdsc_exp <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_exp.csv")
 
-ctrp_target_tibble <- read_csv("~/cluster_scratch/prior/target_long_ctrpv2.csv")
-ctrpv2_list_to_zia <- read_csv("~/cluster_scratch/prior/ctrpv2_list_to_zia.csv")
-ctrp_target_dtc <- read_csv("~/cluster_scratch/prior/ctrp_target_dtc.csv")
+feature_imp_ridge_prism_ces1 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ces1.csv")
 
-# generate cor martix directly based on fingerprint
-feature_maccs_finger_print <- read_csv("~/cluster_scratch/fingerprints/maccs_finger.csv")
-feature_extended_finger_print <- read_csv("~/cluster_scratch/fingerprints/extended_finger.csv")
+feature_imp_ridge_prism_ceres <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ceres.csv")
 
-extended_cor <- feature_extended_finger_print %>% 
-  pivot_longer(cols = -broad_cpd_id,names_to= "name", values_to= "value") %>% 
-  pivot_wider(id_cols = name, names_from= broad_cpd_id,  values_from= value) %>%
-  arrange(name) %>% 
-  select(-name) %>% 
-  as.matrix() %>%
-  prabclus::jaccard()
+feature_imp_ridge_prism_demeter2 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ces1.csv")
+
+feature_imp_ridge_prism_exp <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_exp.csv")
+```
+
+### 2.1 Target label preparation 
+```{r,warning = FALSE, message=FALSE}
+ctrp_target_binary <- ctrp_data %>% 
+  select(broad_cpd_id, target) %>% 
+  unnest(target) %>% 
+  drop_na() %>% 
+  distinct() %>% 
+  rename(drug=broad_cpd_id, target= gene_symbol_of_protein_target) %>% 
+  filter(target!="")
+
+gdsc_target_binary <- gdsc_data %>% 
+  select(DRUG_ID, target) %>% 
+  unnest(target) %>% 
+  drop_na() %>% 
+  rename(drug=DRUG_ID, target= gene_target) %>% 
+  distinct()
+
+prism_target_binary <- prism_data %>% 
+  select(BROAD_ID, target) %>% 
+  unnest(target) %>% 
+  drop_na() %>% 
+  distinct() %>% 
+  rename(drug=BROAD_ID)
+
+# write_csv(ctrp_target_binary, 
+#           path = "~/cluster_scratch/prior/ctrpv2_target_binary.csv")
+# write_csv(gdsc_target_binary, 
+#           path = "~/cluster_scratch/prior/gdsc_target_binary.csv")
+# write_csv(prism_target_binary, 
+#           path = "~/cluster_scratch/prior/prism_target_binary.csv")
+
+
+ctrp_list_to_zia <- read_csv("~/cluster_scratch/prior/drug_id_list/ctrp_idlist.csv")
+gdsc_list_to_zia <- read_csv("~/cluster_scratch/prior/drug_id_list/gdsc2_idlist.csv")
+prism_list_to_zia <- read_csv("~/cluster_scratch/prior/drug_id_list/prism_idlist.csv")
+
+ctrp_target_dtc <- read_csv("~/cluster_scratch/prior/drug_target/ctrp_data.csv")
+
+gdsc_target_dtc <- read_csv("~/cluster_scratch/prior/drug_target/gdsc_data.csv")
+
+prism_target_dtc <- read_csv("~/cluster_scratch/prior/drug_target/prism_data.csv")
+```
+
+### 2.2 additional feature preparation
+```{r,warning = FALSE, message=FALSE}
+#fingerprint
+setwd("~/cluster_scratch/fingerprints/new/fingerprint/result")
+feature_maccs_ctrp <- read_csv("maccs_finger_ctrp.csv") %>% select(-smiles, -InChIKey,-pubchem_cid) %>% rename(drug =broad_cpd_id)
+feature_extended_ctrp <- read_csv("extended_finger_ctrp.csv") %>% select(-smiles, -InChIKey,-pubchem_cid) %>% rename(drug =broad_cpd_id)
+
+feature_maccs_gdsc <- read_csv("maccs_finger_gdsc.csv")%>% select(-smiles,-PubCHEM) %>% rename(drug =DRUG_ID)
+feature_extended_gdsc <- read_csv("extended_finger_gdsc.csv")%>% select(-smiles, -PubCHEM) %>% rename(drug =DRUG_ID)
+
+feature_maccs_prism <- read_csv("maccs_finger_prism.csv")%>% select(-smiles, -InChIKey,-pubchem_cid) %>% rename(drug =BROAD_ID)
+feature_extended_prism <- read_csv("extended_finger_prism.csv") %>% select(-smiles, -InChIKey,-pubchem_cid) %>% rename(drug =BROAD_ID)
+
+## Consensus signature
+drug_consensus <- read_csv( "~/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_drugs.csv") %>% 
+  rename(drug = X1) 
+# save.image("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
+```
+
+
+Some previous analysis
+```{r,warning = FALSE, message=FALSE}
+# Write A function to calculate jaccard similarity based on fingerprint
+# extended_cor <- feature_extended_finger_print %>% 
+#   pivot_longer(cols = -broad_cpd_id,names_to= "name", values_to= "value") %>% 
+#   pivot_wider(id_cols = name, names_from= broad_cpd_id,  values_from= value) %>%
+#   arrange(name) %>% 
+#   select(-name) %>% 
+#   as.matrix() %>%
+#   prabclus::jaccard()
   # cor(method = "spearman")
   
 
@@ -126,54 +241,46 @@ extended_cor <- feature_extended_finger_print %>%
 # extended_cor1 <- -extended_cor + mean(extended_cor)
 # hist(extended_cor1) 
 
-maccs_cor <- feature_maccs_finger_print %>% 
-  pivot_longer(cols = -broad_cpd_id,names_to= "name", values_to= "value") %>% 
-  arrange(broad_cpd_id) %>% 
-  pivot_wider(id_cols = name, names_from= broad_cpd_id,  values_from= value) %>% 
-  select(-name) %>% 
-  as.matrix() %>% 
-  prabclus::jaccard()
-  # cor(method = "spearman")
+# maccs_cor <- feature_maccs_finger_print %>% 
+#   pivot_longer(cols = -broad_cpd_id,names_to= "name", values_to= "value") %>% 
+#   arrange(broad_cpd_id) %>% 
+#   pivot_wider(id_cols = name, names_from= broad_cpd_id,  values_from= value) %>% 
+#   select(-name) %>% 
+#   as.matrix() %>% 
+#   prabclus::jaccard()
+#   # cor(method = "spearman")
 
 # hist(maccs_cor)
 # maccs_cor1 <- -maccs_cor + mean(maccs_cor)
 # hist(maccs_cor1) 
 # hist(sen_cor)
  
-ces1_cor <- cor(t(
-  x = feature_imp_ridge_ctrp_ces1 %>% 
-    rename(drug=broad_cpd_id) %>% 
-    arrange(drug) %>% 
-    select(-drug) %>% 
-    mutate_all(.funs = scale)), method = "spearman")
-ces1_cor[ces1_cor<0] <- 0
-colnames(ces1_cor) <- row.names(ces1_cor) <- sort(feature_imp_ridge_ctrp_ces1$broad_cpd_id)
-
-sen_cor <- cor(t(
-  x = feature_sen_ctrp %>% 
-    rename(drug=broad_cpd_id) %>% 
-    arrange(drug) %>% 
-    select(-drug) %>% 
-    mutate_all(.funs = scale)), method = "spearman")
-sen_cor[sen_cor<0] <- 0
-colnames(sen_cor) <- row.names(sen_cor) <- sort(feature_imp_ridge_ctrp_ces1$broad_cpd_id)
-
-
-ces1_extended_cor <- (ces1_cor + extended_cor)/2
-ces1_extended_sen_cor <- (ces1_cor + extended_cor+ sen_cor)/3
-ces1_maccs_cor <- (ces1_cor + maccs_cor)/2
-ces1_maccs_sen_cor <- (ces1_cor + maccs_cor+ sen_cor)/3
+# ces1_cor <- cor(t(
+#   x = feature_imp_ridge_ctrp_ces1 %>% 
+#     rename(drug=broad_cpd_id) %>% 
+#     arrange(drug) %>% 
+#     select(-drug) %>% 
+#     mutate_all(.funs = scale)), method = "spearman")
+# ces1_cor[ces1_cor<0] <- 0
+# colnames(ces1_cor) <- row.names(ces1_cor) <- sort(feature_imp_ridge_ctrp_ces1$broad_cpd_id)
+# 
+# sen_cor <- cor(t(
+#   x = feature_sen_ctrp %>% 
+#     rename(drug=broad_cpd_id) %>% 
+#     arrange(drug) %>% 
+#     select(-drug) %>% 
+#     mutate_all(.funs = scale)), method = "spearman")
+# sen_cor[sen_cor<0] <- 0
+# colnames(sen_cor) <- row.names(sen_cor) <- sort(feature_imp_ridge_ctrp_ces1$broad_cpd_id)
 
 
-## add consensus signature
-drug_consensus <- read_csv( "~/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_drugs.csv")
+# ces1_extended_cor <- (ces1_cor + extended_cor)/2
+# ces1_extended_sen_cor <- (ces1_cor + extended_cor+ sen_cor)/3
+# ces1_maccs_cor <- (ces1_cor + maccs_cor)/2
+# ces1_maccs_sen_cor <- (ces1_cor + maccs_cor+ sen_cor)/3
 
-save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData") 
-
+save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
 ```
-
-
-
 
 lets use the existing target information of the
 365 drugs to do cv and predict drug target
@@ -185,14 +292,10 @@ the central idea is to check what additional value can such basal cell info brin
 
 ## 3) Supervisied prediction with ctrpv2's own target info (from DrugBank)
 ```{r}
-load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
+# load("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
 source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
 source('~/cluster_wrk/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
-target_tibble= ctrp_target_tibble %>%
-  ungroup() %>%
-  select(broad_cpd_id, gene_symbol_of_protein_target) %>%
-  rename(drug=broad_cpd_id, target_gene=gene_symbol_of_protein_target) %>% 
-  mutate(binding_score= 1)
+
 ```
 
 
@@ -200,89 +303,32 @@ target_tibble= ctrp_target_tibble %>%
 source('~/cluster_wrk/drug_moa/supervised_target_pred/return_acc_estimate_loocv.R')
 set.seed(0000) 
 acc_ces1 <- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
+  target_tibble = ctrp_target_binary,
   predictors_tibble = feature_imp_ridge_ctrp_ces1 %>% rename(drug=broad_cpd_id) ) 
-
-# acc_ces1_2 <- return_acc_estimate_loocv(
-#   target_tibble = target_tibble,
-#   cor_mat = ces1_cor1) 
-
-acc_ces2<- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_ces2 %>% rename(drug=broad_cpd_id) ) 
-
 
 acc_ceres<- return_acc_estimate_loocv(
   target_tibble = target_tibble,
   predictors_tibble = feature_imp_ridge_ctrp_ceres %>% rename(drug=broad_cpd_id) ) 
 
-
 acc_demeter2<- return_acc_estimate_loocv(
   target_tibble = target_tibble,
   predictors_tibble = feature_imp_ridge_ctrp_demeter2 %>% rename(drug=broad_cpd_id) ) 
 
-acc_sen<- return_acc_estimate_loocv(
+acc_exp<- return_acc_estimate_loocv(
   target_tibble = target_tibble,
-  predictors_tibble = feature_sen_ctrp %>% rename(drug=broad_cpd_id) ) 
+  predictors_tibble = feature_imp_ridge_ctrp_exp %>% rename(drug=broad_cpd_id) )
 
-acc_sen_ces1 <- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_sen_ces1_ctrp %>% rename(drug=broad_cpd_id) )
- 
-# acc_sen_ces1_1<- return_acc_estimate_loocv(
-#   target_tibble = target_tibble,
-#   predictors_tibble = feature_sen_ces1_ctrp %>% rename(drug=broad_cpd_id) )
-# mean(acc_sen_ces1_1$acc) 
-# 
-#  
-# acc_sen_ces1_2<- return_acc_estimate_loocv(
-#   target_tibble = target_tibble,
-#   cor_mat = ces1_sen_cor)
-# mean(acc_sen_ces1_2$acc) 
-
-acc_seqpca<- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_seqpca %>% rename(drug=broad_cpd_id) )
-
-
-acc_sen_seqpca <- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_sen_seqpca_ctrp %>% rename(drug=broad_cpd_id) )
-
-######################
 acc_maccs<- return_acc_estimate_loocv(
   target_tibble = target_tibble,
   cor_mat = maccs_cor )
 
-
-acc_ces1_maccs <- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_maccs_cor ) 
-
-
-acc_ces1_maccs_sen <- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_maccs_sen_cor )
-
-#################
 acc_extended <- return_acc_estimate_loocv(
   target_tibble = target_tibble,
   cor_mat = extended_cor )
 
-
-acc_ces1_extended <- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_extended_cor ) 
-
-
-acc_ces1_extended_sen <- return_acc_estimate_loocv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_extended_sen_cor )
-
-
 acc_consensus <- return_acc_estimate_loocv(
   target_tibble = target_tibble,
-  predictors_tibble = drug_consensus %>% rename(drug=X1) ) 
+  predictors_tibble = drug_consensus %>% rename(drug=BROAD_ID) ) 
 
 
 
@@ -292,8 +338,8 @@ acc_df <- acc_ces1 %>% mutate(method = "ces1") %>%
     bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
     bind_rows(acc_sen %>% mutate(method = "sen")) %>% 
     bind_rows(acc_sen_ces1 %>% mutate(method = "ces1_sen")) %>% 
-    bind_rows(acc_seqpca %>% mutate(method = "seq")) %>% 
-    bind_rows(acc_sen_seqpca %>% mutate(method = "seq_sen")) %>% 
+    bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
+    bind_rows(acc_sen_exp %>% mutate(method = "exp_sen")) %>% 
     bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>% 
     bind_rows(acc_ces1_extended %>% mutate(method = "ces1_ECFP")) %>% 
     bind_rows(acc_ces1_extended_sen %>% mutate(method = "ces1_ECFP_sen")) %>% 
@@ -326,95 +372,44 @@ save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_ctr
 lets try fold cv to see if we can finder a larger difference
 ```{r}
 source('~/cluster_wrk/drug_moa/supervised_target_pred/return_acc_estimate_5fold_cv.R')
-set.seed(1234)
+set.seed(0000)
 acc_ces1 <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_ces1 %>% rename(drug=broad_cpd_id) ) 
+  target_tibble = ctrp_target_binary,
+  predictors_tibble = feature_imp_ridge_ctrp_ces1 ) 
 
-# acc_ces2<- return_acc_estimate_foldcv(
-#   target_tibble = target_tibble,
-#   predictors_tibble = feature_imp_ridge_ctrp_ces2 %>% rename(drug=broad_cpd_id) ) 
- 
 acc_ceres<- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_ceres %>% rename(drug=broad_cpd_id) ) 
+  target_tibble = ctrp_target_binary,
+  predictors_tibble = feature_imp_ridge_ctrp_ceres ) 
 
 acc_demeter2<- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_demeter2 %>% rename(drug=broad_cpd_id) ) 
+  target_tibble = ctrp_target_binary,
+  predictors_tibble = feature_imp_ridge_ctrp_demeter2 ) 
 
-acc_sen<- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_sen_ctrp %>% rename(drug=broad_cpd_id) ) 
+acc_exp<- return_acc_estimate_foldcv(
+  target_tibble = ctrp_target_binary,
+  predictors_tibble = feature_imp_ridge_ctrp_exp )
 
-acc_sen_ces1 <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_sen_ces1_ctrp %>% rename(drug=broad_cpd_id) )
-
-# acc_sen_ces1_1<- return_acc_estimate_foldcv(
-#   target_tibble = target_tibble,
-#   predictors_tibble = feature_sen_ces1_ctrp %>% rename(drug=broad_cpd_id) )
-# mean(acc_sen_ces1_1$acc) 
-# 
-#  
-# acc_sen_ces1_2<- return_acc_estimate_foldcv(
-#   target_tibble = target_tibble,
-#   cor_mat = ces1_sen_cor)
-# mean(acc_sen_ces1_2$acc) 
-
-acc_seqpca<- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_seqpca %>% rename(drug=broad_cpd_id) )
-
-acc_sen_seqpca <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = feature_sen_seqpca_ctrp %>% rename(drug=broad_cpd_id) )
-
-######################
 acc_maccs<- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  cor_mat = maccs_cor )
+  target_tibble = ctrp_target_binary,
+  predictors_tibble = feature_maccs_ctrp ,
+  similiarity = "tahimoto")
 
-acc_ces1_maccs <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_maccs_cor ) 
-
-acc_ces1_maccs_sen <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_maccs_sen_cor )
-
-#################
 acc_extended <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  cor_mat = extended_cor )
-
-acc_ces1_extended <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_extended_cor ) 
-
-acc_ces1_extended_sen <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  cor_mat = ces1_extended_sen_cor )
+  target_tibble = ctrp_target_binary,
+  predictors_tibble = feature_extended_ctrp,
+  similiarity = "tahimoto")
 
 acc_consensus <- return_acc_estimate_foldcv(
-  target_tibble = target_tibble,
-  predictors_tibble = drug_consensus %>% rename(drug=X1) ) 
+  target_tibble = ctrp_target_binary,
+  predictors_tibble = drug_consensus ) 
 
 
 acc_df <- acc_ces1 %>% mutate(method = "ces1") %>% 
-  # bind_rows(acc_ces2 %>% mutate(method = "ces2")) %>% 
     bind_rows(acc_ceres %>% mutate(method = "ceres")) %>% 
     bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
-    bind_rows(acc_sen %>% mutate(method = "sen")) %>% 
-    bind_rows(acc_sen_ces1 %>% mutate(method = "ces1_sen")) %>% 
-    bind_rows(acc_seqpca %>% mutate(method = "seq")) %>% 
-    bind_rows(acc_sen_seqpca %>% mutate(method = "seq_sen")) %>% 
-    bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>% 
-    bind_rows(acc_ces1_extended %>% mutate(method = "ces1_ECFP")) %>% 
-    bind_rows(acc_ces1_extended_sen %>% mutate(method = "ces1_ECFP_sen")) %>% 
-    bind_rows(acc_maccs %>% mutate(method = "structure_MACCS")) %>% 
-    bind_rows(acc_ces1_maccs %>% mutate(method = "ces1_MACCS")) %>% 
-    bind_rows(acc_ces1_maccs_sen %>% mutate(method = "ces1_MACCS_sen")) %>% 
+    bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
+    bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>%
+    bind_rows(acc_maccs %>% mutate(method = "structure_MACCS")) %>%
     bind_rows(acc_consensus %>% mutate(method = "Consensus_exp_perturb")) 
 
 acc_df %>% 
@@ -436,15 +431,90 @@ acc_df %>%
 save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_ctrp_drugbank_5foldcv.RData")
 
 acc_df %>% 
-  filter(method %in% c("structure_MACCS", "structure_ECFP", "sen", "ces1", "Consensus_exp_perturb", "seq","ceres", "demeter2" )) %>% 
+  filter(method %in% c("structure_MACCS", "structure_ECFP", "sen", "ces1", "Consensus_exp_perturb", "exp","ceres", "demeter2" )) %>% 
   ggplot(aes(x=method, y=acc)) +
   geom_boxplot()+
   coord_flip()+
   theme_classic() 
 ```
+
+
+
+
+how about gdsc
+```{r}
+source('~/cluster_wrk/drug_moa/supervised_target_pred/return_acc_estimate_5fold_cv.R')
+set.seed(0000)
+acc_ces1 <- return_acc_estimate_foldcv(
+  target_tibble = gdsc_target_binary,
+  predictors_tibble = feature_imp_ridge_gdsc_ces1 ) 
+
+acc_ceres<- return_acc_estimate_foldcv(
+  target_tibble = gdsc_target_binary,
+  predictors_tibble = feature_imp_ridge_gdsc_ceres ) 
+
+acc_demeter2<- return_acc_estimate_foldcv(
+  target_tibble = gdsc_target_binary,
+  predictors_tibble = feature_imp_ridge_gdsc_demeter2 ) 
+
+acc_exp<- return_acc_estimate_foldcv(
+  target_tibble = gdsc_target_binary,
+  predictors_tibble = feature_imp_ridge_gdsc_exp )
+
+acc_maccs<- return_acc_estimate_foldcv(
+  target_tibble = gdsc_target_binary,
+  predictors_tibble = feature_maccs_gdsc ,
+  similiarity = "tahimoto")
+
+acc_extended <- return_acc_estimate_foldcv(
+  target_tibble = gdsc_target_binary,
+  predictors_tibble = feature_extended_gdsc,
+  similiarity = "tahimoto")
+
+acc_consensus <- return_acc_estimate_foldcv(
+  target_tibble = gdsc_target_binary,
+  predictors_tibble = drug_consensus ) 
+
+
+acc_df <- acc_ces1 %>% mutate(method = "ces1") %>% 
+    bind_rows(acc_ceres %>% mutate(method = "ceres")) %>% 
+    bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
+    bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
+    bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>%
+    bind_rows(acc_maccs %>% mutate(method = "structure_MACCS")) %>%
+    bind_rows(acc_consensus %>% mutate(method = "Consensus_exp_perturb")) 
+
+acc_df %>% 
+  group_by(method) %>% 
+  summarise(acc_mean= mean(acc,na.rm = T))
+
+acc_df %>% 
+  ggplot(aes(x=method, y=acc)) + 
+  geom_violin()+
+  coord_flip()+
+  theme_classic()
+
+acc_df %>% 
+  ggplot(aes(x=method, y=acc)) + 
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()  
+
+save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_ctrp_drugbank_5foldcv.RData")
+
+acc_df %>% 
+  filter(method %in% c("structure_MACCS", "structure_ECFP", "sen", "ces1", "Consensus_exp_perturb", "exp","ceres", "demeter2" )) %>% 
+  ggplot(aes(x=method, y=acc)) +
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic() 
+```
+
+
+
 comparing performance of ces1 and consensus with same sample size
 ```{r}
-overlapping_drugs = intersect(feature_imp_ridge_ctrp_ces1$broad_cpd_id, drug_consensus$X1)
+overlapping_drugs = intersect(feature_imp_ridge_ctrp_ces1$broad_cpd_id, drug_consensus$BROAD_ID)
 acc_ces1 <- return_acc_estimate_foldcv(
   target_tibble = target_tibble,
   predictors_tibble = feature_imp_ridge_ctrp_ces1 %>% 
@@ -468,7 +538,7 @@ acc_ces1_consensus <- return_acc_estimate_foldcv(
   target_tibble = target_tibble,
   predictors_tibble =  inner_join(
     x= feature_imp_ridge_ctrp_ces1 %>%     rename(drug=broad_cpd_id) ,
-    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=x1) ,
+    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=BROAD_ID) ,
     by= "drug"
     ) 
   )
@@ -485,7 +555,7 @@ acc_sen_consensus <- return_acc_estimate_foldcv(
     x=  feature_sen_ctrp %>% 
     rename(drug=broad_cpd_id) %>% 
     filter(drug %in% overlapping_drugs),
-    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=x1) ,
+    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=BROAD_ID) ,
     by= "drug"
     ) 
     
@@ -592,14 +662,14 @@ acc_sen_ces1 <- return_acc_estimate_foldcv(
 #   cor_mat = ces1_sen_cor)
 
 
-acc_seqpca<- return_acc_estimate_foldcv(
+acc_exp<- return_acc_estimate_foldcv(
   target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_seqpca %>% rename(drug=broad_cpd_id) )
+  predictors_tibble = feature_imp_ridge_ctrp_exp %>% rename(drug=broad_cpd_id) )
 
 
-acc_sen_seqpca <- return_acc_estimate_foldcv(
+acc_sen_exp <- return_acc_estimate_foldcv(
   target_tibble = target_tibble,
-  predictors_tibble = feature_sen_seqpca_ctrp %>% rename(drug=broad_cpd_id) )
+  predictors_tibble = feature_sen_exp_ctrp %>% rename(drug=broad_cpd_id) )
 
 ######################
 acc_maccs<- return_acc_estimate_foldcv(
@@ -634,7 +704,7 @@ acc_ces1_extended_sen <- return_acc_estimate_foldcv(
 
 acc_consensus <- return_acc_estimate_foldcv(
    target_tibble = target_tibble,
-   predictors_tibble = drug_consensus %>% rename(drug=X1) ) 
+   predictors_tibble = drug_consensus %>% rename(drug=BROAD_ID) ) 
 
 acc_df <- acc_ces1 %>% mutate(method = "ces1") %>% 
   bind_rows(acc_ces2 %>% mutate(method = "ces2")) %>% 
@@ -642,8 +712,8 @@ acc_df <- acc_ces1 %>% mutate(method = "ces1") %>%
     bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
     bind_rows(acc_sen %>% mutate(method = "sen")) %>% 
     bind_rows(acc_sen_ces1 %>% mutate(method = "ces1_sen")) %>% 
-    bind_rows(acc_seqpca %>% mutate(method = "seq")) %>% 
-    bind_rows(acc_sen_seqpca %>% mutate(method = "seq_sen")) %>% 
+    bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
+    bind_rows(acc_sen_exp %>% mutate(method = "exp_sen")) %>% 
     bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>% 
     bind_rows(acc_ces1_extended %>% mutate(method = "ces1_ECFP")) %>% 
     bind_rows(acc_ces1_extended_sen %>% mutate(method = "ces1_ECFP_sen")) %>% 
@@ -667,7 +737,7 @@ acc_df %>%
   theme_classic()  
 
 acc_df %>% 
-  filter(method %in% c("structure_MACCS", "structure_ECFP", "sen", "ces1", "Consensus_exp_perturb", "seq","ceres", "demeter2" )) %>% 
+  filter(method %in% c("structure_MACCS", "structure_ECFP", "sen", "ces1", "Consensus_exp_perturb", "exp","ceres", "demeter2" )) %>% 
   ggplot(aes(x=method, y=acc)) +
   geom_boxplot()+
   coord_flip()+
@@ -677,7 +747,7 @@ save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_ctr
 ```
 
 ```{r}
-overlapping_drugs = intersect(feature_imp_ridge_ctrp_ces1$broad_cpd_id, drug_consensus$X1)
+overlapping_drugs = intersect(feature_imp_ridge_ctrp_ces1$broad_cpd_id, drug_consensus$BROAD_ID)
 acc_ces1 <- return_acc_estimate_foldcv(
   target_tibble = target_tibble,
   predictors_tibble = feature_imp_ridge_ctrp_ces1 %>% 
@@ -693,7 +763,7 @@ acc_sen <-  return_acc_estimate_foldcv(
 acc_consensus <- return_acc_estimate_foldcv(
   target_tibble = target_tibble,
   predictors_tibble = drug_consensus %>% 
-    rename(drug=X1) %>% 
+    rename(drug=BROAD_ID) %>% 
    filter(drug %in% overlapping_drugs) 
   ) 
 
@@ -701,7 +771,7 @@ acc_ces1_consensus <- return_acc_estimate_foldcv(
   target_tibble = target_tibble,
   predictors_tibble =  inner_join(
     x= feature_imp_ridge_ctrp_ces1 %>%     rename(drug=broad_cpd_id) ,
-    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=x1) ,
+    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=BROAD_ID) ,
     by= "drug"
     ) 
   )
@@ -718,7 +788,7 @@ acc_sen_consensus <- return_acc_estimate_foldcv(
     x=  feature_sen_ctrp %>% 
     rename(drug=broad_cpd_id) %>% 
     filter(drug %in% overlapping_drugs),
-    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=x1) ,
+    y= drug_consensus %>%  rename_all( .funs = tolower) %>% rename(drug=BROAD_ID) ,
     by= "drug"
     ) 
     
@@ -817,14 +887,14 @@ mean(acc_sen_ces1$acc)
 #   cor_mat = ces1_sen_cor)
 # mean(acc_sen_ces1_2$acc) 
 
-acc_seqpca<- return_acc_estimate_loocv(
+acc_exp<- return_acc_estimate_loocv(
   target_tibble = target_tibble,
-  predictors_tibble = feature_imp_ridge_ctrp_seqpca %>% rename(drug=broad_cpd_id) )
-mean(acc_seqpca$acc) 
+  predictors_tibble = feature_imp_ridge_ctrp_exp %>% rename(drug=broad_cpd_id) )
+mean(acc_exp$acc) 
 
-acc_sen_seqpca <- return_acc_estimate_loocv(
+acc_sen_exp <- return_acc_estimate_loocv(
   target_tibble = target_tibble,
-  predictors_tibble = feature_sen_seqpca_ctrp %>% rename(drug=broad_cpd_id) )
+  predictors_tibble = feature_sen_exp_ctrp %>% rename(drug=broad_cpd_id) )
 
 ######################
 acc_maccs<- return_acc_estimate_loocv(
@@ -864,8 +934,8 @@ acc_df <- acc_ces1 %>% mutate(method = "ces1") %>%
     bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
     bind_rows(acc_sen %>% mutate(method = "sen")) %>% 
     bind_rows(acc_sen_ces1 %>% mutate(method = "ces1_sen")) %>% 
-    bind_rows(acc_seqpca %>% mutate(method = "seq")) %>% 
-    bind_rows(acc_sen_seqpca %>% mutate(method = "seq_sen")) %>% 
+    bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
+    bind_rows(acc_sen_exp %>% mutate(method = "exp_sen")) %>% 
     bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>% 
     bind_rows(acc_ces1_extended %>% mutate(method = "ces1_ECFP")) %>% 
     bind_rows(acc_ces1_extended_sen %>% mutate(method = "ces1_ECFP_sen")) %>% 
@@ -898,8 +968,8 @@ Check prediction performance Summary
 # mean(acc_demeter2)
 # mean(acc_sen)
 # mean(acc_sen_ces1)
-# mean(acc_seqpca)
-# mean(acc_sen_seqpca)
+# mean(acc_exp)
+# mean(acc_sen_exp)
 # 
 # wilcox.test(acc_ces1, acc_ceres,paired = T)
 # wilcox.test(acc_ces1, acc_ces2,paired = T)
@@ -911,8 +981,8 @@ Check prediction performance Summary
 # median(acc_demeter2)
 # median(acc_sen)
 # median(acc_sen_ces1)
-# median(acc_seqpca)
-# median(acc_sen_seqpca)
+# median(acc_exp)
+# median(acc_sen_exp)
 ```
 
 
@@ -966,7 +1036,7 @@ fig
 ```
 ```{r}
 fig <- acc_supervised_target_pred %>% 
-  filter(method %in% c("acc_ces1", "acc_sen", "acc_sen_ces1", "acc_seqpca", "acc_sen_seqpca")) %>% 
+  filter(method %in% c("acc_ces1", "acc_sen", "acc_sen_ces1", "acc_exp", "acc_sen_exp")) %>% 
   ggplot(aes(fill= method,  x= label_dataset,y = spearman_cor)) +
   geom_boxplot(outlier.color = "white")+
   theme_classic()+
@@ -1036,7 +1106,7 @@ target_mat_dtc <- get_target_mat(target_tibble_dtc)
 target_drugbank_cor <- t(target_mat_ctrp) %>% 
   prabclus::jaccard()
 
-consensusexp_cor <- t(drug_consensus %>% filter(X1 %in% colnames(ces1_cor 
+consensusexp_cor <- t(drug_consensus %>% filter(BROAD_ID %in% colnames(ces1_cor 
 get_long_tibble_from_mat <- function(mat){
   tmp <- as_tibble(mat) %>% 
   mutate(drug1= colnames(mat)) %>% 

@@ -1,12 +1,15 @@
 library(tidyverse) 
 get_target_mat <- function(target_tibble){
+  if (!("binding_score" %in% colnames(target_tibble))){  
+    target_tibble <- target_tibble %>% mutate(binding_score = 1)}
+  
   target_tibble <- target_tibble %>% 
     distinct() %>% 
-    group_by(drug, target_gene) %>%
+    group_by(drug, target) %>%
     summarize(binding_score= median(binding_score,na.rm = T)) %>% 
     ungroup() %>% 
     pivot_wider(id_cols = drug,
-                names_from= target_gene, 
+                names_from= target, 
                 values_from=binding_score) %>% 
     arrange(drug) %>%     
     replace(is.na(.), 0) 
