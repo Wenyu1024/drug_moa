@@ -8,7 +8,7 @@ output: html_document
 The aim of this nootbook is to explore whether the extracted model importances from the sen~ess glmnet model can be used in supervised drug target prediction
 
 
-
+## 1)
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
@@ -16,124 +16,11 @@ library(tidymodels)
 load("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
 ```
 
-
-## 1) Extract and reformat the feature importance from the glmnet model
-
-```{r}
-transform_mat_to_tibble <- function(mat){as_tibble(mat, rownames= "drug")}
-#confirm whether the gene is matched
-# tmp <- tibble(gene)
-# tmp <- map(res_feature$ces1_perf,function(x){bind_cols(tmp, tibble(x))} )
-gene <- sort(colnames(ces1)[-1])
-```
-
-
-### 1.1 CTRP
-```{r}
-ctrp_imp_ces1 <- ctrp_imp_ceres <-ctrp_imp_demeter2 <-ctrp_imp_exp <- matrix(nrow = 545,ncol = length(gene),dimnames = list(ctrp_data$broad_cpd_id, gene))
-
-for (job_id in 1:545){
-    file_name <- paste0( '~/cluster_scratch/forward_modelling/ctrp_spearman_feature_imp/drug_' ,job_id,".RData" )
-    load(file_name)
-    ctrp_imp_ces1[job_id,] <- ces1_imp
-    ctrp_imp_ceres[job_id,] <- ceres_imp
-    ctrp_imp_demeter2[job_id,] <- demeter2_imp
-    ctrp_imp_exp[job_id,] <- exp_imp
-}
-
-write_csv(transform_mat_to_tibble(ctrp_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ces1.csv")
-write_csv(transform_mat_to_tibble(ctrp_imp_ceres),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ceres.csv")
-write_csv(transform_mat_to_tibble(ctrp_imp_demeter2),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_demeter2.csv")
-write_csv(transform_mat_to_tibble(ctrp_imp_exp),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_exp.csv")
-
-```
-
-### 1.2 GDSC
-```{r}
-gdsc_imp_ces1 <- gdsc_imp_ceres <-gdsc_imp_demeter2 <-gdsc_imp_exp <- matrix(nrow = 198,ncol = length(gene),dimnames = list(gdsc_data$DRUG_ID, gene))
-
-for (job_id in 1:198){
-    file_name <- paste0( '~/cluster_scratch/forward_modelling/gdsc_spearman_feature_imp/drug_' ,job_id,".RData" )
-    load(file_name)
-    gdsc_imp_ces1[job_id,] <- ces1_imp
-    gdsc_imp_ceres[job_id,] <- ceres_imp
-    gdsc_imp_demeter2[job_id,] <- demeter2_imp
-    gdsc_imp_exp[job_id,] <- exp_imp
-}
-
-write_csv(transform_mat_to_tibble(gdsc_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ces1.csv")
-write_csv(transform_mat_to_tibble(gdsc_imp_ceres),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_ceres.csv")
-write_csv(transform_mat_to_tibble(gdsc_imp_demeter2),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_demeter2.csv")
-write_csv(transform_mat_to_tibble(gdsc_imp_exp),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_gdsc_exp.csv")
-```
-
-### 1.3 PRISM
-```{r}
-prism_imp_ces1 <- prism_imp_ceres <-prism_imp_demeter2 <-prism_imp_exp <- matrix(nrow = 1448,ncol = length(gene),dimnames = list(prism_data$BROAD_ID, gene))
-
-for (job_id in 1:1448){
-    file_name <- paste0( '~/cluster_scratch/forward_modelling/prism_spearman_feature_imp/drug_' ,job_id,".RData" )
-    load(file_name)
-    prism_imp_ces1[job_id,] <- ces1_imp
-    prism_imp_ceres[job_id,] <- ceres_imp
-    prism_imp_demeter2[job_id,] <- demeter2_imp
-    prism_imp_exp[job_id,] <- exp_imp
-}
-
-write_csv(transform_mat_to_tibble(prism_imp_ces1),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ces1.csv")
-write_csv(transform_mat_to_tibble(prism_imp_ceres),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_ceres.csv")
-write_csv(transform_mat_to_tibble(prism_imp_demeter2),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_demeter2.csv")
-write_csv(transform_mat_to_tibble(prism_imp_exp),"~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_exp.csv")
-```
-
-### 1.4 Additional ID cleaning
-prepare the ids for Zia and Yinyin to extract DTC and fingerprint
-
-DTC is target is extracted from Zia 
-CTRP target is extracted using inchikey
-GDSC target is extracted using PubChem id 
-PRISM drug is first mapped to drug repurposing hub to get Pubchem id and inchikeys by using broad_id as a reference.
-
-All three dataset have smiles directly available, which is prepared during the sensitivity preparation steps.
-```{r}
-# Use Drugrepurposinghub 
-DRH <-  read_csv("/home/cloud-user/cluster_scratch/prior/drug_repurposing_hub_sample.csv") %>% 
-  select(-vendor_name, -deprecated_broad_id, -smiles, -pert_iname) %>% 
-  separate(col = broad_id,into = c("BRD", "id", NA, NA, NA),sep = "-", remove = T) %>% 
-  unite(BRD, id, col = "BROAD_ID",  remove = T,sep= "-" ) %>% 
-  distinct()%>% 
-  arrange(BROAD_ID, pubchem_cid)
-
-#In case there is two inchikeys only the first one is kept
-DRH <- DRH[!duplicated(DRH$BROAD_ID),]
-
-
-
-
-ctrp_id <- ctrp_data %>% 
-  filter(drug_type == "single drug")%>%
-  select(broad_cpd_id,cpd_smiles) %>% 
-  left_join(DRH,by = c("broad_cpd_id"= "BROAD_ID"))
-
-gdsc2_id <- gdsc_data %>% 
-  select(DRUG_ID, PubCHEM, smiles) 
-
-  
-prism_id <- prism_data %>% 
-  select(BROAD_ID, smiles) %>% 
-  left_join(DRH,by = "BROAD_ID")
-
-setwd("~/cluster_scratch/prior/drug_id_list")
-write_csv(ctrp_id, path = "ctrp_idlist.csv")
-write_csv(gdsc2_id, path = "gdsc2_idlist.csv")
-write_csv(prism_id, path = "prism_idlist.csv")
-```
-
-
-## 2) prepare labels and additional features. 
+## 2) read in files. 
 
 read in all the needed csv file for drug target prediction using various predictors and then save an RData file as input for modelscript
 
+### 2.1 read in model based features
 ```{r,warning = FALSE, message=FALSE}
 feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ces1.csv")
 
@@ -160,50 +47,17 @@ feature_imp_ridge_prism_demeter2 <- read_csv("~/cluster_scratch/forward_modellin
 feature_imp_ridge_prism_exp <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_exp.csv")
 ```
 
-### 2.1 Target label preparation 
+### 2.2 read in target labels 
 ```{r,warning = FALSE, message=FALSE}
-ctrp_target_binary <- ctrp_data %>% 
-  select(broad_cpd_id, target) %>% 
-  unnest(target) %>% 
-  drop_na() %>% 
-  distinct() %>% 
-  rename(drug=broad_cpd_id, target= gene_symbol_of_protein_target) %>% 
-  filter(target!="")
-
-gdsc_target_binary <- gdsc_data %>% 
-  select(DRUG_ID, target) %>% 
-  unnest(target) %>% 
-  drop_na() %>% 
-  rename(drug=DRUG_ID, target= gene_target) %>% 
-  distinct()
-
-prism_target_binary <- prism_data %>% 
-  select(BROAD_ID, target) %>% 
-  unnest(target) %>% 
-  drop_na() %>% 
-  distinct() %>% 
-  rename(drug=BROAD_ID)
-
-# write_csv(ctrp_target_binary, 
-#           path = "~/cluster_scratch/prior/ctrpv2_target_binary.csv")
-# write_csv(gdsc_target_binary, 
-#           path = "~/cluster_scratch/prior/gdsc_target_binary.csv")
-# write_csv(prism_target_binary, 
-#           path = "~/cluster_scratch/prior/prism_target_binary.csv")
-
-
-ctrp_list_to_zia <- read_csv("~/cluster_scratch/prior/drug_id_list/ctrp_idlist.csv")
-gdsc_list_to_zia <- read_csv("~/cluster_scratch/prior/drug_id_list/gdsc2_idlist.csv")
-prism_list_to_zia <- read_csv("~/cluster_scratch/prior/drug_id_list/prism_idlist.csv")
-
-ctrp_target_dtc <- read_csv("~/cluster_scratch/prior/drug_target/ctrp_data.csv")
-
-gdsc_target_dtc <- read_csv("~/cluster_scratch/prior/drug_target/gdsc_data.csv")
-
-prism_target_dtc <- read_csv("~/cluster_scratch/prior/drug_target/prism_data.csv")
+ctrp_target_binary <- read_csv("~/cluster_scratch/prior/ctrpv2_target_binary.csv")
+gdsc_target_binary <- read_csv("~/cluster_scratch/prior/gdsc_target_binary.csv")
+prism_target_binary <- read_csv("~/cluster_scratch/prior/prism_target_binary.csv")
+ctrp_target_dtc <- read_csv("~/cluster_scratch/prior/ctrpv2_target_dtc.csv")
+gdsc_target_dtc <- read_csv("~/cluster_scratch/prior/gdsc_target_dtc.csv")
+prism_target_dtc <- read_csv("~/cluster_scratch/prior/ctrpv2_target_dtc.csv")
 ```
 
-### 2.2 additional feature preparation
+### 2.3 read in additional feature preparation
 ```{r,warning = FALSE, message=FALSE}
 #fingerprint
 setwd("~/cluster_scratch/fingerprints/new/fingerprint/result")
@@ -217,9 +71,15 @@ feature_maccs_prism <- read_csv("maccs_finger_prism.csv")%>% select(-smiles, -In
 feature_extended_prism <- read_csv("extended_finger_prism.csv") %>% select(-smiles, -InChIKey,-pubchem_cid) %>% rename(drug =BROAD_ID)
 
 ## Consensus signature
-drug_consensus <- read_csv( "~/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_drugs.csv") %>% 
-  rename(drug = X1) 
-# save.image("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
+setwd("~/cluster_scratch//L1000/consensus_signatures_challenge/")
+drug_consensus_ctrp <- read_csv("feature_consensus_ctrp.csv")
+drug_consensus_prism <- read_csv("feature_consensus_prism.csv")
+drug_consensus_gdsc <- read_csv("feature_consensus_gdsc.csv")
+```
+
+### 2.4 save workspace
+```{r,warning = FALSE, message=FALSE}
+save.image("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
 ```
 
 
@@ -293,9 +153,100 @@ the central idea is to check what additional value can such basal cell info brin
 ## 3) Supervisied prediction with ctrpv2's own target info (from DrugBank)
 ```{r}
 # load("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
-source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
-source('~/cluster_wrk/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
 
+
+```
+
+
+
+write a function to output a acc_df for choice of estimation method, dataset, and target file.
+
+```{r}
+function(dataset= "ctrp", id_list= NULL, estimation_method= , target_source= ctrp_target_binary){
+  source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
+  source('~/cluster_wrk/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
+  
+  if (estimation_method== "fold_cv") {
+    source('~/cluster_wrk/drug_moa/supervised_target_pred/return_acc_estimate_5fold_cv.R')
+    } 
+  if (estimation_method== "loocv") {
+    source('~/cluster_wrk/drug_moa/supervised_target_pred/return_acc_estimate_loocv.R')
+    } 
+  set.seed(0000)
+  
+  acc_ces1 <- return_acc_estimate_cv(
+    target_tibble = target_source,
+    predictors_tibble = eval(as.symbol(
+        str_c("feature_imp_ridge_", dataset, "_ces1" ,collapse = "") )) )
+  
+  acc_ceres<- return_acc_estimate_cv(
+    target_tibble = target_source,
+        predictors_tibble = eval(as.symbol(
+        str_c("feature_imp_ridge_", dataset, "_ces1" ,collapse = "") )) ) 
+  
+  acc_demeter2<- return_acc_estimate_cv(
+    target_tibble = target_source,
+        predictors_tibble = eval(as.symbol(
+        str_c("feature_imp_ridge_", dataset, "_ces1" ,collapse = "") ))  ) 
+  
+  acc_exp<- return_acc_estimate_cv(
+    target_tibble = target_source,
+        predictors_tibble = eval(as.symbol(
+        str_c("feature_imp_ridge_", dataset, "_ces1" ,collapse = "") ))  )
+  
+  acc_maccs<- return_acc_estimate_cv(
+    target_tibble = target_source,
+    predictors_tibble = eval(as.symbol(
+        str_c("feature_maccs_", dataset,collapse = "") ))  ,
+    similiarity = "tahimoto")
+  
+  acc_extended<- return_acc_estimate_cv(
+    target_tibble = target_source,
+    predictors_tibble = eval(as.symbol(
+        str_c("feature_extended_", dataset,collapse = "") ))  ,
+    similiarity = "tahimoto")
+  
+  acc_consensus <- return_acc_estimate_cv(
+    target_tibble = target_source,
+    predictors_tibble = eval(as.symbol(
+        str_c("drug_consensus_", dataset,collapse = "") )) ) 
+  
+  acc_df <- acc_ces1 %>% mutate(method = "ces1") %>% 
+      bind_rows(acc_ceres %>% mutate(method = "ceres")) %>% 
+      bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
+      bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
+      bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>%
+      bind_rows(acc_maccs %>% mutate(method = "structure_MACCS")) %>%
+      bind_rows(acc_consensus %>% mutate(method = "Consensus_exp_perturb"))
+  return(acc_df)
+```
+
+
+```{r}
+acc_df %>% 
+  group_by(method) %>% 
+  summarise(acc_mean= mean(acc,na.rm = T))
+
+acc_df %>% 
+  ggplot(aes(x=method, y=acc)) + 
+  geom_violin()+
+  coord_flip()+
+  theme_classic()
+
+acc_df %>% 
+  ggplot(aes(x=method, y=acc)) + 
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic()  
+
+save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_ctrp_drugbank_5foldcv.RData")
+
+acc_df %>% 
+  filter(method %in% c("structure_MACCS", "structure_ECFP", "sen", "ces1", "Consensus_exp_perturb", "exp","ceres", "demeter2" )) %>% 
+  ggplot(aes(x=method, y=acc)) +
+  geom_boxplot()+
+  coord_flip()+
+  theme_classic() 
 ```
 
 
@@ -368,77 +319,6 @@ acc_df %>%
 save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_ctrp_drugbank_loocv.RData")
 
 ```
-
-lets try fold cv to see if we can finder a larger difference
-```{r}
-source('~/cluster_wrk/drug_moa/supervised_target_pred/return_acc_estimate_5fold_cv.R')
-set.seed(0000)
-acc_ces1 <- return_acc_estimate_foldcv(
-  target_tibble = ctrp_target_binary,
-  predictors_tibble = feature_imp_ridge_ctrp_ces1 ) 
-
-acc_ceres<- return_acc_estimate_foldcv(
-  target_tibble = ctrp_target_binary,
-  predictors_tibble = feature_imp_ridge_ctrp_ceres ) 
-
-acc_demeter2<- return_acc_estimate_foldcv(
-  target_tibble = ctrp_target_binary,
-  predictors_tibble = feature_imp_ridge_ctrp_demeter2 ) 
-
-acc_exp<- return_acc_estimate_foldcv(
-  target_tibble = ctrp_target_binary,
-  predictors_tibble = feature_imp_ridge_ctrp_exp )
-
-acc_maccs<- return_acc_estimate_foldcv(
-  target_tibble = ctrp_target_binary,
-  predictors_tibble = feature_maccs_ctrp ,
-  similiarity = "tahimoto")
-
-acc_extended <- return_acc_estimate_foldcv(
-  target_tibble = ctrp_target_binary,
-  predictors_tibble = feature_extended_ctrp,
-  similiarity = "tahimoto")
-
-acc_consensus <- return_acc_estimate_foldcv(
-  target_tibble = ctrp_target_binary,
-  predictors_tibble = drug_consensus ) 
-
-
-acc_df <- acc_ces1 %>% mutate(method = "ces1") %>% 
-    bind_rows(acc_ceres %>% mutate(method = "ceres")) %>% 
-    bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
-    bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
-    bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>%
-    bind_rows(acc_maccs %>% mutate(method = "structure_MACCS")) %>%
-    bind_rows(acc_consensus %>% mutate(method = "Consensus_exp_perturb")) 
-
-acc_df %>% 
-  group_by(method) %>% 
-  summarise(acc_mean= mean(acc,na.rm = T))
-
-acc_df %>% 
-  ggplot(aes(x=method, y=acc)) + 
-  geom_violin()+
-  coord_flip()+
-  theme_classic()
-
-acc_df %>% 
-  ggplot(aes(x=method, y=acc)) + 
-  geom_boxplot()+
-  coord_flip()+
-  theme_classic()  
-
-save.image("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_ctrp_drugbank_5foldcv.RData")
-
-acc_df %>% 
-  filter(method %in% c("structure_MACCS", "structure_ECFP", "sen", "ces1", "Consensus_exp_perturb", "exp","ceres", "demeter2" )) %>% 
-  ggplot(aes(x=method, y=acc)) +
-  geom_boxplot()+
-  coord_flip()+
-  theme_classic() 
-```
-
-
 
 
 how about gdsc
