@@ -3,11 +3,12 @@
 # the function may take several minute to run, depend on how many rows of the input are there.
 library(tidyverse)
 library(tidymodels)
-annotate_feature_matrix <- function(network, feature_imp_mat, target){
+load("~/cluster_scratch/forward_modelling/targetpred_output.RData")
+annotate_feature_matrix <- function(network, feature_imp_mat, target_source){
   network_full <- network %>% 
     rename(gene1= gene2, gene2= gene1) %>% 
     bind_rows(network)
-  target_gene <- target$target_gene
+  target_gene <- target_source$target
   drug_list <- sort(unique(feature_imp_mat$drug))
   gene_list <-  colnames(feature_imp_mat)[-1]
   target_list <- NULL
@@ -17,7 +18,7 @@ annotate_feature_matrix <- function(network, feature_imp_mat, target){
   for (drug_i in drug_list){
     target_list <- NULL
     # tic()
-    target_i <-  target %>% filter(drug %in%  drug_i) %>% pull(target_gene)
+    target_i <-  target_source %>% filter(drug %in%  drug_i) %>% pull(target)
     first_n <- setdiff(network_full %>% filter( gene1 %in% target_i) %>% pull(gene2) , target_i)
     first_n <- c(first_n,"NA")
     second_n <- setdiff(network_full %>% filter( gene1 %in% first_n) %>% pull(gene2) , union(target_i,first_n))
@@ -52,3 +53,226 @@ annotate_feature_matrix <- function(network, feature_imp_mat, target){
   
   return(res)
 }
+
+
+# Call the function with KEGG dataset and 
+
+kegg_tibble <- read_csv("~/cluster_scratch/prior/kegg_tibble.csv")
+setwd("~/cluster_scratch/prior/")
+
+ces1_glm_feature_annotated_ctrpbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_ces1,
+    target_source=  ctrp_target_binary
+  )
+write_csv(ces1_glm_feature_annotated_ctrpbinary_kegg,"ces1_glm_feature_annotated_ctrpbinary_kegg.csv")
+
+ceres_glm_feature_annotated_ctrpbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_ceres,
+    target_source=  ctrp_target_binary
+  )
+write_csv(ceres_glm_feature_annotated_ctrpbinary_kegg,"ceres_glm_feature_annotated_ctrpbinary_kegg.csv")
+
+demeter_glm_feature_annotated_ctrpbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_demeter2 ,
+    target_source=  ctrp_target_binary
+  )
+write_csv(demeter_glm_feature_annotated_ctrpbinary_kegg,"demeter_glm_feature_annotated_ctrpbinary_kegg.csv")
+
+exp_glm_feature_annotated_ctrpbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_exp ,
+    target_source=  ctrp_target_binary
+  )
+write_csv(exp_glm_feature_annotated_ctrpbinary_kegg,"exp_glm_feature_annotated_ctrpbinary_kegg.csv")
+
+# use dtc binarized tibble insteand
+ces1_glm_feature_annotated_ctrpdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_ces1,
+    target_source=  ctrp_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(ces1_glm_feature_annotated_ctrpdtc_kegg,"ces1_glm_feature_annotated_ctrpdtc_kegg.csv")
+
+ceres_glm_feature_annotated_ctrpdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_ceres,
+    target_source=  ctrp_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(ceres_glm_feature_annotated_ctrpdtc_kegg,"ceres_glm_feature_annotated_ctrpdtc_kegg.csv")
+
+demeter_glm_feature_annotated_ctrpdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_demeter2 ,
+    target_source=  ctrp_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(demeter_glm_feature_annotated_ctrpdtc_kegg,"demeter_glm_feature_annotated_ctrpdtc_kegg.csv")
+
+exp_glm_feature_annotated_ctrpdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_ctrp_exp,
+    target_source=  ctrp_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(exp_glm_feature_annotated_ctrpdtc_kegg,"exp_glm_feature_annotated_ctrpdtc_kegg.csv")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# gdsc
+
+
+ces1_glm_feature_annotated_gdscbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_ces1,
+    target_source=  gdsc_target_binary
+  )
+write_csv(ces1_glm_feature_annotated_gdscbinary_kegg,"ces1_glm_feature_annotated_gdscbinary_kegg.csv")
+
+ceres_glm_feature_annotated_gdscbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_ceres,
+    target_source=  gdsc_target_binary
+  )
+write_csv(ceres_glm_feature_annotated_gdscbinary_kegg,"ceres_glm_feature_annotated_gdscbinary_kegg.csv")
+
+demeter_glm_feature_annotated_gdscbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_demeter2 ,
+    target_source=  gdsc_target_binary
+  )
+write_csv(demeter_glm_feature_annotated_gdscbinary_kegg,"demeter_glm_feature_annotated_gdscbinary_kegg.csv")
+
+exp_glm_feature_annotated_gdscbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_exp ,
+    target_source=  gdsc_target_binary
+  )
+write_csv(exp_glm_feature_annotated_gdscbinary_kegg,"exp_glm_feature_annotated_gdscbinary_kegg.csv")
+
+# use dtc binarized tibble insteand
+ces1_glm_feature_annotated_gdscdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_ces1,
+    target_source=  gdsc_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(ces1_glm_feature_annotated_gdscdtc_kegg,"ces1_glm_feature_annotated_gdscdtc_kegg.csv")
+
+ceres_glm_feature_annotated_gdscdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_ceres,
+    target_source=  gdsc_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(ceres_glm_feature_annotated_gdscdtc_kegg,"ceres_glm_feature_annotated_gdscdtc_kegg.csv")
+
+demeter_glm_feature_annotated_gdscdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_demeter2 ,
+    target_source=  gdsc_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(demeter_glm_feature_annotated_gdscdtc_kegg,"demeter_glm_feature_annotated_gdscdtc_kegg.csv")
+
+exp_glm_feature_annotated_gdscdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_gdsc_exp,
+    target_source=  gdsc_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(exp_glm_feature_annotated_gdscdtc_kegg,"exp_glm_feature_annotated_gdscdtc_kegg.csv")
+
+# prism
+
+
+ces1_glm_feature_annotated_prismbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_ces1,
+    target_source=  prism_target_binary
+  )
+write_csv(ces1_glm_feature_annotated_prismbinary_kegg,"ces1_glm_feature_annotated_prismbinary_kegg.csv")
+
+ceres_glm_feature_annotated_prismbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_ceres,
+    target_source=  prism_target_binary
+  )
+write_csv(ceres_glm_feature_annotated_prismbinary_kegg,"ceres_glm_feature_annotated_prismbinary_kegg.csv")
+
+demeter_glm_feature_annotated_prismbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_demeter2 ,
+    target_source=  prism_target_binary
+  )
+write_csv(demeter_glm_feature_annotated_prismbinary_kegg,"demeter_glm_feature_annotated_prismbinary_kegg.csv")
+
+exp_glm_feature_annotated_prismbinary_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_exp ,
+    target_source=  prism_target_binary
+  )
+write_csv(exp_glm_feature_annotated_prismbinary_kegg,"exp_glm_feature_annotated_prismbinary_kegg.csv")
+
+# use dtc binarized tibble insteand
+ces1_glm_feature_annotated_prismdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_ces1,
+    target_source=  prism_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(ces1_glm_feature_annotated_prismdtc_kegg,"ces1_glm_feature_annotated_prismdtc_kegg.csv")
+
+ceres_glm_feature_annotated_prismdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_ceres,
+    target_source=  prism_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(ceres_glm_feature_annotated_prismdtc_kegg,"ceres_glm_feature_annotated_prismdtc_kegg.csv")
+
+demeter_glm_feature_annotated_prismdtc_kegg <-
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_demeter2 ,
+    target_source=  prism_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(demeter_glm_feature_annotated_prismdtc_kegg,"demeter_glm_feature_annotated_prismdtc_kegg.csv")
+
+exp_glm_feature_annotated_prismdtc_kegg <- 
+  annotate_feature_matrix(
+    network = kegg_tibble,
+    feature_imp_mat = feature_imp_ridge_prism_exp,
+    target_source=  prism_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)
+  )
+write_csv(exp_glm_feature_annotated_prismdtc_kegg,"exp_glm_feature_annotated_prismdtc_kegg.csv")
