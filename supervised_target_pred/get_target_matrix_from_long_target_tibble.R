@@ -16,6 +16,7 @@ get_target_mat <- function(target_tibble){
     # select(-drug)
   target_mat= as.matrix(target_tibble[,-1])
   row.names(target_mat) <- target_tibble$drug
+  target_mat <- target_mat[,colSums(target_mat)!=0]
   return(target_mat)
 }
 

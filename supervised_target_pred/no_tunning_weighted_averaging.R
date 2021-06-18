@@ -1,7 +1,11 @@
 library(tidyverse)
 library(pROC)
 
-no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx){
+# acc_metric can be either "AUC" or "spearman_cor"
+# if acc_metric= spearman_cor, target_mat has to be continues
+# if acc_metric= AUC, target_mat has to be binary.
+
+no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metric){
   test_idx <- unlist(test_idx)
   if (length(test_idx)>1){
       cor_test <- cor_mat[test_idx,-test_idx] # 
@@ -12,12 +16,23 @@ no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx){
       pred1 = (cor_test) %*% as.matrix(target_mat[-test_idx,]) 
       label= target_mat[test_idx,]
       # add a minus sign to predictions because roc function automatically set controls > cases
-      res <- map_dbl(.x= 1:length(test_idx), 
-                     .f = function(idx){
-                       roc_auc_vec(truth = as.factor(label[idx,]), estimate = pred1[idx,],event_level = "second",estimator = "binary") 
-                     })
-      res <- mean(res)
-      return(res)
+      if (acc_metric== "AUC") {
+        res <- map_dbl(.x= 1:length(test_idx), 
+                       .f = function(idx){
+                         df <- tibble(truth = as.factor(label[idx,]), estimate = pred1[idx,]) 
+                         roc_auc_vec(df$truth,df$estimate, event_level = "second", estimator = "binary",na_rm = T )
+                       })
+        res <- mean(res)
+      }
+      
+      if (acc_metric== "spearman_cor") {
+        res <- map_dbl(.x= 1:length(test_idx), 
+                       .f = function(idx){
+                         df <- tibble(truth = label[idx,], estimate = pred1[idx,]) 
+                         cor(df$truth,df$estimate, use = "complete.obs",method = "spearman" )
+                       })
+        res <- mean(res)
+      }
   }
   
   
@@ -31,11 +46,13 @@ no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx){
     pred1 <- as.vector(pred1)
     acc <- vector(mode = "numeric",length = length(test_idx))
     label= as.vector(target_mat[test_idx,])
-    drug_auc <- roc_auc_vec(truth = as.factor(label), pred1,event_level = "second",estimator = "binary") 
-    return(drug_auc)
-    # return(pred1)
-    # return(label)
-    # res= tibble(response = label, predictor = pred1)
-    # return(res)
+    if (acc_metric== "AUC") { 
+      res <- roc_auc_vec(truth = as.factor(label), pred1,event_level = "second",estimator = "binary") 
+    }
+    if (acc_metric== "spearman_cor") { 
+      res <- cor(label, pred1,use = "complete.obs",method = "spearman") 
+    }
   }
+  
+  return(res)
 }
