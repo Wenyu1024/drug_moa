@@ -8,20 +8,20 @@ output: html_document
 The aim of this nootbook is to explore whether the extracted model importances from the sen~ess glmnet model can be used in supervised drug target prediction
 
 
-## 1)
+## 1
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tidymodels)
-# load("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
 ```
 
-## 2) read in files. 
+## 2 read in files. 
 
 read in all the needed csv file for drug target prediction using various predictors and then save an RData file as input for modelscript
 
 ### 2.1 read in model based features
 ```{r,warning = FALSE, message=FALSE}
+load("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
 feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ces1.csv")
 
 feature_imp_ridge_ctrp_ceres <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_ctrp_ceres.csv")
@@ -46,6 +46,146 @@ feature_imp_ridge_prism_demeter2 <- read_csv("~/cluster_scratch/forward_modellin
 
 feature_imp_ridge_prism_exp <- read_csv("~/cluster_scratch/forward_modelling/feature_imp/feature_imp_ridge_prism_exp.csv")
 ```
+
+
+We discussed that the drug sen fitted signatures should be combined
+
+```{r,warning = FALSE, message=FALSE}
+#comb 1 simple sum
+feature_imp_ridge_ctrp_comb1 <- 
+  bind_cols(
+    feature_imp_ridge_ctrp_ces1 %>% select(drug),
+    as_tibble(
+      (as.matrix(feature_imp_ridge_ctrp_ces1 %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_ctrp_ceres %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_ctrp_demeter2 %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_ctrp_exp %>% select(-drug)) )/4)
+    )
+
+feature_imp_ridge_gdsc_comb1 <- 
+  bind_cols(
+    feature_imp_ridge_gdsc_ces1 %>% select(drug),
+    as_tibble(
+      (as.matrix(feature_imp_ridge_gdsc_ces1 %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_gdsc_ceres %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_gdsc_demeter2 %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_gdsc_exp %>% select(-drug)) )/4)
+    )
+
+feature_imp_ridge_prism_comb1 <- 
+  bind_cols(
+    feature_imp_ridge_prism_ces1 %>% select(drug),
+    as_tibble(
+      (as.matrix(feature_imp_ridge_prism_ces1 %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_prism_ceres %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_prism_demeter2 %>% select(-drug)) +
+      as.matrix(feature_imp_ridge_prism_exp %>% select(-drug))/4) )
+    )
+  
+#comb 2 weighted sum exp + 1/3 of each ess based
+feature_imp_ridge_ctrp_comb2 <- 
+  bind_cols(
+    feature_imp_ridge_ctrp_ces1 %>% select(drug),
+    as_tibble(
+      (as.matrix(feature_imp_ridge_ctrp_ces1 %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_ctrp_ceres %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_ctrp_demeter2 %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_ctrp_exp %>% select(-drug)))/2 )
+    )
+
+feature_imp_ridge_gdsc_comb2 <- 
+  bind_cols(
+    feature_imp_ridge_gdsc_ces1 %>% select(drug),
+    as_tibble(
+      (as.matrix(feature_imp_ridge_gdsc_ces1 %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_gdsc_ceres %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_gdsc_demeter2 %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_gdsc_exp %>% select(-drug)) )/2)
+    )
+
+feature_imp_ridge_prism_comb2 <- 
+  bind_cols(
+    feature_imp_ridge_prism_ces1 %>% select(drug),
+    as_tibble(
+      (as.matrix(feature_imp_ridge_prism_ces1 %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_prism_ceres %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_prism_demeter2 %>% select(-drug))/3 +
+      as.matrix(feature_imp_ridge_prism_exp %>% select(-drug)) )/2)
+    )
+
+
+
+#comb 3 use the feature vector from the best model
+feature_imp_ridge_ctrp_comb3 <- as_tibble(
+    cbind(
+    matrix(0, nrow = 545, ncol = 10623)
+    )
+)
+feature_imp_ridge_gdsc_comb3 <- as_tibble(
+    cbind(
+    matrix(0, nrow = 198, ncol = 10623)
+    )
+)
+feature_imp_ridge_prism_comb3 <- as_tibble(
+    cbind(
+    matrix(0, nrow = 1448, ncol = 10623)
+    )
+)
+
+idx_list_ctrp <-  apply(res_ctrp2[,1:4],MARGIN = 1, which.max)
+idx_list_gdsc <-   apply(res_gdsc2[,1:4],MARGIN = 1, which.max)
+idx_list_prism <-   apply(res_prism2[,1:4],MARGIN = 1, which.max)
+    
+ctrp_array <- array(
+  data =
+      c(as.matrix(feature_imp_ridge_ctrp_ces1 %>% select(-drug)),
+      as.matrix(feature_imp_ridge_ctrp_ceres %>% select(-drug)),
+      as.matrix(feature_imp_ridge_ctrp_demeter2  %>% select(-drug)), 
+      as.matrix(feature_imp_ridge_ctrp_exp %>% select(-drug))
+      ),
+  dim= c(545,10623,4) 
+  )
+
+gdsc_array <- array(
+  data =
+      c(as.matrix(feature_imp_ridge_gdsc_ces1 %>% select(-drug)),
+      as.matrix(feature_imp_ridge_gdsc_ceres %>% select(-drug)),
+      as.matrix(feature_imp_ridge_gdsc_demeter2  %>% select(-drug)), 
+      as.matrix(feature_imp_ridge_gdsc_exp %>% select(-drug))
+      ),
+  dim= c(198,10623,4) 
+  )
+
+prism_array <- array(
+  data =
+      c(as.matrix(feature_imp_ridge_prism_ces1 %>% select(-drug)),
+      as.matrix(feature_imp_ridge_prism_ceres %>% select(-drug)),
+      as.matrix(feature_imp_ridge_prism_demeter2  %>% select(-drug)), 
+      as.matrix(feature_imp_ridge_prism_exp %>% select(-drug))
+      ),
+  dim= c(1448,10623,4) 
+  )
+
+for (i in 1:545){
+ feature_imp_ridge_ctrp_comb3[i,] <- t(ctrp_array[i,,idx_list_ctrp[i]])
+}
+  
+for (i in 1:198){
+ feature_imp_ridge_gdsc_comb3[i,] <- t(gdsc_array[i,,idx_list_gdsc[i]])
+}
+
+for (i in 1:1448){
+ feature_imp_ridge_prism_comb3[i,] <- t(prism_array[i,,idx_list_prism[i]])
+}
+
+
+
+
+
+```
+
+
+
 
 ### 2.2 read in target labels 
 ```{r,warning = FALSE, message=FALSE}
@@ -154,14 +294,14 @@ We then consider again a nested cv to first find the thresholding parameters
 
 the central idea is to check what additional value can such basal cell info bring to MOA prediction in addition to the drug sensitivity and how does the accuracy comparing to, for example, chemical fingerprint based prediction?
 
-## 3) Supervisied prediction with ctrpv2's own target info (from DrugBank)
+## 3 Supervisied prediction with ctrpv2's own target info (from DrugBank)
 ```{r}
 load("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
 ```
 
 
 
-
+### 3.1 Naive prediction without any filtering
 ```{r}
 #ctrp
 acc_df_ctrp_binary_fold_cv <- get_target_pred_accuracy_batch(dataset= "ctrp",  estimation_method= "fold_cv" , target_source= ctrp_target_binary)
@@ -211,15 +351,14 @@ acc_df_prism_binary_fold_cv <- get_target_pred_accuracy_batch(dataset= "prism", 
 acc_df_prism_binary_loocv <- get_target_pred_accuracy_batch(dataset= "prism",  estimation_method= "loocv" , target_source= prism_target_binary)
 
 acc_df_prism_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
-  dataset= "prism", estimation_method= "fold_cv" , 
+  dataset= "prism", estimation_method= "fold_cv" ,
   target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score)
   )
 
 acc_df_prism_dtcbinary_loocv <- get_target_pred_accuracy_batch(
-  dataset= "prism",  estimation_method= "loocv" , 
+  dataset= "prism",  estimation_method= "loocv" ,
   target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score)
   )
-
 
 acc_df_prism_dtc_foldcv <- get_target_pred_accuracy_batch(dataset= "prism", estimation_method= "fold_cv" , target_source= prism_target_dtc%>% filter(binding_score >0))
 
@@ -229,28 +368,190 @@ save.image("~/cluster_scratch/forward_modelling/targetpred_output.RData")
 ```
 
 
+### 3.2 Target prediction by filtering out the poorly fitted drugs and merging the gene signatures of the duplicated drugs.
 
 
+I will get three id_list, one for each dataset.
+For overlapping drugs (same smiles)
+pick only best fitted ones.
+
+filtering standard acc <0.10 and sample size < 100
+
+```{r}
+
+ctrp_drug_list <- res_ctrp2 %>% 
+  filter(!ces<0.1) %>% 
+  filter(!ceres<0.1) %>% 
+  filter(!demeter2<0.1) %>% 
+  filter(!exp<0.1) %>% 
+  filter(!sample_size <100) %>% 
+  select(cpd_smiles,broad_cpd_id, ces) %>%
+  drop_na() %>% 
+  group_by(cpd_smiles) %>% 
+  slice_max(n=1, order_by=ces) %>% 
+  pull(broad_cpd_id)
+  
+
+gdsc_drug_list <- res_gdsc2 %>% 
+  # filter(!ces<0.1) %>% 
+  # filter(!ceres<0.1) %>% 
+  # filter(!demeter2<0.1) %>% 
+  # filter(!exp<0.1) %>% 
+  filter(!sample_size <100) %>% 
+  select(smiles,DRUG_ID, ces) %>%
+  drop_na() %>% 
+  group_by(smiles) %>% 
+  slice_max(n=1, order_by=ces) %>% 
+  pull(DRUG_ID)
+  
+prism_drug_list <- res_prism2  %>% 
+  filter(!ces<0.1) %>% 
+  filter(!ceres<0.1) %>% 
+  filter(!demeter2<0.1) %>% 
+  filter(!exp<0.1) %>% 
+  filter(!sample_size <100) %>% 
+  select(smiles,BROAD_ID, ces) %>%
+  drop_na() %>% 
+  group_by(smiles) %>% 
+  slice_max(n=1, order_by=ces) %>% 
+  pull(BROAD_ID)
+
+#ctrp
+acc_df_ctrp_binary_fold_cv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",  
+  estimation_method= "fold_cv" , 
+  target_source= ctrp_target_binary, 
+  id_list = ctrp_drug_list)
+
+acc_df_ctrp_binary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",  estimation_method= "loocv" , 
+  target_source= ctrp_target_binary, 
+  id_list = ctrp_drug_list)
+
+acc_df_ctrp_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp", estimation_method= "fold_cv" , 
+  target_source= ctrp_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score), 
+  id_list = ctrp_drug_list
+  )
+
+acc_df_ctrp_dtcbinary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",  estimation_method= "loocv" , 
+  target_source= ctrp_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score), 
+  id_list = ctrp_drug_list
+  )
+
+acc_df_ctrp_dtc_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp", estimation_method= "fold_cv" , target_source= ctrp_target_dtc%>% filter(binding_score >0), 
+  id_list = ctrp_drug_list)
+
+acc_df_ctrp_dtc_loocv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",  estimation_method= "loocv" , 
+  target_source= ctrp_target_dtc%>% filter(binding_score >0), 
+  id_list = ctrp_drug_list)
+
+
+#gdsc
+acc_df_gdsc_binary_fold_cv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "fold_cv" , target_source= gdsc_target_binary, 
+  id_list = gdsc_drug_list)
+
+acc_df_gdsc_binary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "loocv" , 
+  target_source= gdsc_target_binary, 
+  id_list = gdsc_drug_list
+  )
+
+acc_df_gdsc_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc", estimation_method= "fold_cv" , 
+  target_source= gdsc_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score), 
+  id_list = gdsc_drug_list
+  )
+
+acc_df_gdsc_dtcbinary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "loocv" , 
+  target_source= gdsc_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = gdsc_drug_list
+  )
+
+
+acc_df_gdsc_dtc_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc", estimation_method= "fold_cv" , 
+  target_source= gdsc_target_dtc%>% filter(binding_score >0),
+  id_list = gdsc_drug_list
+  )
+
+acc_df_gdsc_dtc_loocv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "loocv" , 
+  target_source= gdsc_target_dtc%>% filter(binding_score >0),
+  id_list = gdsc_drug_list 
+  )
+
+
+#prism
+acc_df_prism_binary_fold_cv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "fold_cv" , 
+  target_source= prism_target_binary,
+  id_list = prism_drug_list)
+
+acc_df_prism_binary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "loocv" , 
+  target_source= prism_target_binary,
+  id_list = prism_drug_list)
+
+acc_df_prism_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "prism", estimation_method= "fold_cv" ,
+  target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = prism_drug_list
+  )
+
+acc_df_prism_dtcbinary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "loocv" ,
+  target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = prism_drug_list
+  )
+
+acc_df_prism_dtc_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "prism", estimation_method= "fold_cv" , 
+  target_source= prism_target_dtc%>% filter(binding_score >0),
+  id_list = prism_drug_list)
+
+acc_df_prism_dtc_loocv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "loocv" , 
+  target_source= prism_target_dtc%>% filter(binding_score >0),
+  id_list = prism_drug_list)
+
+save.image("~/cluster_scratch/forward_modelling/targetpred_output_allfiltered.RData")
+```
 
 
 ```{r}
+sum(duplicated(ctrp_data$cpd_smiles)) # no duplicates
+sum(duplicated(na.omit(gdsc_data$smiles))) # 1 duplicates
+sum(duplicated(prism_data$smiles)) # no duplicates
+```
+
+
+```{r}
+# load("~/cluster_scratch/forward_modelling/targetpred_output.RData")
+load("~/cluster_scratch/forward_modelling/targetpred_output_filtered.RData")
 get_acc_summary <- function(acc_df){
   acc_df %>% 
     group_by(method) %>% 
     summarise(acc_mean= mean(acc,na.rm = T), acc_median= median(acc, na.rm = T))
 }
 
-get_acc_summary(acc_df_ctrp_binary_fold_cv)
-
 
 get_acc_violin_plot <- function(acc_df){
   acc_df %>% 
+    filter(method %in% c("senbased_genesig_comb2", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS") ) %>% 
     ggplot(aes(x=method, y=acc)) + 
     geom_violin()+
     coord_flip()+
     theme_classic()
 }
 ```
+
+
 
 
 ```{r}
@@ -260,6 +561,14 @@ get_acc_summary(acc_df_ctrp_dtcbinary_foldcv)
 get_acc_summary(acc_df_ctrp_dtcbinary_loocv)
 get_acc_summary(acc_df_ctrp_dtc_foldcv)
 get_acc_summary(acc_df_ctrp_dtc_loocv)
+
+
+get_acc_violin_plot(acc_df_ctrp_binary_fold_cv)
+get_acc_violin_plot(acc_df_ctrp_binary_loocv)
+get_acc_violin_plot(acc_df_ctrp_dtcbinary_foldcv)
+get_acc_violin_plot(acc_df_ctrp_dtcbinary_loocv)
+get_acc_violin_plot(acc_df_ctrp_dtc_foldcv)
+get_acc_violin_plot(acc_df_ctrp_dtc_loocv)
 ```
 
 
@@ -270,8 +579,14 @@ get_acc_summary(acc_df_gdsc_dtcbinary_foldcv)
 get_acc_summary(acc_df_gdsc_dtcbinary_loocv)
 get_acc_summary(acc_df_gdsc_dtc_foldcv)
 get_acc_summary(acc_df_gdsc_dtc_loocv)
-```
 
+get_acc_violin_plot(acc_df_gdsc_binary_fold_cv)
+get_acc_violin_plot(acc_df_gdsc_binary_loocv)
+get_acc_violin_plot(acc_df_gdsc_dtcbinary_foldcv)
+get_acc_violin_plot(acc_df_gdsc_dtcbinary_loocv)
+get_acc_violin_plot(acc_df_gdsc_dtc_foldcv)
+get_acc_violin_plot(acc_df_gdsc_dtc_loocv)
+```
 
 
 ```{r}
@@ -281,32 +596,39 @@ get_acc_summary(acc_df_prism_dtcbinary_foldcv)
 get_acc_summary(acc_df_prism_dtcbinary_loocv)
 get_acc_summary(acc_df_prism_dtc_foldcv)
 get_acc_summary(acc_df_prism_dtc_loocv)
+
+get_acc_violin_plot(acc_df_prism_binary_fold_cv)
+get_acc_violin_plot(acc_df_prism_binary_loocv)
+get_acc_violin_plot(acc_df_prism_dtcbinary_foldcv)
+get_acc_violin_plot(acc_df_prism_dtcbinary_loocv)
+get_acc_violin_plot(acc_df_prism_dtc_foldcv)
+get_acc_violin_plot(acc_df_prism_dtc_loocv)
 ```
 
 
 
 imp dtc correlation
 ```{r}
-feature_imp_ridge_ctrp_ces1 %>% 
-  pivot_longer(cols= -drug, names_to = "gene",values_to= "importance") %>% 
-  inner_join(ctrp_target_dtc ,by =c("drug"= "drug", "gene"="target")) %>% 
-  filter(importance >0) %>% 
-  # filter(binding_score >0) %>% 
-  ggplot(aes(x= importance,y= binding_score)) + 
-  geom_point(size= 0.01) +
-  theme_classic()
-
-feature_imp_ridge_ctrp_ces1 %>% 
-  pivot_longer(cols= -drug, names_to = "gene",values_to= "importance") %>% 
-  inner_join(ctrp_target_dtc ,by =c("drug"= "drug", "gene"="target")) %>% 
-  filter(importance >0) %>% 
-  inner_join(res_ctrp2 %>% select(ces,broad_cpd_id, cpd_name,ces_variance)) %>% 
-  filter(ces_variance < 0.05) %>% 
-  filter(ces >0.3) %>% 
-  # filter(binding_score >0) %>% 
-  ggplot(aes(x= importance,y= binding_score)) + 
-  geom_point(size= 0.01) +
-  theme_classic()
+# feature_imp_ridge_ctrp_ces1 %>% 
+#   pivot_longer(cols= -drug, names_to = "gene",values_to= "importance") %>% 
+#   inner_join(ctrp_target_dtc ,by =c("drug"= "drug", "gene"="target")) %>% 
+#   filter(importance >0) %>% 
+#   # filter(binding_score >0) %>% 
+#   ggplot(aes(x= importance,y= binding_score)) + 
+#   geom_point(size= 0.01) +
+#   theme_classic()
+# 
+# feature_imp_ridge_ctrp_ces1 %>% 
+#   pivot_longer(cols= -drug, names_to = "gene",values_to= "importance") %>% 
+#   inner_join(ctrp_target_dtc ,by =c("drug"= "drug", "gene"="target")) %>% 
+#   filter(importance >0) %>% 
+#   inner_join(res_ctrp2 %>% select(ces,broad_cpd_id, cpd_name,ces_variance)) %>% 
+#   filter(ces_variance < 0.05) %>% 
+#   filter(ces >0.3) %>% 
+#   # filter(binding_score >0) %>% 
+#   ggplot(aes(x= importance,y= binding_score)) + 
+#   geom_point(size= 0.01) +
+#   theme_classic()
 
 
 # feature_imp_ridge_gdsc_ces1 %>% 
@@ -361,7 +683,9 @@ cor_tibble <- tibble(drug= imp_ctrp_shared$drug,
                      ctrp_gdsc = get_cor_long_tibble(imp_ctrp_shared, imp_gdsc_shared), 
                      ctrp_prism = get_cor_long_tibble(imp_ctrp_shared, imp_prism_shared), 
                      gdsc_prism = get_cor_long_tibble(imp_prism_shared, imp_gdsc_shared)) 
-  
+
+cor_tibble
+
 ```
 
 
@@ -449,7 +773,7 @@ Continues binding score and prediction scatter plot.
 
 ## 7)
 
-Exploring whether similiarity matrix calculated on the ess signature is a better representation of drug target based similiarity matrix
+Exploring whether similarity matrix calculated on the ess signature is a better representation of drug target based similarity matrix
 ```{r}
 load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
 
@@ -520,4 +844,55 @@ res %>%
   geom_point(size=0.1)
 ```
 
+
+
+## checking correlation
+
+We want to check how original ces and ces based feature importance is correlating with the other basal cell line feature.
+
+```{r}
+load("~/cluster_scratch/forward_modelling/ctrp_input.RData")
+
+
+map(.x = 2:437, .f = ~cor(ces1[,.x], ceres[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+map(.x = 2:437, .f = ~cor(ces1[,.x], demeter2[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+map(.x = 2:437, .f = ~cor(ces1[,.x], exp_seq[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+
+map(.x = 2:437, .f = ~cor(ceres[,.x], demeter2[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+
+```
+
+
+```{r}
+load("~/cluster_scratch/forward_modelling/targetpred_output_filtered.RData")
+
+map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ces1[,.x], feature_imp_ridge_ctrp_ceres[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ces1[,.x], feature_imp_ridge_ctrp_demeter2[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ces1[,.x], feature_imp_ridge_ctrp_exp[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ceres[,.x], feature_imp_ridge_ctrp_demeter2[,.x],method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+```
 

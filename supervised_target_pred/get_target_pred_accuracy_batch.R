@@ -10,8 +10,9 @@ get_target_pred_accuracy_batch <-
     if (estimation_method== "loocv") {
       source('~/cluster_wrk/drug_moa/supervised_target_pred/return_acc_estimate_loocv.R')
     } 
-    set.seed(0000)
+    if (!is.null(id_list)) {target_source <- target_source %>% filter(drug %in% id_list )}
     
+    set.seed(0000)
     acc_ces1 <- return_acc_estimate_cv(
       target_tibble = target_source,
       predictors_tibble = eval(as.symbol(
@@ -49,12 +50,27 @@ get_target_pred_accuracy_batch <-
       predictors_tibble = eval(as.symbol(
         str_c("drug_consensus_", dataset,collapse = "") )) ) 
     
+    acc_comb1<- return_acc_estimate_cv(
+      target_tibble = target_source,
+      predictors_tibble = eval(as.symbol(
+        str_c("feature_imp_ridge_", dataset, "_comb1" ,collapse = "") ))  ) 
+    
+    acc_comb2<- return_acc_estimate_cv(
+      target_tibble = target_source,
+      predictors_tibble = eval(as.symbol(
+        str_c("feature_imp_ridge_", dataset, "_comb2" ,collapse = "") ))  ) 
+    
+    
+    
     acc_df <- acc_ces1 %>% mutate(method = "ces1") %>% 
       bind_rows(acc_ceres %>% mutate(method = "ceres")) %>% 
       bind_rows(acc_demeter2 %>% mutate(method = "demeter2")) %>% 
       bind_rows(acc_exp %>% mutate(method = "exp")) %>% 
       bind_rows(acc_extended %>% mutate(method = "structure_ECFP")) %>%
       bind_rows(acc_maccs %>% mutate(method = "structure_MACCS")) %>%
-      bind_rows(acc_consensus %>% mutate(method = "Consensus_exp_perturb"))
+      bind_rows(acc_consensus %>% mutate(method = "Consensus_exp_perturb")) %>% 
+      bind_rows(acc_comb1 %>% mutate(method = "senbased_genesig_comb1")) %>%
+      bind_rows(acc_comb2 %>% mutate(method = "senbased_genesig_comb2"))
+    
     return(acc_df)
   }
