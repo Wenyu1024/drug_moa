@@ -60,7 +60,12 @@ get_target_pred_accuracy_batch <-
       predictors_tibble = eval(as.symbol(
         str_c("feature_imp_ridge_", dataset, "_comb2" ,collapse = "") ))  ) 
     
-    
+    acc_comb3<- return_acc_estimate_cv(
+      target_tibble = target_source,
+      predictors_tibble = eval(as.symbol(
+        str_c("feature_imp_ridge_", dataset, "_comb3" ,collapse = "") ))  ) 
+
+        
     
     acc_df <- acc_ces1 %>% mutate(method = "ces1") %>% 
       bind_rows(acc_ceres %>% mutate(method = "ceres")) %>% 
@@ -70,7 +75,8 @@ get_target_pred_accuracy_batch <-
       bind_rows(acc_maccs %>% mutate(method = "structure_MACCS")) %>%
       bind_rows(acc_consensus %>% mutate(method = "Consensus_exp_perturb")) %>% 
       bind_rows(acc_comb1 %>% mutate(method = "senbased_genesig_comb1")) %>%
-      bind_rows(acc_comb2 %>% mutate(method = "senbased_genesig_comb2"))
+      bind_rows(acc_comb2 %>% mutate(method = "senbased_genesig_comb2")) %>% 
+      bind_rows(acc_comb3 %>% mutate(method = "senbased_genesig_comb3"))
     
     return(acc_df)
   }
