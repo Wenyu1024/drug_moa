@@ -1,0 +1,136 @@
+---
+title: "data_checking"
+author: "Wenyu"
+date: "7/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+
+first mannually checking if the ceres and demeter2 score in the df_long_data is correct
+```{r}
+load("~/cluster_scratch/ces_21q1_io/ces_prepare_21q1_intermediate.RData")
+
+#for ceres and demeter2 check twp values from different row column, whether the values in original data is the same to the values in the prepared long tibble 
+
+# demeter2 A1BG HEL_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE (ACH-000004) -0.136, TP53 LS513_LARGE_INTESTINE (ACH-000007) 1.22
+# ceres dep score A1BG HEL_HAEMATOPOIETIC_AND_LYMPHOID_TISSUE (ACH-000004) 0.165, TP53 LS513_LARGE_INTESTINE (ACH-000007) 0.436
+ df_long_original %>% 
+   filter(gene %in% c("A1BG", "TP53")) %>% 
+   filter(DepMap_ID %in% c("ACH-000004", "ACH-000007"))
+ 
+```
+
+
+
+Check the row and column correlation of different ESS score in prepared df_long_scaled and df_long_original
+
+```{r}
+df_long_original <- read_csv("~/cluster_scratch/ces_21q1_io/ces_input_21q1_original.csv")
+
+df_long_original %>% 
+  group_by(gene) %>% 
+  summarise(cor = cor(ceres, demeter2)) %>% 
+  ungroup() %>% 
+  pull(cor) %>% 
+  hist()
+
+df_long_original %>% 
+  group_by(DepMap_ID) %>% 
+  summarise(cor = cor(ceres, demeter2)) %>% 
+  ungroup() %>% 
+  pull(cor) %>% 
+  hist()
+```
+
+```{r}
+hist(df_long_original$ceres)
+hist(df_long_original$demeter2)
+cor(df_long_original$ceres,df_long_original$demeter2)
+
+```
+
+
+
+
+```{r}
+df_long_scaled <- read_csv("~/cluster_scratch/ces_21q1_io/ces_input_21q1.csv")
+df_long_scaled %>% 
+  group_by(gene) %>% 
+  summarise(cor = cor(ceres, demeter2)) %>% 
+  ungroup() %>% 
+  pull(cor) %>% 
+  hist()
+
+df_long_scaled %>% 
+  group_by(DepMap_ID) %>% 
+  summarise(cor = cor(ceres, demeter2)) %>% 
+  ungroup() %>% 
+  pull(cor) %>% 
+  hist()
+```
+
+
+
+
+```{r}
+tmp  <- df_long_original %>% 
+  group_by(gene) %>% 
+  summarise(cor = cor(ceres, demeter2)) %>% 
+  ungroup() 
+df_long_original %>% 
+  filter(gene=="KRAS") %>% 
+  ggplot(aes(x= ceres, y= demeter2)) +
+  geom_point()
+
+df_long_original %>% 
+  filter(gene=="TAF1D") %>% 
+  ggplot(aes(x= ceres, y= demeter2)) +
+  geom_point()
+
+df_long_original %>% 
+  filter(gene=="ALG9") %>% 
+  ggplot(aes(x= ceres, y= demeter2)) +
+  geom_point()
+```
+
+I believe the reason that most gene have zero correlation between crispr and shRNA is because they are close to zero and invariantly
+```{r}
+tmp <- df_long_original %>% 
+  group_by(gene) %>% 
+  summarise(cor = cor(ceres, demeter2), median_ceres = median(ceres), median_demeter2 = median(demeter2)) %>% 
+  ungroup() 
+
+tmp %>%   ggplot(aes(x= median_ceres, y= cor)) +
+  geom_point()
+
+tmp %>%   ggplot(aes(x= median_demeter2, y= cor)) +
+  geom_point()
+  
+```
+
+
+```{r}
+# check the range of each gene 
+df_long_original %>% 
+  group_by(gene) %>% 
+  summarise(median_ceres = median(ceres)) %>% 
+  ungroup() %>% 
+  pull(median_ceres) %>% 
+  hist()
+
+df_long_original %>% 
+  group_by(gene) %>% 
+  summarise(median_demeter2 = median(demeter2)) %>% 
+  ungroup() %>% 
+  pull(median_demeter2) %>% 
+  hist()
+```
+
+
+
+
