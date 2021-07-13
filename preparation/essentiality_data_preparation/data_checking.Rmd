@@ -82,6 +82,7 @@ tmp  <- df_long_original %>%
   group_by(gene) %>% 
   summarise(cor = cor(ceres, demeter2)) %>% 
   ungroup() 
+
 df_long_original %>% 
   filter(gene=="KRAS") %>% 
   ggplot(aes(x= ceres, y= demeter2)) +
