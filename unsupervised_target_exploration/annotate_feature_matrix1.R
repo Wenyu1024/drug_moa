@@ -426,73 +426,77 @@ annotate_feature_matrix_par <- function(network, drug_gene_matrix, target_source
 #   ) 
 # toc()
 
-plan(multicore, workers =40)
-tic()
-CTRP_binary_PPIold_Consen_sig <-
-  annotate_feature_matrix_par(
-    network = PPI_old,
-    drug_gene_matrix = feature_imp_ridge_ctrp_comb1,
-    target_source=  ctrp_target_binary
-  )
-toc()
-write_csv(CTRP_binary_PPIold_Consen_sig,"CTRP_binary_PPIold_Consen_sig.csv")
-
-
-tic()
-GDSC_binary_PPIold_Consen_sig <-
-  annotate_feature_matrix_par(
-    network = PPI_old,
-    drug_gene_matrix = feature_imp_ridge_gdsc_comb1,
-    target_source=  gdsc_target_binary
-  )
-toc()
-write_csv(GDSC_binary_PPIold_Consen_sig,"GDSC_binary_PPIold_Consen_sig.csv")
-
-tic()
-PRISM_binary_PPIold_Consen_sig <-
-  annotate_feature_matrix_par(
-    network = PPI_old,
-    drug_gene_matrix = feature_imp_ridge_prism_comb1,
-    target_source=  prism_target_binary
-  )
-toc()
-write_csv(PRISM_binary_PPIold_Consen_sig,"PRISM_binary_PPIold_Consen_sig.csv")
-
-plan(sequential)
-
-# 
-# ##PPI new
+# plan(multicore, workers =40)
 # tic()
-# CTRP_binary_PPInew_Consen_sig <-
+# CTRP_binary_PPIold_Consen_sig <-
 #   annotate_feature_matrix_par(
-#     network = PPI_new,
+#     network = PPI_old,
 #     drug_gene_matrix = feature_imp_ridge_ctrp_comb1,
 #     target_source=  ctrp_target_binary
 #   )
+# toc()
+# write_csv(CTRP_binary_PPIold_Consen_sig,"CTRP_binary_PPIold_Consen_sig.csv")
 # 
-# write_csv(CTRP_binary_PPInew_Consen_sig,"CTRP_binary_PPInew_Consen_sig.csv")
 # 
-# 
-# GDSC_binary_PPInew_Consen_sig <-
+# tic()
+# GDSC_binary_PPIold_Consen_sig <-
 #   annotate_feature_matrix_par(
-#     network = PPI_new,
+#     network = PPI_old,
 #     drug_gene_matrix = feature_imp_ridge_gdsc_comb1,
 #     target_source=  gdsc_target_binary
 #   )
+# toc()
+# write_csv(GDSC_binary_PPIold_Consen_sig,"GDSC_binary_PPIold_Consen_sig.csv")
 # 
-# write_csv(GDSC_binary_PPInew_Consen_sig,"GDSC_binary_PPInew_Consen_sig.csv")
-# 
-# 
-# PRISM_binary_PPInew_Consen_sig <-
+# tic()
+# PRISM_binary_PPIold_Consen_sig <-
 #   annotate_feature_matrix_par(
-#     network = PPI_new,
+#     network = PPI_old,
 #     drug_gene_matrix = feature_imp_ridge_prism_comb1,
 #     target_source=  prism_target_binary
-#   ) 
-# 
-# write_csv(PRISM_binary_PPInew_Consen_sig,"PRISM_binary_PPInew_Consen_sig.csv")
-# 
+#   )
 # toc()
+# write_csv(PRISM_binary_PPIold_Consen_sig,"PRISM_binary_PPIold_Consen_sig.csv")
+# 
+# plan(sequential)
+
+# 
+# ##PPI new
+plan(multicore, workers=40)
+tic()
+CTRP_binary_PPInew_Consen_sig <-
+  annotate_feature_matrix_par(
+    network = PPI_new,
+    drug_gene_matrix = feature_imp_ridge_ctrp_comb1,
+    target_source=  ctrp_target_binary
+  )
+
+write_csv(CTRP_binary_PPInew_Consen_sig,"CTRP_binary_PPInew_Consen_sig.csv")
+
+
+GDSC_binary_PPInew_Consen_sig <-
+  annotate_feature_matrix_par(
+    network = PPI_new,
+    drug_gene_matrix = feature_imp_ridge_gdsc_comb1,
+    target_source=  gdsc_target_binary
+  )
+
+write_csv(GDSC_binary_PPInew_Consen_sig,"GDSC_binary_PPInew_Consen_sig.csv")
+
+
+PRISM_binary_PPInew_Consen_sig <-
+  annotate_feature_matrix_par(
+    network = PPI_new,
+    drug_gene_matrix = feature_imp_ridge_prism_comb1,
+    target_source=  prism_target_binary
+  )
+
+write_csv(PRISM_binary_PPInew_Consen_sig,"PRISM_binary_PPInew_Consen_sig.csv")
+
+
+plan(sequential, workers=40)
+toc()
+
 # 2for ConSen sig
 
 # ## KEGG
