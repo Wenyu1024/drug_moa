@@ -1,11 +1,5 @@
-# LOOCV
-# predictors_tibble = feature_imp_ridge_ctrp_ces1 %>% rename(drug=broad_cpd_id)
-# target_tibble= ctrp_target_tibble %>%
-#   ungroup() %>%
-#   select(broad_cpd_id, gene_symbol_of_protein_target) %>%
-#   rename(drug=broad_cpd_id, target_gene=gene_symbol_of_protein_target) %>% 
-#   mutate(binding_score= 1)
-
+library(tidyverse)
+library(tidymodels)
 
 return_acc_estimate_cv <- function(target_tibble,predictors_tibble=NULL,cor_mat= NULL, similiarity= "spearman",acc_metric= "AUC"){
   set.seed(0000)
