@@ -1,10 +1,11 @@
 return_acc_estimate_cv <- function(target_tibble,predictors_tibble=NULL,cor_mat= NULL, similiarity= "spearman",acc_metric= "AUC"){
   set.seed(0000)
+  source('/projappl/project_2003466/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
+  source('/projappl/project_2003466/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
+  
   if (("binding_score" %in% colnames(target_tibble))){  
     acc_metric= "spearman_cor"}
   
-  source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
-  source('~/cluster_wrk/drug_moa/supervised_target_pred/get_target_matrix_from_long_target_tibble.R')
   if (is.null(cor_mat) ){
     overlapping_drug= intersect(target_tibble$drug, predictors_tibble$drug)
 
