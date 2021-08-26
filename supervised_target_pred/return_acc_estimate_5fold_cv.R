@@ -39,9 +39,9 @@ return_acc_estimate_cv <- function(target_tibble,predictors_tibble=NULL,cor_mat=
   
   fold_obj <- vfold_cv(data = tibble(idx= 1:nrow(target_mat)),v = 5,
                        repeats = 3) %>%
-    mutate(train_idx = map(splits, .f= function(split) {split %>% training() %>% pull(idx)})) %>%
-    mutate(test_idx = map(splits, .f= function(split) {split %>% testing() %>% pull(idx)})) %>%
-    mutate(acc= map_dbl(.x = .data$test_idx,
+    mutate(train_idx = future_map(splits, .f= function(split) {split %>% training() %>% pull(idx)})) %>%
+    mutate(test_idx = future_map(splits, .f= function(split) {split %>% testing() %>% pull(idx)})) %>%
+    mutate(acc= future_map_dbl(.x = .data$test_idx,
                         .f = ~no_tunning_weighted_averaging(target_mat = target_mat, cor_mat= cor_mat, test_idx= .x, acc_metric = acc_metric)))
 
   # w <- no_tunning_weighted_averaging(target_mat = target_mat, cor_mat= cor_mat, test_idx= 1:20)

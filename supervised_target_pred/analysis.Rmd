@@ -87,10 +87,12 @@ feature_imp_ridge_ctrp_comb2 <-
   bind_cols(
     feature_imp_ridge_ctrp_ces1 %>% select(drug),
     as_tibble(
-      (as.matrix(feature_imp_ridge_ctrp_ces1 %>% select(-drug))/3 +
+      (
+      as.matrix(feature_imp_ridge_ctrp_ces1 %>% select(-drug))/3 +
       as.matrix(feature_imp_ridge_ctrp_ceres %>% select(-drug))/3 +
       as.matrix(feature_imp_ridge_ctrp_demeter2 %>% select(-drug))/3 +
-      as.matrix(feature_imp_ridge_ctrp_exp %>% select(-drug)))/2 )
+      as.matrix(feature_imp_ridge_ctrp_exp %>% select(-drug))
+      )/2 )
     )
 
 feature_imp_ridge_gdsc_comb2 <- 
@@ -388,6 +390,7 @@ idx_list_ctrp <-   apply(res_ctrp2[,1:4],MARGIN = 1, max)
 idx_list_gdsc <-   apply(res_gdsc2[,1:4],MARGIN = 1, max)
 idx_list_prism <-   apply(res_prism2[,1:4],MARGIN = 1, max)
 
+#217
 ctrp_drug_list <- res_ctrp2 %>% 
   bind_cols(senfitting_acc=apply(res_ctrp2[,1:4],MARGIN = 1, max)) %>% 
   filter(senfitting_acc>0.1) %>% 
@@ -404,7 +407,7 @@ ctrp_drug_list <- res_ctrp2 %>%
   slice_max(n=1, order_by=senfitting_acc) %>% 
   pull(broad_cpd_id)
   
-
+#56
 gdsc_drug_list <- res_gdsc2 %>% 
     bind_cols(senfitting_acc=apply(res_gdsc2[,1:4],MARGIN = 1, max)) %>% 
   filter(senfitting_acc>0.1) %>% 
@@ -420,7 +423,8 @@ gdsc_drug_list <- res_gdsc2 %>%
   group_by(smiles) %>% 
   slice_max(n=1, order_by=senfitting_acc) %>% 
   pull(DRUG_ID)
-  
+
+#684  
 prism_drug_list <- res_prism2  %>% 
   bind_cols(senfitting_acc=apply(res_prism2[,1:4],MARGIN = 1, max)) %>% 
   filter(senfitting_acc>0.1) %>% 
@@ -436,6 +440,15 @@ prism_drug_list <- res_prism2  %>%
   group_by(smiles) %>% 
   slice_max(n=1, order_by=senfitting_acc) %>% 
   pull(BROAD_ID)
+
+length(intersect(ctrp_drug_list, unique(ctrp_target_binary$drug))) #196
+length(intersect(ctrp_drug_list, unique(ctrp_target_dtc$drug))) #183
+length(intersect(gdsc_drug_list, unique(gdsc_target_binary$drug))) #48
+length(intersect(gdsc_drug_list, unique(gdsc_target_dtc$drug))) #51
+length(intersect(prism_drug_list, unique(prism_target_binary$drug))) #604
+length(intersect(prism_drug_list, unique(prism_target_dtc$drug))) #119
+
+
 
 #ctrp
 acc_df_ctrp_binary_fold_cv <- get_target_pred_accuracy_batch(
@@ -550,6 +563,52 @@ sum(duplicated(ctrp_data$cpd_smiles)) # no duplicates
 sum(duplicated(na.omit(gdsc_data$smiles))) # 1 duplicates
 sum(duplicated(prism_data$smiles)) # no duplicates
 ```
+
+
+### 3.3 Target prediction with simple filtering
+```{r}
+
+#217
+ctrp_drug_list <- res_ctrp2 %>% 
+  filter(!sample_size <100) %>% 
+  filter(broad_cpd_id %in% drug_consensus_ctrp$drug) %>% 
+  select(cpd_smiles,broad_cpd_id, sample_size) %>%
+  drop_na() %>% 
+  group_by(cpd_smiles) %>% 
+  slice_max(n=1, order_by=sample_size) %>% 
+  pull(broad_cpd_id)
+  
+#57
+gdsc_drug_list <- res_gdsc2 %>% 
+  filter(DRUG_ID %in% drug_consensus_gdsc$drug) %>% 
+  filter(!sample_size <100) %>% 
+  select(smiles,DRUG_ID, sample_size) %>%
+  drop_na() %>% 
+  group_by(smiles) %>% 
+  slice_max(n=1, order_by=sample_size) %>% 
+  pull(DRUG_ID)
+
+#918  
+prism_drug_list <- res_prism2  %>% 
+  filter(BROAD_ID %in% drug_consensus_prism$drug) %>% 
+  filter(!sample_size <100) %>% 
+  select(smiles,BROAD_ID, sample_size) %>%
+  drop_na() %>% 
+  group_by(smiles) %>% 
+  slice_max(n=1, order_by=sample_size) %>% 
+  pull(BROAD_ID)
+
+length(intersect(ctrp_drug_list, unique(ctrp_target_binary$drug))) #196
+length(intersect(ctrp_drug_list, unique(ctrp_target_dtc$drug))) #183
+length(intersect(gdsc_drug_list, unique(gdsc_target_binary$drug))) #49
+length(intersect(gdsc_drug_list, unique(gdsc_target_dtc$drug))) #52
+length(intersect(prism_drug_list, unique(prism_target_binary$drug))) #805
+length(intersect(prism_drug_list, unique(prism_target_dtc$drug))) #137
+
+
+```
+
+
 
 
 ```{r}
@@ -776,15 +835,6 @@ fig
 ```
 
 
-
-
-
-
-
-
-
-
-
 ## 6) further explore the prediction result.
 
 drug category, Does perturbation data favor certain kind of drug comparing to chemical finger print?
@@ -874,46 +924,124 @@ We want to check how original ces and ces based feature importance is correlatin
 ```{r}
 load("~/cluster_scratch/forward_modelling/ctrp_input.RData")
 
-
-map(.x = 2:437, .f = ~cor(ces1[,.x], ceres[,.x],method = "spearman")) %>% 
+tmp <- unlist(ces1[1,-1])
+map(.x = 1:437, .f = ~cor(unlist(ces1[.x,-1]), unlist(ceres[.x,-1]),method = "spearman")) %>% 
   unlist() %>% 
   hist()
 
-map(.x = 2:437, .f = ~cor(ces1[,.x], demeter2[,.x],method = "spearman")) %>% 
-  unlist() %>% 
-  hist()
-
-map(.x = 2:437, .f = ~cor(ces1[,.x], exp_seq[,.x],method = "spearman")) %>% 
+map(.x = 1:437, .f = ~cor(unlist(ces1[.x,-1]), unlist(demeter2[.x,-1]),method = "spearman")) %>% 
   unlist() %>% 
   hist()
 
 
-map(.x = 2:437, .f = ~cor(ceres[,.x], demeter2[,.x],method = "spearman")) %>% 
+
+map(.x = 1:437, .f = ~cor(unlist(ceres[.x,-1]), unlist(demeter2[.x,-1]),method = "spearman")) %>% 
   unlist() %>% 
   hist()
 
 
+
+map(.x = 1:437, .f = ~cor(unlist(ces1[.x,-1]), unlist(exp_seq[.x,-1]),method = "spearman")) %>%
+  unlist() %>%
+  hist()
+```
+
+```{r}
+# ces_columnscaled <- ces %>% 
+#   mutate_at(2:10624, scale)
+# 
+# ceres_columnscaled <- ceres %>% 
+#   mutate_at(2:10624, scale)
+
+
+ces1_columnscaled <- ces1 %>% 
+  pivot_longer(cols= -DepMap_ID, names_to = "gene", values_to= "ess") %>% 
+  pivot_wider(id_cols = gene, names_from= DepMap_ID, values_from= ess) %>% 
+  mutate_at(2:438, .funs = scale) %>% 
+  pivot_longer(cols= -gene, names_to = "DepMap_ID", values_to= "ess") %>% 
+  pivot_wider(id_cols = DepMap_ID, names_from= gene, values_from= ess) 
+
+ceres_columnscaled <- ceres %>% 
+  pivot_longer(cols= -DepMap_ID, names_to = "gene", values_to= "ess") %>% 
+  pivot_wider(id_cols = gene, names_from= DepMap_ID, values_from= ess) %>% 
+  mutate_at(2:438, .funs = scale) %>% 
+  pivot_longer(cols= -gene, names_to = "DepMap_ID", values_to= "ess") %>% 
+  pivot_wider(id_cols = DepMap_ID, names_from= gene, values_from= ess) 
+
+
+map(.x = 2:10624, .f = ~cor(unlist(ces1[,.x]), unlist(ceres[,.x]),method = "spearman")) %>%
+  unlist() %>% 
+  hist()
+
+map(.x = 2:10624, 
+    .f = 
+      ~cor(unlist(ces1_columnscaled[,.x]),unlist(ceres_columnscaled[,.x]),method = "spearman")) %>% 
+  unlist() %>% 
+  hist()
+
+# map(.x = 2:10624, .f = ~cor(unlist(ces1[,.x]), unlist(demeter2[,.x]),method = "spearman")) %>%
+#   unlist() %>% 
+#   hist()
+# 
+# 
+# map(.x = 2:10624, .f = ~cor(unlist(demeter2[,.x]), unlist(ceres[,.x]),method = "spearman")) %>% 
+#   unlist() %>% 
+#   hist()
 ```
 
 
+
+
 ```{r}
-load("~/cluster_scratch/forward_modelling/targetpred_output_filtered.RData")
+load("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
 
-map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ces1[,.x], feature_imp_ridge_ctrp_ceres[,.x],method = "spearman")) %>% 
-  unlist() %>% 
+map(.x = 1:5, .f = ~cor(feature_imp_ridge_ctrp_ces1[.x,-1], feature_imp_ridge_ctrp_ceres[.x,-1],method = "spearman")) %>%
+  unlist() %>%
   hist()
+# 
+# map(.x = 1:545, .f = ~cor(feature_imp_ridge_ctrp_ces1[.x,-1], feature_imp_ridge_ctrp_demeter2[.x,],method = "spearman")) %>% 
+#   unlist() %>% 
+#   hist()
+# 
+# map(.x = 1:545, .f = ~cor(feature_imp_ridge_ctrp_ces1[.x,], feature_imp_ridge_ctrp_exp[.x,],method = "spearman")) %>% 
+#   unlist() %>% 
+#   hist()
+# 
+# map(.x = 1:545, .f = ~cor(feature_imp_ridge_ctrp_ceres[.x,], feature_imp_ridge_ctrp_demeter2[.x,],method = "spearman")) %>% 
+#   unlist() %>% 
+#   hist()
 
-map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ces1[,.x], feature_imp_ridge_ctrp_demeter2[,.x],method = "spearman")) %>% 
-  unlist() %>% 
-  hist()
+tmp <- bind_rows(feature_imp_ridge_ctrp_ces1[1,],feature_imp_ridge_ctrp_ceres[1,]) %>% 
+  select(-drug) %>% 
+  t() %>% 
+  as_tibble() 
+tmp %>% 
+  ggplot(aes(x=V1, y= V2))+
+  geom_point()
 
-map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ces1[,.x], feature_imp_ridge_ctrp_exp[,.x],method = "spearman")) %>% 
-  unlist() %>% 
-  hist()
+cor(tmp$V1, tmp$V2)
 
-map(.x = 2:495, .f = ~cor(feature_imp_ridge_ctrp_ceres[,.x], feature_imp_ridge_ctrp_demeter2[,.x],method = "spearman")) %>% 
-  unlist() %>% 
-  hist()
+
+tmp <- bind_rows(feature_imp_ridge_ctrp_ces1[1,],feature_imp_ridge_ctrp_demeter2[1,]) %>% 
+  select(-drug) %>% 
+  t() %>% 
+  as_tibble() 
+tmp %>% 
+  ggplot(aes(x=V1, y= V2))+
+  geom_point()
+
+cor(tmp$V1, tmp$V2)
+
+
+tmp <- bind_rows(feature_imp_ridge_ctrp_ces1[1,],feature_imp_ridge_ctrp_exp[1,]) %>% 
+  select(-drug) %>% 
+  t() %>% 
+  as_tibble() 
+tmp %>% 
+  ggplot(aes(x=V1, y= V2))+
+  geom_point()
+
+cor(tmp$V1, tmp$V2)
 
 ```
 
