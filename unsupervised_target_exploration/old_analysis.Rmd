@@ -1,0 +1,365 @@
+---
+title: "unsupervised target exploration"
+author: "Wenyu"
+date: "3/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Note all the useful analysis has been moved.
+This file is nolonger used
+
+
+# 2 Unsupervised target exploration
+use network long table, target long table and feature long table to generate a full long table with at least 5 columns
+
+
+Now I derive the ces based feature importance vector to see 
+
+```{r}
+kegg_tibble <- read_csv("~/cluster_scratch/prior/kegg_tibble.csv")
+
+target_tibble <- ctrp_target_tibble %>%
+  ungroup() %>%
+  select(broad_cpd_id, gene_symbol_of_protein_target) %>%
+  rename(drug=broad_cpd_id, target_gene=gene_symbol_of_protein_target) %>% 
+  mutate(binding_score= 1)
+
+
+save(ces1_glm_feature_annotated,
+     file = "~/cluster_scratch/glmnet_modelling/drugbank_annotated_feature_importance.RData"
+     )
+```
+
+plot how the feature importance top ranked genes falls in direct target and 1, 2,3 neighbors. 
+```{r}
+load("~/cluster_scratch/glmnet_modelling/drugbank_annotated_feature_importance.RData")
+
+drugbank_annotated_feature_importance <- 
+  ces1_glm_feature_annotated %>% 
+  mutate(ess= "ces1") 
+%>% 
+  bind_rows(ces2_glm_feature_annotated %>% mutate(ess= "ces2")) %>% 
+  bind_rows(ceres_glm_feature_annotated %>% mutate(ess= "ceres")) %>%   
+  bind_rows(demeter_glm_feature_annotated %>% mutate(ess= "demeter")) 
+
+
+#let plot a grouped table of how target and their 1,2,3 neighbors are identified.
+
+# feature importance distribution 
+
+tmp <- drugbank_annotated_feature_importance %>%
+  filter(imp!=0) %>% 
+  pull(imp)
+hist(tmp)  
+
+
+drugbank_annotated_feature_importance %>% 
+  filter(imp!=0) %>% 
+  ggplot(aes(x= target_cat, y= imp, fill= ess)) +
+  geom_violin()+
+  theme_classic()+
+  geom_hline(yintercept =0)
+
+# drugbank_annotated_feature_importance %>% 
+#   filter(imp!=0) %>% 
+#   ggplot(aes(x= target_cat, y= log2(imp+1), fill= ess)) +
+#   geom_violin()+
+#   theme_classic()
+fig <- drugbank_annotated_feature_importance %>% 
+  filter(imp!=0) %>% 
+  # ggplot(aes(x= target_cat, y= log(imp+1), fill= ess)) +
+  ggplot(aes(x= target_cat, y= imp, fill= ess)) +
+  geom_boxplot(outlier.size = 0.01)+ #outlier.size = -1
+  geom_hline(yintercept = 0, lty=4, color= "red")+
+  theme_classic()+
+  xlab("Gene type")+
+  ylab("Feature importance")+
+  labs(fill= "Essentiality") +
+  scale_x_discrete(breaks=c("0","1","2","3","4"),
+        labels=c("Nomial target", "1st neighbour", "2nd neigbour", "3rd neighbour", "Others"))
+  
+
+# drugbank_annotated_feature_importance %>% 
+#   filter(imp!=0) %>% 
+#   ggplot(aes(x= target_cat, y= log2(imp+1), fill= ess)) +
+#   geom_boxplot()+
+#   theme_classic()
+
+# how to transform the y axis so that it distribute more equally?
+
+```
+
+```{r, fig.height=2,fig.width=6}
+fig
+```
+
+
+```{r}
+#how many target and 1,2,3 neighbours has been identified by the non-zero feature importance?
+drugbank_annotated_feature_importance %>% 
+  filter(imp!=0) %>% 
+  # filter(target_cat!=4) %>% 
+  select(-imp) %>% 
+  ggplot(aes(x= target_cat,  fill= ess)) +
+  geom_bar(position = position_dodge())
+
+# note dont use numbers, use the percentage: such as what percent of all the target are identified by the positive drug-gene feature importance?
+tmp <- drugbank_annotated_feature_importance %>% 
+  filter(target_cat==0) %>% 
+  filter(imp > 0) %>%
+  # filter(imp!0) %>% 
+  group_by(ess) %>% 
+  summarise(Percetage= n()/744)
+
+# looks that the percentage of identifying the direct target is not looking good.
+# (ceres result better than ces1?)
+# perhaps stay with the form plot.
+# or maybe tailer a threshold?
+
+
+#How many target has been identified by the positive feature importance?
+tmp <- drugbank_annotated_feature_importance %>% 
+  # filter(target_cat==0) %>% 
+  filter(imp > 0) %>%
+  group_by(ess) %>% 
+  summarise(Percetage= n())
+
+```
+
+ROC curve
+```{r}
+# tmp <-drugbank_annotated_feature_importance %>% 
+#   mutate(d= (target_cat == "0")) 
+  # pivot_wider(names_from=ess, values_from=imp)
+  
+
+library(plotROC)
+
+
+fig <-  drugbank_annotated_feature_importance %>% 
+  filter(imp>0) %>% 
+  mutate(d= (target_cat == "0")) %>% 
+  ggplot(aes(d = d, m = imp, color = ess )) + 
+  geom_roc(n.cuts=0, size =0.3) + 
+  style_roc(xlab="FPR",ylab="TPR")+
+  theme_classic()+
+  ggtitle("drugbank")+
+      scale_x_continuous(breaks=seq(0,1,0.2),name = "FPR")+
+    scale_y_continuous(breaks=seq(0,1,0.2),name = "TPR")
+```
+
+```{r,fig.height=2, fig.width=3}
+fig
+```
+
+
+
+
+
+How about use dtc target to annotate
+note now you also have interaction strength!
+
+```{r}
+ctrpv2_list_to_zia <- read_csv("~/cluster_scratch/prior/ctrpv2_list_to_zia.csv")
+ctrp_target_dtc <- read_csv("~/cluster_scratch/prior/ctrp_target_dtc.csv")
+
+target_tibble <- ctrp_target_dtc %>% 
+  select(standard_inchi_key, gene_name, interaction_strength) %>%
+  filter(interaction_strength!= 0) %>% 
+  drop_na() %>% 
+  group_by(standard_inchi_key, gene_name) %>% 
+  summarize(interaction_strength= median(interaction_strength,na.rm = T)) %>% 
+  ungroup() %>% 
+  inner_join(ctrpv2_list_to_zia,by= c("standard_inchi_key"= "InChIKey")) %>% 
+  select(broad_cpd_id, gene_name, interaction_strength) %>% 
+  group_by(broad_cpd_id, gene_name) %>% 
+  summarize(interaction_strength= median(interaction_strength,na.rm = T)) %>% 
+  ungroup() %>%   rename(drug=broad_cpd_id, target_gene=gene_name, binding_score= interaction_strength) 
+
+# ces1_glm_feature_annotated <- 
+#   annotate_feature_matrix(
+#     network = kegg_tibble,
+#     feature_imp_mat = feature_imp_glmnet_ctrp_ces1%>% 
+#       rename(drug= broad_cpd_id),
+#     target=  target_tibble
+#     )
+# 
+# ces2_glm_feature_annotated <- 
+#   annotate_feature_matrix(
+#     network = kegg_tibble,
+#     feature_imp_mat = feature_imp_glmnet_ctrp_ces2%>% 
+#       rename(drug= broad_cpd_id),
+#     target=  target_tibble
+#     )
+#   
+# ceres_glm_feature_annotated <- 
+#     annotate_feature_matrix(
+#     network = kegg_tibble,
+#     feature_imp_mat = feature_imp_glmnet_ctrp_ceres %>% 
+#       rename(drug= broad_cpd_id),
+#     target=  target_tibble
+#     )
+# 
+# demeter_glm_feature_annotated <- 
+#     annotate_feature_matrix(
+#     network = kegg_tibble,
+#     feature_imp_mat = feature_imp_glmnet_ctrp_demeter2 %>% 
+#       rename(drug= broad_cpd_id),
+#     target=  target_tibble
+#     )
+# 
+# save(list = c("ces1_glm_feature_annotated","ces2_glm_feature_annotated","ceres_glm_feature_annotated","demeter_glm_feature_annotated"),
+#      file = "~/cluster_scratch/glmnet_modelling/DTC_annotated_feature_importance.RData"
+#      )
+
+```
+
+since both feature importance and target binding score are continues now
+lets see how do they agree with each other.
+
+Is there a correlation?  for genes that do have a drug target binding score, does the feature importance value correlate with the numeric binding strength (original values or abs or only take the negative/positive ones?))
+
+
+```{r}
+load("~/cluster_scratch/glmnet_modelling/DTC_annotated_feature_importance.RData")
+DTC_annotated_feature_importance <- 
+  ces1_glm_feature_annotated %>% 
+  mutate(ess= "ces1") %>% 
+  bind_rows(ces2_glm_feature_annotated %>% mutate(ess= "ces2")) %>% 
+  bind_rows(ceres_glm_feature_annotated %>% mutate(ess= "ceres")) %>%   
+  bind_rows(demeter_glm_feature_annotated %>% mutate(ess= "demeter")) %>% 
+  left_join(target_tibble,by= c("drug"= "drug", "gene"= "target_gene"))
+
+```
+
+Is there a linear relationship?
+
+```{r}
+fig <- DTC_annotated_feature_importance %>% 
+  drop_na() %>%
+  filter(imp!=0) %>% 
+  ggplot(aes(y= imp, x= binding_score, color= ess)) 
+
+fig +  geom_point()
+fig +  stat_summary_bin(geom="crossbar",position = position_dodge()) 
+```
+
+
+```{r}
+fig <- DTC_annotated_feature_importance %>% 
+  drop_na() %>%
+  filter(imp>0) %>%
+  filter(ess== "ces1") %>% 
+  ggplot(aes(y= log10(imp), x= binding_score))+
+  geom_point(size= 0.1)+
+  # stat_summary_bin(geom="crossbar",width= 0.3, color= "red",bins = 8)+
+  theme_classic()
+```
+
+
+```{r, fig.width=2, fig.height=2}
+fig
+```
+
+How does the ROC and Precision-recall curve looks like?
+
+Note the precision and recall curve requires a binary label.
+lets just use binding score 0, 0.2, 0.4, 0.6, 0.8 as threshold for binarization
+```{r}
+generate_roc_by_thresholding <- function(x){
+  tmp <- DTC_annotated_feature_importance %>% 
+  replace_na(list(binding_score = 0)) %>% 
+  mutate(d= as.integer(binding_score>x))  %>% 
+  filter(imp > 0)
+  # mutate(threshold_0= (binding_score>0)) %>% 
+  # mutate(threshold_0.2= (binding_score>0.2)) %>% 
+  # mutate(threshold_0.4= (binding_score>0.4)) %>% 
+  # mutate(threshold_0.6= (binding_score>0.6) ) %>% 
+  # mutate(threshold_0.8= (binding_score>0.8)) %>% 
+  # filter(threshold== threshold_0.2) %>% 
+  # pivot_longer(cols = starts_with("thres"),names_to = "threshold", values_to= "D") %>% 
+  tmp %>% 
+  ggplot(aes(d = d, m = imp, color = ess)) + 
+  geom_roc(n.cuts=0) + 
+  style_roc(xlab="FPR",ylab="TPR")+
+  theme_classic()+
+  ggtitle(paste("threshold", x,sep= " "))
+
+  }
+
+
+```
+
+```{r}
+generate_roc_by_thresholding(0.2)
+generate_roc_by_thresholding(0.4)
+generate_roc_by_thresholding(0.5)
+generate_roc_by_thresholding(0.6)
+generate_roc_by_thresholding(0.8)
+
+
+```
+
+
+how many drug are there for each expression dataset?
+```{r}
+x <- ctrpv2_data$sensitivity[[1]]
+tmp <- ctrpv2_data %>% 
+  mutate(exp_data_point= map_int(.x = sensitivity, .f = function(x){
+    tmp <- x %>% inner_join( 
+      y= janitor::clean_names(exp_seq_imputed[,1:2])%>% 
+        rename_at(vars(!contains("dep_map_id")), .fun= ~paste0(., "_predictors")), 
+            by= c("DepMap_ID"="dep_map_id")) 
+    tmp1 <- nrow(tmp)
+    return(tmp1)
+  })) 
+estimate_performance_glmnet(sen_df = x,ess = exp_seq_imputed[,1:10])
+estimate_performance_glmnet(sen_df = x,ess = exp_seq_imputed[,1:10])
+```
+
+
+explore how ces1 feature importance correspond to drug perturbated gene expression?
+```{r}
+#first check the overlapping drugs available between ctrp and consensus signature.
+consensus_signature_shRNA <- read_csv("/home/cloud-user/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_shRNA.csv")
+# also check the overlapping genes between the gene vector and perturbed genes.
+consensus_signature_drugs <- read_csv("/home/cloud-user/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_drugs.csv")
+
+
+# 183 overlapping drugs
+overlapping_drug <- intersect(consensus_signature_drugs$X1, ctrpv2_data$broad_cpd_id)
+
+load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
+
+# 3562 overlapped perturved genes. 
+overlapping_gene <- intersect(consensus_signature_shRNA$X1,
+            colnames(feature_imp_ridge_ctrp_ces1))
+
+```
+
+
+
+
+ 
+
+
+
+
+```{r}
+pathways_df <- 
+  tibble(broad_cpd_id=feature_imp_ridge_ctrp_ces1$broad_cpd_id,res_pathway) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = ctrpv2_data %>% select_at(1:5),
+             by= "broad_cpd_id")
+  
+top_5drugs <- pathways_df %>% select(broad_cpd_id) %>% distinct() %>% slice(1:5)
+tmp  <- pathways_df %>% 
+  filter(broad_cpd_id %in% top_5drugs$broad_cpd_id) 
+  
+```
+
