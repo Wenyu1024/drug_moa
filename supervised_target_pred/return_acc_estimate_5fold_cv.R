@@ -1,3 +1,4 @@
+library(furrr)
 library(tidyverse)
 library(tidymodels)
 return_acc_estimate_cv <- function(target_tibble,predictors_tibble=NULL,cor_mat= NULL, similiarity= "spearman",acc_metric= "AUC"){

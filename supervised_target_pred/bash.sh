@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=5
 #SBATCH -p small
-#SBATCH --mem-per-cpu=10000
+#SBATCH --mem-per-cpu=5000
 
 # Load r-env-singularity
 module load r-env-singularity

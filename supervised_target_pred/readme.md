@@ -1,0 +1,1 @@
+This folder conducts descriptive and supervised target prediction analysis for consensig (as well as other signatures)
