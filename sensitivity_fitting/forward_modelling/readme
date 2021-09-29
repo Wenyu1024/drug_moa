@@ -1,22 +1,27 @@
-Two major computations in this folder:
+1. General design description
+Two major computations:
+1) Estimate accuracy: two layers of CV (outer 5fold 3repeats, inner 10 bootstrapping), inside layer for parameter tunning, outside layer accounts uncertainty of accurate estimation brought by subsampling .
 
-1) Estimate accuracy: 
+Since I build one model per drug. To speed up computation I used the array job design, where for each drug occupy a node. 
+In addition, each job contains an additional layer of parallelization within the called function (estimate_performance_par function object is defined in the estimate_performance.R function code).
 
-two layers of CV (both 5fold 3repeats), one for parameter tunning one for get estimate uncertainty.
-
-I used the array job design where for each drug I submit one array job. Each job contains an additional layer of parallelization within the called function (estimate_performance_par function object is defined in the estimate_performance.R function code).
-TO help this second layer of parallelization, I defined in my code 5cpus per task and 50 000 mb memory per cpu. Since it indeed need this much of memory. I still stick to partition small because such node has better avaliability than the huge mem node.
+To help this second layer of parallelization, I defined in my code 5cpus per task and 50 000 mb memory per cpu. Since it indeed need this much of memory. I still stick to partition small because such node has better avaliability than the huge mem node.
 
 
 2) Derive feature importance:
-One layer of CV (Still 5*3 CV), first search for the best hyperparameter, then fix the model, and apply to the whole dataset to derive the feature importance vector. 
+One layer of CV (Still 5*3 CV), first search for the best hyperparameter, then fix the model, and apply the fixed model to the whole dataset to derive the feature importance vector. 
 
 
-
-
-IO:
-IO is added in the analysis Rmd file
+2. IO:
 Input data is the same for both two computations. using prepare_inputRdata.R
-output for feature imp is directly used in the next step.
-output for the performance estimation is evaluated here in the Rmd file
+Output for feature imp is directly used in the next step.
+Output for the performance estimation is evaluated here in the Rmd file
 
+3. Funciton:
+1)run_*.R: For a given sensitivity dataset, conduct final data mangling with various predictor dataset to generate a df, feed the prepared df to function, get result and save workspace as output.
+
+2)estimate_performance_par: Prepapre resampling, fix model with get_fixed*.R and estimate acc of fixed model with outer layer of CV.
+
+3)derive_feature_imp: Prepapre resampling, fix model with get_fixed*.R and get feature imp from fixed model.
+
+4)get_fixed*: get a fixed model from the data and resampling setting given.

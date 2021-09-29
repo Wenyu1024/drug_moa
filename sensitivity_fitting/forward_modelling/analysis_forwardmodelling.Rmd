@@ -21,19 +21,12 @@ load("~/cluster_scratch/forward_modelling/ctrp_input.RData")
 ctrp_data <- data
 rm(data)
 res_ctrp <- map_dfr(c(1:545), .f = function(x){
-
-  # drug <- paste("~/cluster_scratch/forward_modelling/ctrp_pearson/", x, ".RData", sep = "")
     drug <- paste("~/cluster_scratch/forward_modelling/ctrp_spearman/drug_", x, ".RData", sep = "")
   load(drug)
   df <- bind_cols(ceres= ceres_perf, ces= ces1_perf, demeter2= demeter2_perf, exp= exp_perf, drug= x)
   
 })
 
-
-```
-
-
-```{r}
 res_ctrp1 <- res_ctrp %>% 
   group_by(drug) %>% 
   summarise_all(.funs = median) 
@@ -90,9 +83,7 @@ res_ctrp2 %>%
 ```
 
 
-
-
-
+Supplementary figure
 ```{r,fig.width=2.5, fig.height=2.5}
 res_ctrp2 %>%
   select(ces,sample_size) %>% 
@@ -336,4 +327,8 @@ tmp %>%
 
 
 
+Additional analysis 
+```{r}
+cor(ces1$A1BG, ceres)
+```
 

@@ -1,6 +1,6 @@
 # 1 load data, function and packages
-source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_fixed_ridge.R')
-source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_feature_imp.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/function/get_fixed_ridge.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/function/derive_featureimp.R')
 load("/scratch/project_2003466/forward_modelling/prism_input.RData")
 library(tidyverse, quietly = T)
 library(furrr, quietly = T)
@@ -19,10 +19,8 @@ print(job_id)
 sen_drug <- data %>% 
   slice(job_id) %>% 
   pull(sensitivity) 
-
 sen_drug <- sen_drug[[1]]
 
-# 3 accuracy estimation
 get_df_prism <- function(sen_df= sen_drug, predictor_df){
   df <- sen_df  %>% 
     as_tibble() %>% 
@@ -42,6 +40,7 @@ demeter2_df <- get_df_prism(predictor_df = demeter2)
 exp_df <- get_df_prism(predictor_df = exp_seq)
 rm(ces1, ceres,demeter2, exp_seq,data, sen_drug)
 
+# 3 feature imp derivation
 plan(multicore)
 ces1_perf= get_feature_imp(df= ces1_df,fun_name = get_fixed_glmnet)
 print("ces1 success")
@@ -57,12 +56,8 @@ print("exp success")
 rm(exp_df)
 plan(sequential)
 
-
-
-# 5 write out results
+# 4 write out results
 file_name = paste0( '/scratch/project_2003466/forward_modelling/prism_spearman_feature_imp/drug_' ,job_id,".RData" )
-# save(list = c('ces1_perf'), file = file_name)
-
 save(list = c('ces1_perf',"ceres_perf", "demeter2_perf","exp_perf"), file = file_name)
 
 print("all success")

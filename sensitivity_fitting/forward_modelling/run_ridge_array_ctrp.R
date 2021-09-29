@@ -1,5 +1,6 @@
-source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/get_fixed_ridge.R')
-source('/projappl/project_2003466/drug_moa/sensitivity_fitting/function/estimate_performance_uniform.R')
+# 1 load data, function and packages
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/function/get_fixed_ridge.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/function/estimate_performance_uniform.R')
 load("/scratch/project_2003466/forward_modelling/ctrp_input.RData")
 library(tidyverse, quietly = T)
 library(furrr, quietly = T)
@@ -10,6 +11,7 @@ args <- as.numeric( commandArgs( TRUE ) )
 job_id <- args[1]
 print(job_id)
 
+# 2 generate the input format of the sensitivity data for a specific drug
 sen_drug <- data %>% 
   slice(job_id) %>% 
   pull(sensitivity) 
@@ -33,6 +35,7 @@ demeter2_df <- get_df_ctrp(predictor_df = demeter2)
 exp_df <- get_df_ctrp(predictor_df = exp_seq)
 rm(ces1, ceres,demeter2, exp_seq,data, sen_drug)
 
+# 3 accuracy estimation
 plan(multicore)
 ces1_perf= estimate_performance_par(df= ces1_df,fun_name = get_fixed_glmnet)
 print("ces1 success")
@@ -48,8 +51,8 @@ print("exp success")
 rm(exp_df)
 plan(sequential)
 
+# 4 write out results
 file_name = paste0( '/scratch/project_2003466/forward_modelling/ctrp_spearman/drug_' ,job_id,".RData" )
-# save(list = c('ces1_perf'), file = file_name)
 save(list = c('ces1_perf',"ceres_perf", "demeter2_perf","exp_perf"), file = file_name)
 
 print("all success")
