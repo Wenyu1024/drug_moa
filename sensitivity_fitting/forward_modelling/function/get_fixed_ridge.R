@@ -1,4 +1,3 @@
-#this code combines and update the effort in run_glm.R
 .libPaths(c("/projappl/project_2003466/project_rpackages", .libPaths()))
 library(glmnet,quietly = T)
 library(tidyverse,quietly = T)

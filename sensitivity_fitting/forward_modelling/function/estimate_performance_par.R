@@ -1,15 +1,14 @@
-# This function takes a df and a model fitting function 
-# to get an estimate of the model accuracy.
+# This function only provides a standardized frame for 
+# estimating the accuracy (5-fold 3 replicate cv, 15 estimates)
 
-# The model, including the possible values of the 
-# hyperparameters, is defined in the model function Rfile.
+# Input is a tibble object(df) as well as model function
 
 # The df contains both response variables (y) and 
 # predictors (ends with "_predictors"), preparation of the
 # df is done in the code to be submitted to the array jobs
 
-# This function only provides a standardized frame for 
-# estimating the accuracy (5-fold 3 replicate cv, 15 estimates)
+# The model definition is coded in the model function Rfile.
+
 .libPaths(c("/projappl/project_2003466/project_rpackages", .libPaths()))
 library(tidyverse, quietly = T)
 library(tidymodels, quietly = T)
@@ -21,7 +20,6 @@ estimate_performance_par <- function(df, fun_name){
   # plan(multicore)
   res <-  df %>% 
     nested_cv(outside=vfold_cv(v = 5,repeats = 3), 
-              # inside= vfold_cv(v = 5,repeats = 3)) %>% 
               inside= bootstraps(times = 10)) %>% 
     mutate(train_data= future_map(.x = splits, .f = training,.options = furrr_options(seed = 0000))) %>% 
     mutate(test_data= future_map(.x = splits, .f = ~testing(.x),.options = furrr_options(seed = 0000))) %>% 
