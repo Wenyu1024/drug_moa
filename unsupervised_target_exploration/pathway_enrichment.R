@@ -29,3 +29,5 @@ for (i in 1:365){
   print(i)
 }
 save(res_pathway,file =  "~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_kegg.RData")
+
+

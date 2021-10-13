@@ -1,0 +1,405 @@
+---
+title: "Non-oncology drug exploration"
+output: html_document
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+rm(get_target_mat)
+rm(no_tunning_weighted_averaging)
+rm(get_target_pred_accuracy_batch)
+rm(return_acc_estimate_cv)
+load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
+setwd("~/cluster_wrk/drug_moa/supervised_target_pred/")
+source('return_acc_estimate_loocv.R') 
+library(tidyverse)
+library(ggsci)
+
+
+prism_sc_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
+
+targetpanel_dtc <- data.table::fread("~/cluster_scratch/prior/DTC_data_all.csv",
+                                 select = c("gene_names")) %>% distinct() %>% pull(gene_names)
+
+cell_line_info <- data.table::fread("~/cluster_scratch/depmap_21q1/sampleinfo")
+
+targetpanel_drh <- read_tsv("~/cluster_scratch/prior/repurposing_drugs_20200324.txt") %>% 
+  select(-disease_area, -indication) %>% 
+  drop_na() %>% 
+  separate_rows(target) %>% 
+  distinct() 
+
+targetpanel_drh_genelevel <- targetpanel_drh %>% 
+  select(pert_iname, target) %>% 
+  group_by(target) %>% 
+  summarise(drug= paste(pert_iname,collapse = ","))
+
+length(unique(targetpanel_drh$target))   # 1943 genes
+```
+
+```{r}
+prism_good_fitted_drugs <- res_prism2 %>%
+  mutate(acc_sen= (ceres+ces+demeter2)/3) %>% 
+  filter(sample_size>100) %>% 
+  drop_na() %>% 
+  filter(acc_sen>0.2) %>% 
+  arrange(BROAD_ID) %>% 
+  pull(BROAD_ID)
+  #n=305
+
+#n = 268 
+prism_good_fitted_drugs_annotated <- sort(intersect(prism_good_fitted_drugs, prism_target_binary$drug))
+prism_good_fitted_drugs_notannotated <- setdiff(prism_good_fitted_drugs,prism_good_fitted_drugs_annotated)
+prism_good_fitted_drugs_notannotated %>% 
+
+# use this 268 drugs to further make predictions for the drugs in tmp3
+# use only the supervised prediction! forgot about the non-supervised prediction!
+# go back to non-supervised prediction analysis part and check genes that are important for
+# all drugs! they can be genes related with cell of death effect(check signature of cell death paper), or metabolic enzymes/drug efflux pumps(MDR1, ABCB1)
+
+
+# what is the target condition
+target_check <- prism_target_binary %>% filter(drug %in% prism_good_fitted_drugs_annotated)
+target_check %>% group_by(drug) %>% summarise(N=n()) %>% arrange(desc(N))
+target_check %>% group_by(target) %>% summarise(N=n())%>% arrange(desc(N))
+
+# how many non-oncology drugs? 46 
+prism_good_fitted_nononcologydrugs_annotated <- res_prism2 %>% 
+  filter(BROAD_ID %in% prism_good_fitted_drugs_annotated) %>% 
+  filter(drug_category== "noncancer") %>% 
+  arrange(BROAD_ID )
+
+
+ # target_mat <- get_target_mat(target_tibble = 
+ #                                     prism_target_binary %>% 
+ #                                     filter(drug %in% prism_good_fitted_drugs_annotated) %>% 
+ #                                     arrange(drug))
+```
+
+
+supervised target prediction
+```{r}
+setwd("~/cluster_wrk/drug_moa/supervised_target_pred/")
+acc_supervised_prism268 <- return_acc_estimate_cv(
+  target_tibble = prism_target_binary %>% 
+    filter(drug %in% prism_good_fitted_drugs_annotated),
+  predictors_tibble = feature_imp_ridge_prism_comb1 %>% 
+    filter(drug %in% prism_good_fitted_drugs_annotated)
+    ) 
+
+
+acc_unsupervised_prism268 <- prism_unsupervised_auc %>% 
+  filter(drug %in% prism_good_fitted_drugs_annotated) %>% 
+  filter(imptype== "ConSen-Sig") # 194
+
+prism_268_all <- acc_supervised_prism268 %>% 
+  left_join(acc_unsupervised_prism268) %>% 
+  left_join(prism_data %>% select_at(c(1:5,8)),by= c("drug" = "BROAD_ID") ) %>%
+  mutate(Drug_category= case_when(drug_category== "noncancer"~ drug_category,
+                                  TRUE ~ "cancer") ) %>% 
+  left_join(prism_sc_drug %>% select_at(c(1,2)),by= c("drug" = "broad_id"))
+  
+  
+fig <- prism_268_all %>% 
+  ggplot(aes(x= acc, y= AUC, color= Drug_category)) + geom_point()
+ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T) 
+
+
+prism_268_all %>% 
+  # filter(phase == "Launched") %>%
+  filter(drug_category=="noncancer") %>%
+  pull(AUC) %>% 
+  summary()
+
+prism_268_all %>% 
+  # filter(phase == "Launched") %>%
+  filter(drug_category=="noncancer") %>%
+  pull(acc) %>% 
+  summary()  
+
+
+prism_268_all %>% 
+  # filter(phase == "Launched") %>%
+  filter(drug_category!="noncancer") %>%
+  pull(AUC) %>% 
+  summary()
+
+prism_268_all %>% 
+  # filter(phase == "Launched") %>%
+  filter(drug_category!="noncancer") %>%
+  pull(acc) %>% 
+  summary()    
+
+# adding a plot showing that poor overlap?
+tmp <- prism_268_all %>%   
+  filter(drug_category=="noncancer")
+```
+
+
+<!-- for these 7 drugs, find a overlap between top supervised and unsupervised prediction -->
+<!-- top unsupervised prediction from  -->
+
+```{r}
+# PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv") 
+# source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/get_drug_frac.R")
+
+prism268_non_oncology_druglist <- prism_268_all %>% 
+  # filter(phase == "Launched") %>%
+  filter(drug_category=="noncancer") %>%
+  pull(drug) 
+
+prism268_non_oncology_druglist_poorlypredicted <- prism_268_all %>% 
+  filter(phase=="Launched") %>% 
+  filter(drug_category=="noncancer") %>%
+  filter(acc< 0.7) %>%
+  filter(AUC<0.6) %>% 
+  pull(drug)
+
+#top and bottom 50 drugs
+# top_50pair_prism <-   get_drug_frac(
+#   dataset= PRISM_binary_PPIold_data,
+#   top_n=50, res_type = "toppair",
+#   top_method = "top_both"
+#   ) %>%
+#   filter(imptype== "ConSen-Sig")
+
+# only top 10
+top_10pair_prism <-  get_drug_frac(
+  dataset= PRISM_binary_PPIold_data,
+  top_n=10, res_type = "toppair",
+  top_method = "top_both"
+  ) %>%
+  filter(imptype== "ConSen-Sig")
+
+# and last, explore only the poorly predicted non-oncology drugs
+# tmp1 <- prism_268_all %>%
+#   filter(drug_category=="noncancer") %>%
+#   filter(acc< 0.7) %>%
+#   filter(AUC<0.6) %>%
+
+
+# top_50pair_prism %>%
+#   filter(impdef== "toppos gene") %>% 
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarise(N=n()) %>%
+#   arrange(desc(N))
+# 
+# top_50pair_prism %>%
+#   filter(impdef== "topneg gene") %>% 
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarise(N=n()) %>%
+#   arrange(desc(N))
+
+top_10pair_prism %>%
+  filter(impdef== "toppos gene") %>% 
+  ungroup() %>%
+  group_by(gene) %>%
+  summarise(N=n()) %>%
+  arrange(desc(N))
+
+# top_10pair_prism %>%
+#   filter(impdef== "topneg gene") %>% 
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarise(N=n()) %>%
+#   arrange(desc(N))
+# 
+# # top and bottom pair, what about non-oncology drugs?
+# top_10pair_prism %>% 
+#   filter(drug %in% prism268_non_oncology_druglist) %>% 
+#   filter(impdef== "toppos gene") %>% 
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarise(N=n()) %>%
+#   arrange(desc(N))
+# 
+# top_10pair_prism %>% 
+#   filter(drug %in% prism268_non_oncology_druglist) %>% 
+#   filter(impdef== "topneg gene") %>% 
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarise(N=n()) %>%
+#   arrange(desc(N))
+# 
+# top_10pair_prism %>% 
+#   filter(drug %in% prism268_non_oncology_druglist) %>% 
+#   filter(impdef== "toppos gene") %>% 
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarise(N=n()) %>%
+#   arrange(desc(N))
+
+top_10pair_prism %>% 
+  filter(drug %in% prism268_non_oncology_druglist_poorlypredicted) %>% 
+  filter(impdef== "toppos gene") %>% 
+  ungroup() %>%
+  group_by(gene) %>%
+  summarise(N=n()) %>%
+  arrange(desc(N))
+
+
+pred1 <- top_10pair_prism %>% 
+  filter(drug %in% prism268_non_oncology_druglist_poorlypredicted) %>% 
+  filter(impdef== "toppos gene") %>% 
+  select(-dataset, -imptype, -imp,-impdef, -anno_type1) %>% 
+  left_join(prism_sc_drug, by= c("drug" = "broad_id")) %>% 
+  # group_by(drug) %>%
+  # arrange(desc(imp), .by_group = TRUE) %>% 
+  mutate(DTC_panel=gene %in% targetpanel_dtc) %>% 
+  left_join(targetpanel_drh_genelevel %>% rename(prism_targeted_drug= drug), by= c("gene"= "target")) %>%
+  rename(top_pos_gene= gene, nominal_target =target ) %>% 
+  left_join(prism_data %>% select(BROAD_ID, sensitivity), by= c("drug" = "BROAD_ID"))  %>% 
+  # mutate(top_sen_cell= map(sensitivity,function(x){x %>%filter(auc < 0.7) %>%  pull(depmap_id)})) %>% 
+  # select(-sensitivity) %>%
+  filter(DTC_panel )
+
+
+# add cell line info..   
+pred1_celllevel <- pred1 %>% 
+  filter(DTC_panel) %>% 
+  select(drug,top_pos_gene) %>% 
+  left_join(prism_data %>% select(BROAD_ID, sensitivity), by= c("drug" = "BROAD_ID"))  %>% 
+  # mutate(sensitivity= map( sensitivity, function(df){df %>% filter(auc < 0.7) })) %>% 
+  mutate(top_sen_cell= map(sensitivity,function(x){x %>%filter(auc < 0.7) %>%  pull(depmap_id)})) %>% 
+  select(-sensitivity) %>% 
+  unnest()  %>% 
+  inner_join(cell_line_info, by= c("top_sen_cell"= "DepMap_ID"))
+
+# sum(tmp$gene %in% targetpanel)
+setwd("~/cluster_wrk/drug_moa/predicting_prism")
+pred1  %>% select(-sensitivity) %>% write_csv("incorrectdrug_druglevel.csv" )
+write_csv(pred1_celllevel, "incorrectdrug_celllevel.csv" )
+```
+
+get the top 10 target for supervised prediction
+```{r}
+# source('~/cluster_wrk/drug_moa/supervised_target_pred/no_tunning_weighted_averaging.R')
+# 
+# predictors_mat <- feature_imp_ridge_prism_comb1 %>% 
+#   filter(drug %in% prism_good_fitted_drugs_annotated) %>% 
+#   arrange(drug) %>% 
+#   select(-drug) %>% 
+#   mutate_all(.funs = scale)
+# test_idx <- which(prism_good_fitted_drugs_annotated %in%  unique(tmp1$drug) )
+# cor_mat = cor(t(predictors_mat),method = "spearman") %>% replace(is.na(.), 0)
+# cor_mat[cor_mat< 0 ] <- 0 
+# 
+# target_mat <- get_target_mat(target_tibble = 
+#                                prism_target_binary %>% 
+#                                filter(drug %in% prism_good_fitted_drugs_annotated) %>% 
+#                                filter(!(drug %in% unique(tmp1$drug))) %>% 
+#                                arrange(drug))
+# 
+#   
+# tmp2 <-   no_tunning_weighted_averaging(
+#   
+#   target_mat = target_mat,
+#   cor_mat = cor_mat,
+#   test_idx = test_idx,
+#   pred_new=T
+#   )
+# 
+# # row.names(tmp2) <- prism_good_fitted_drugs_annotated[test_idx]
+# tmp3 <- bind_cols(drug=prism_good_fitted_drugs_annotated[test_idx],  as_tibble(tmp2)) %>% 
+#   pivot_longer(cols = -drug, names_to= "gene",values_to= "pred") %>% 
+#   group_by(drug) %>% 
+#   slice_max(order_by = pred, n=5) %>% 
+#   arrange(desc(pred), .by_group = TRUE)
+# 
+# 
+# # join supervised and unsupervised prediction result
+# 
+# tmp4 <- inner_join(top_pair_prism, tmp3, by= c("drug","gene"))
+# 
+# # no good overlapping result!
+```
+
+
+
+also get the proved, non-oncology drugs that no nominal target info is available
+```{r}
+
+prism_good_fitted_nononcologydrugs_notannotated <- prism_sc_drug %>% 
+  filter(broad_id %in% setdiff(prism_good_fitted_drugs, prism_good_fitted_drugs_annotated)) %>% 
+  filter(phase=="Launched") %>% 
+  filter(drug_category== "noncancer")
+
+
+pred2 <- feature_imp_ridge_prism_comb1 %>% 
+  filter(drug %in% prism_good_fitted_nononcologydrugs_notannotated$broad_id) %>% 
+  pivot_longer(cols= - drug, names_to= "gene", values_to = "imp") %>% 
+  group_by(drug) %>% 
+  slice_max(order_by = imp,n=10) %>% 
+  inner_join(prism_good_fitted_nononcologydrugs_notannotated, by= c("drug" = "broad_id")) %>%
+  inner_join(prism_data %>% select(-target, - sensitivity, -moa, -drug_category), by=c("drug"= "BROAD_ID") )%>% 
+  mutate(DTC_panel=gene %in% targetpanel_dtc) %>% 
+  left_join(targetpanel_drh_genelevel %>% rename(prism_targeted_drug= drug), by= c("gene"= "target")) %>%
+  rename(top_pos_gene= gene, nominal_target =target ) %>% 
+  left_join(prism_data %>% select(BROAD_ID, sensitivity), by= c("drug" = "BROAD_ID"))  %>% 
+  # mutate(top_sen_cell= map(sensitivity,function(x){x %>%filter(auc < 0.7) %>%  pull(depmap_id)})) %>% 
+  filter(DTC_panel )
+  
+pred2_celllevel <- pred2 %>% 
+  filter(DTC_panel) %>% 
+  select(drug,top_pos_gene) %>% 
+  left_join(prism_data %>% select(BROAD_ID, sensitivity), by= c("drug" = "BROAD_ID"))  %>% 
+  # mutate(sensitivity= map( sensitivity, function(df){df %>% filter(auc < 0.7) })) %>% 
+  mutate(top_sen_cell= map(sensitivity,function(x){x %>%filter(auc < 0.7) %>%  pull(depmap_id)})) %>% 
+  select(-sensitivity) %>% 
+  unnest()  %>% 
+  inner_join(cell_line_info, by= c("top_sen_cell"= "DepMap_ID"))
+
+pred2 %>%  select(-sensitivity) %>% write_csv("notargetdrug_druglevel.csv")
+
+cell_level_summary <- bind_rows(pred1_celllevel, pred2_celllevel)%>% 
+  select(-top_pos_gene )%>% distinct()%>%
+  add_count(top_sen_cell) %>%select(-drug)%>%
+  arrange(desc(n))
+  
+  
+write_csv(cell_level_summary, "cell_level_summary.csv")
+
+sum(tmp$gene %in% targetpanel)
+sum(top_10pair_prism$gene %in% targetpanel)
+```
+
+
+
+```{r}
+# lets predict for the 6 drugs!
+# train_consen_sig <- bind_rows(
+#     feature_imp_ridge_prism_comb1 %>% 
+#       filter(drug %in% training_prism_druglist) %>% 
+#       arrange(drug),
+#       
+#     feature_imp_ridge_prism_comb1 %>% 
+#       filter(drug %in% test_prism_druglist) %>% 
+#       arrange(drug)
+# )
+# train_cor_mat <- cor(t(train_consen_sig %>% select(-drug)))
+# colnames(train_cor_mat) <- row.names(train_cor_mat) <- train_consen_sig$drug
+# target_mat_268 <- get_target_mat(
+#   target_tibble = prism_target_binary %>% 
+#     filter(drug %in% training_prism_druglist) %>% 
+#     arrange(drug))
+# 
+# pred_6 <- no_tunning_weighted_averaging(
+#   target_mat = target_mat_268,
+#   cor_mat = train_cor_mat,
+#   test_idx = 269:274,pred_new = T)
+# pred6 <- as.data.frame(t(pred_6)) %>% as_tibble() %>% mutate(target= colnames(pred_6))
+# write_csv(pred6, "~/cluster_wrk/drug_moa/pred6nononcologydrugs.csv")
+# drug sensitivities in xx postive cell lines and xx negative cell lines, 
+
+
+# Explore the 6 poorly predicted non-oncology drugs as well as 6 non-oncology drugs without target information 
+
+
+```
+
+
+
+

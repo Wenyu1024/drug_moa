@@ -10,7 +10,8 @@ no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metr
   if (pred_new){
     cor_test <- cor_mat[test_idx,-test_idx] # 
     cor_test[apply(cor_test, 1, sum) == 0, ] <- 1
-    pred1 = (cor_test) %*% as.matrix(target_mat) 
+    pred1 = (cor_test) %*% as.matrix(target_mat)
+    row.names(pred1) <- test_idx
     res <- pred1
     
   }else {
@@ -41,6 +42,11 @@ no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metr
                        })
         res <- mean(res)
       }
+      
+      # if (acc_metric== "NULL") {
+      #   res <- pred1
+      # }
+      
     }
     if (length(test_idx)==1){ 
       cor_test <- cor_mat[test_idx,-test_idx]
@@ -58,6 +64,9 @@ no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metr
       if (acc_metric== "spearman_cor") { 
         res <- cor(label, pred1,use = "complete.obs",method = "spearman") 
       }
+      # if (acc_metric== "NULL") {
+      #   res <- pred1
+      # }
     }
   }
   return(res)

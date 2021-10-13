@@ -8,69 +8,18 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
-library(tidymodels)
 library(ggsci)
+library(ggpubr)
 ```
 
 ## Unsupervised target and network analysis
 
-```{r}
-# kegg_tibble <- read_csv("~/cluster_scratch/prior/kegg_tibble.csv")
-# 
-# load("~/cluster_scratch/glmnet_modelling/target_pred_server/targetpred_serverinput.RData")
-# 
-# source('~/cluster_wrk/drug_moa/unsupervised_target_exploration/get_target_matrix_from_long_target_tibble.R')
-# source('~/cluster_wrk/drug_moa/unsupervised_target_exploration/annotate_feature_matrix.R')
-# 
-# target_tibble_drugbank= ctrp_target_tibble %>%
-#   ungroup() %>%
-#   select(broad_cpd_id, gene_symbol_of_protein_target) %>%
-#   rename(drug=broad_cpd_id, target_gene=gene_symbol_of_protein_target) %>% 
-#   mutate(binding_score= 1)
-# 
-# target_tibble_dtc <- ctrp_target_dtc %>% 
-#   select(standard_inchi_key, gene_name, interaction_strength) %>%
-#   filter(interaction_strength!= 0) %>% 
-#   drop_na() %>% 
-#   group_by(standard_inchi_key, gene_name) %>% 
-#   summarize(interaction_strength= median(interaction_strength,na.rm = T)) %>% 
-#   ungroup() %>% 
-#   inner_join(ctrpv2_list_to_zia,by= c("standard_inchi_key"= "InChIKey")) %>% 
-#   select(broad_cpd_id, gene_name, interaction_strength) %>% 
-#   group_by(broad_cpd_id, gene_name) %>% 
-#   summarize(interaction_strength= max(interaction_strength,na.rm = T)) %>% 
-#   ungroup() %>%   rename(drug=broad_cpd_id, target_gene=gene_name, binding_score= interaction_strength) 
-
-# length(unique(target_tibble$drug))
-
-# Plotting feature_imp vs dtc target binding plot
-# use dtc target as a base to join drugbank and feature importance
-
-# res <- target_tibble_dtc %>% 
-#   left_join(target_tibble_drugbank %>% rename(drug_bank_target= binding_score)) %>% 
-#   inner_join(
-#     y=feature_imp_ridge_ctrp_ces1 %>% 
-#       pivot_longer(cols= -broad_cpd_id, names_to= "gene", values_to= "feature_imp"),
-#     by= c("drug" = "broad_cpd_id", "target_gene" = "gene")) %>% 
-#   mutate(drug_bank_target= replace_na(drug_bank_target, 0) )
-#     
-#     
-# res %>% 
-#   # filter(drug_bank_target ==1) %>% 
-#   ggplot(aes(y= log10(abs(feature_imp)), x=binding_score)) + 
-#   geom_point(aes(shape= factor(drug_bank_target)),size= 0.01)+
-#   theme_classic()
-```
 
 ## 1 Load the binary target network
 
 ```{r}
 CTRP_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/CTRP_binary_PPIold_data.csv") 
-CTRP_binary_PPInew_data <- read_csv( "~/cluster_scratch/prior/CTRP_binary_PPInew_data.csv")
 GDSC_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/GDSC_binary_PPIold_data.csv") 
-GDSC_binary_PPInew_data <- read_csv( "~/cluster_scratch/prior/GDSC_binary_PPInew_data.csv")
-# PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
-# PRISM_binary_PPInew_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPInew_data.csv")
 ```
 
 check data correctness
@@ -95,206 +44,41 @@ drug_consensus_ctrp %>%
 ```
 
 
-## 2 Ugly result
-Now I have a annotation matrix for the ConSen-sig and ConExp-sig
-lets compare how they can be used
-
-In this comparison I don't care about direction, but only the absolute value.
-
-1）direct comparison, but instead of using the original value which is too small and not comparable across two signatures, should I use rank?
-```{r}
-CTRP_binary_PPIold_data %>% 
-  mutate(anno_type1= 
-           fct_relevel(anno_type1, c("Target","1st degree","2nd degree","3rd degree","over_3","Not_connected", "Unknown" ))) %>% 
-  filter(anno_type1 != "Unknown") %>% 
-  # filter(anno_type !="Target") %>% 
-  group_by(drug, imptype) %>% 
-  mutate(rank=rank(desc(abs(imp)))/n() ) %>%
-  ungroup() %>% 
-  ggplot(aes(x= imptype,y = rank, fill= anno_type1)) +
-  # geom_bar(stat = "summary" , fun.y = "mean",position = position_dodge())+
-  # stat_summary(fun.data = mean_se, geom = "errorbar",position = position_dodge())
-  geom_boxplot(position = position_dodge(),outlier.shape=NA )
-  # ylim(c(0,0.006))
-
-# CTRP_binary_PPInew_data %>% 
-#   mutate(anno_type1= 
-#            fct_relevel(anno_type1, c("Target","1st degree","2nd degree","3rd degree","over_3","Not_connected", "Unknown" ))) %>% 
-#   filter(anno_type1 != "Unknown") %>% 
-#   group_by(drug, imptype) %>% 
-#   mutate(rank=rank(desc(abs(imp)))/n() ) %>%
-#   ungroup() %>% 
-#   ggplot(aes(x= imptype,y = rank, fill= anno_type1)) +
-#   # geom_bar(stat = "summary" , fun.y = "mean",position = position_dodge())+
-#   # stat_summary(fun.data = mean_se, geom = "errorbar",position = position_dodge())
-#   geom_boxplot(position = position_dodge(),outlier.shape=NA )
-#   # ylim(c(0,0.006))
-# 
-
-# CTRP_binary_PPIold_data %>% 
-#   mutate(anno_type1= 
-#            fct_relevel(anno_type1, c("Target","1st degree","2nd degree","3rd degree","over_3","Not_connected", "Unknown" ))) %>% 
-#   filter(anno_type1 != "Unknown") %>% 
-#   group_by(drug, imptype) %>% 
-#   mutate(rank=rank(desc(abs(imp)))/n() ) %>%
-#   ungroup() %>% 
-#   ggplot(aes(x= imptype,y = rank, fill= anno_type1)) +
-#   geom_bar(stat = "summary" , fun.y = "mean",position = position_dodge())+
-#   stat_summary(fun.data = mean_se, geom = "errorbar",position = position_dodge())
-#   # geom_boxplot(position = position_dodge(),outlier.shape=NA )
-#   # ylim(c(0,0.006))
-# 
-# CTRP_binary_PPInew_data %>% 
-#   mutate(anno_type1= 
-#            fct_relevel(anno_type1, c("Target","1st degree","2nd degree","3rd degree","over_3","Not_connected", "Unknown" ))) %>% 
-#   filter(anno_type1 != "Unknown") %>% 
-#   group_by(drug, imptype) %>% 
-#   mutate(rank=rank(desc(abs(imp)))/n() ) %>%
-#   ungroup() %>% 
-#   ggplot(aes(x= imptype,y = rank, fill= anno_type1)) +
-#   geom_bar(stat = "summary" , fun.y = "mean",position = position_dodge())+
-#   stat_summary(fun.data = mean_se, geom = "errorbar",position = position_dodge())
-#   # geom_boxplot(position = position_dodge(),outlier.shape=NA )
-#   # ylim(c(0,0.006))  
-```
-
-Well, despite the ConSen-sig perform better that ConExp-Sig, using rank is not so persuasive since average ranking of the target is around 30%.
 
 
-how about z normalization of the score so that they are comparable,
+2) pick top 50, 100, 200 genes and compare to what percentage of drug the target of which can be prioritized by the top genes
 
-
-```{r}
-CTRP_binary_PPIold_data %>% 
-  mutate(anno_type1= 
-           fct_relevel(anno_type1, c("Target","1st degree","2nd degree","3rd degree","over_3","Not_connected", "Unknown" ))) %>% 
-  filter(anno_type1 != "Unknown") %>% 
-  # filter(anno_type !="Target") %>% 
-  group_by(drug, imptype) %>% 
-  mutate(rank=rank(desc(abs(imp)))/n() ) %>%
-  ungroup() %>% 
-  ggplot(aes(x= imptype,y = rank, fill= anno_type1)) +
-  # geom_bar(stat = "summary" , fun.y = "mean",position = position_dodge())+
-  # stat_summary(fun.data = mean_se, geom = "errorbar",position = position_dodge())
-  geom_boxplot(position = position_dodge(),outlier.shape=NA )
-```
-
-
-
-
-2) pick top 50, 100, 200 genes and compare to what percentage of drugs can be prioritized by the
-top genes
-
-say we choose top 50 genes for each drug, 
-then how many drugs the target of which is picked?
-
-for all the picked drug gene pairs, if the are not drug target pair then what are they
-
-
-```{r}
-get_drug_frac <- function(dataset, top_num, res_type = "target_summary", top_method="top_abs"){
-  # The function calculates that for a given dataset, how many drug, the target of which is prioritized? 
-  # top drug is selected by abosoulte values (top_abs) or both side(top_both)
-  
-  
-  n_drug= dataset %>% filter(anno_type1 %in%  "Target") %>% select(drug) %>% distinct() %>% nrow()
-  
-# target
-  if(top_method == "top_both") {
-      top_druggenepairs<-
-  bind_rows(
-    dataset %>%
-      group_by(drug,imptype) %>% 
-      top_n(wt=imp,  n= top_num) %>% 
-      ungroup() %>% 
-      mutate(impdef= "toppos gene"),
-    dataset %>% 
-      group_by(drug, imptype) %>% 
-      top_n(wt=imp, n = -top_num) %>% 
-      ungroup() %>% 
-      mutate(impdef= "topneg gene"),
-  )
-  }
-  
-  
-  if(top_method == "top_abs") {
-      top_druggenepairs<-
-    dataset %>%
-      mutate(imp_abs= abs(imp)) %>% 
-      group_by(drug,imptype) %>% 
-      top_n(wt=imp_abs,  n= top_num) %>% 
-      ungroup() %>%
-      mutate(impdef= case_when(
-        imp>0 ~"toppos gene",
-        imp<0 ~"topneg gene"))
-
-  }
-  
-
-  drug_shortest_path_tibble <- top_druggenepairs %>% 
-    mutate(anno_type2 = case_when(
-    anno_type!="Target" ~anno_type,
-    TRUE ~ "0")) %>%    
-  mutate(anno_type2= as.numeric(anno_type2) ) %>% 
-  drop_na() %>% 
-  group_by(drug, imptype) %>% 
-  top_n(wt = anno_type2,n = -1) %>% 
-  ungroup() %>% 
-  select(imptype,drug, anno_type2,impdef) %>% 
-  distinct(imptype,drug, anno_type2,.keep_all = TRUE)
-  
-  target_summary <- 
-    top_druggenepairs %>% 
-      filter(anno_type1 %in% "Target") %>% 
-      select(drug, imptype, impdef) %>% 
-      distinct() %>% 
-      group_by(imptype,impdef) %>% 
-      summarize(frac= round(n()*100/n_drug, 1),
-                count= n()) %>% 
-      mutate(top_n= top_num)
-  
-
-  if (res_type == "target_summary") {return(target_summary)} 
-  if (res_type == "toppair") {return(top_druggenepairs)} 
-  if (res_type == "druglevel") {return(drug_shortest_path_tibble)} 
-
-}
-
-
-get_drug_frac(CTRP_binary_PPIold_data,top_num = 50,res_summmarized = F) %>% 
-   filter(anno_type1 %in%  "Target") %>% 
-      select(drug, imptype, impdef) %>% 
-      distinct()
-
-
-tmp <- get_drug_frac(CTRP_binary_PPIold_data,top_num = 50,res_type = "toppair",top_method = "top_abs") 
-```
-
-
-```{r}
+```{r,fig.width=4, fig.height=4}
+source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/get_drug_frac.R")
 target_idf <- bind_rows(
   map_dfr(
-    .x = c(50, 100, 200), 
-    .f = ~get_drug_frac(dataset= CTRP_binary_PPIold_data, top_num=.x)) %>% 
+    .x = c(50, 100, 200),
+    .f = ~get_drug_frac(dataset= CTRP_binary_PPIold_data, top_num=.x)) %>%
     mutate(dataset= "CTRP"),
-  map_dfr(.x = c(50, 100, 200), 
-          .f = ~get_drug_frac(dataset= GDSC_binary_PPIold_data, top_num=.x)) %>% 
+  map_dfr(.x = c(50, 100, 200),
+          .f = ~get_drug_frac(dataset= GDSC_binary_PPIold_data, top_num=.x)) %>%
     mutate(dataset= "GDSC")
-  # map_dfr(.x = c(50, 100, 200), 
-  #         .f = ~get_drug_frac(dataset= PRISM_binary_PPIold_data, top_num=.x)) %>% 
-  #   mutate(dataset= "PRISM")
 )
 
-# Bar plot: pos/neg stack, top_n dodge, imptype x axis, dataset facet 
+# Bar plot: pos/neg stack, top_n dodge, imptype x axis, dataset facet
 # seems impossible to both stack and dodge
 
-target_idf %>% 
-  # filter(frac!=50) %>% 
+target_idf %>%
   ggplot(aes(x= factor(top_n),y = frac, fill= impdef)) +
   geom_bar(stat = "identity",position = "stack")+
   facet_grid(cols = vars(dataset), rows = vars(imptype))+
   xlab("top N genes ranked by signature value")+
-  ylab("% drugs")
+  ylab("% drugs") +
+  scale_fill_manual(values=c("#999999", "#56B4E9"))+
+  theme_classic()+
+  guides(fill=guide_legend(title="",nrow = 2,title.position = "top"))+
+  theme(legend.position = "top")+
+  theme(
+    legend.position = c(0, 0.98),
+    legend.justification = c("left", "top"),
+    legend.box.just = "right"
+    )
+
 
 ```
 
@@ -349,35 +133,45 @@ checking
 ```
 
 
-```{r}
+```{r, fig.width=4, fig.height=4}
 network_idf <- bind_rows(
-  get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=100, res_type = "druglevel") %>% 
+  get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
     mutate(dataset= "CTRP") %>%  select(-drug) ,
-  get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=100, res_type = "druglevel") %>% 
+  get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
     mutate(dataset= "GDSC") %>%  select(-drug) 
   # get_drug_frac(dataset= PRISM_binary_PPIold_data, top_n=100, res_type = "druglevel") %>% 
   #   mutate(dataset= "PRISM") %>%  select(-drug) 
 )
 
-network_idf %>% 
-  ggplot(aes(x= factor(anno_type2), fill= impdef)) +
-  geom_bar(stat = "count",position = "stack")+
-  facet_grid(cols = vars(dataset), rows = vars(imptype))+
-  xlab("top N genes ranked by signature value")+
-  ylab("number of drugs")
+# network_idf %>% 
+#   ggplot(aes(x= factor(anno_type2), fill= impdef)) +
+#   geom_bar(stat = "count",position = "stack")+
+#   facet_grid(cols = vars(dataset), rows = vars(imptype))+
+#   xlab("top N genes ranked by signature value")+
+#   ylab("number of drugs")
 
 network_idf %>% 
   group_by(dataset,imptype) %>% 
   mutate(num= n()) %>% 
+  mutate(anno_type2 = 
+           case_when(
+             anno_type2 <1 ~ "Target",
+             between(anno_type2,1,2) ~as.character(anno_type2),
+             anno_type2>2 ~ "over 2")) %>%    
   ungroup() %>% 
   group_by(impdef, anno_type2,dataset, imptype) %>% 
   summarize(perc= n()/num) %>% 
   ungroup() %>% distinct() %>% 
-  ggplot(aes(x= factor(anno_type2),y=perc, fill= impdef)) +
+  mutate(anno_type2= factor(anno_type2,c("Target", "1", "2", "over 2"))) %>% 
+  ggplot(aes(x= anno_type2,y=perc, fill= impdef)) +
   geom_bar(stat = "identity",position = "stack")+
   facet_grid(cols = vars(dataset), rows = vars(imptype))+
-  xlab("top N genes ranked by signature value")+
-  ylab("% drugs")  
+  xlab("Gene category by PPI target network")+
+  ylab("% drugs")  +
+    scale_fill_manual(values=c("#999999", "#56B4E9"))+
+  theme_classic()+
+  guides(fill=guide_legend(title="",nrow = 2,title.position = "top"))+
+  theme(legend.position = "none")
 ```
 
 
@@ -385,30 +179,35 @@ network_idf %>%
 
 For top genes, if the are not target then what are they (this plot is ugly)
 ```{r}
-get_drug_frac(CTRP_binary_PPIold_data,top_num = 100,res_type = "toppair") %>%
-  ggplot(aes(x= imptype, fill= anno_type)) +
-  geom_bar(stat = "count",position = "dodge")
-
-table(CTRP_binary_PPIold_data1$imptype)
-```
-
-
-```{r}
-# for top 100 top and bottom genes how does them distribute in the target network?
-tmp <- CTRP_binary_PPIold_data1 %>% filter(imptype=="ConSen-Sig")
-table(tmp$impdef,tmp$anno_type1)
-tmp <- CTRP_binary_PPIold_data1 %>% filter(imptype=="ConExp-Sig")
-table(tmp$impdef,tmp$anno_type1)
-
-
-
-CTRP_binary_PPIold_data1 %>% 
-  mutate(degree= as.numeric(anno_type)) %>% 
-  drop_na() %>% 
-  group_by(imptype) %>% 
-  summarise(cor= cor(degree, imp,method="spearman"))
+# get_drug_frac(CTRP_binary_PPIold_data,top_num = 100,res_type = "toppair") %>%
+#   ggplot(aes(x= imptype, fill= anno_type)) +
+#   geom_bar(stat = "count",position = "dodge")
+# 
+# table(CTRP_binary_PPIold_data1$imptype)
+# 
+# # for top 100 top and bottom genes how does them distribute in the target network?
+# tmp <- CTRP_binary_PPIold_data1 %>% filter(imptype=="ConSen-Sig")
+# table(tmp$impdef,tmp$anno_type1)
+# tmp <- CTRP_binary_PPIold_data1 %>% filter(imptype=="ConExp-Sig")
+# table(tmp$impdef,tmp$anno_type1)
+# 
+# 
+# 
+# CTRP_binary_PPIold_data1 %>% 
+#   mutate(degree= as.numeric(anno_type)) %>% 
+#   drop_na() %>% 
+#   group_by(imptype) %>% 
+#   summarise(cor= cor(degree, imp,method="spearman"))
 
 ```
+
+
+
+
+
+
+
+
 
 3) ROC and AUC 
 
@@ -421,228 +220,178 @@ How should I combine the  AUC curves for multiple drugs? Or should I use box plo
 
 perhaps a direct comparison for the available drugs how many target are detected by the most important genes
 
-show me the percentage of the drugs the target of which are being identified as top important genes
-```{r}
-# tmp <- CTRP_binary_PPIold_data %>% 
-#   filter(anno_type == "Target") %>% 
-#   left_join(CTRP_binary_PPIold_data1) %>% 
-#   select(-anno_type, -anno_type1) %>% 
-#   mutate(impdef=replace_na(impdef, replace = "others"))
-# 
-# table(tmp$imptype, tmp$impdef) # this is meaningless considering that there are more "background genes"
-# 
-# # for drugs with both two type of data, how many drugs the target of which has been picked by the top 100 genes?
-#   
-# drug_list <- 
-#   ctrp_target_binary %>% 
-#   filter(drug %in% ctrp_drug_list) %>% 
-#   pull(drug)
-# 
-# # Or, directly compare whether the drug target ranked higher in consensig than conexp sig
-# map_chr(drug_list, function(x){
-#   target= ctrp_target_binary %>% 
-#     fitler(drug==x) %>% 
-#     pull(target)
-#   rank_consensig= consen
-#   if (target)
-#   
-# }
-#         )
-```
-
-
-better coverage and comparable or even higher AUC?
-But what is the interpretation of ConExp-Sig?
-
-For drug target direction matter. For other 1,2,3,neighbour it doesn't
-```{r}
-# The consen-imp for target should be positive. The higher the value the more likely it is a target?
-CTRP_binary_PPIold_data %>%
-  filter(anno_type1!="Unknown") %>%
-  filter(imptype=="ConSen-Sig") %>%
-  filter(imp>0) %>%
-  mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>% 
-  group_by(drug) %>% 
-  summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = imp,event_level = "first")) %>% 
-  ungroup() %>% 
-  pull(AUC) %>% summary
-
-# Consensig imp
-CTRP_binary_PPIold_data %>%
-  filter(anno_type1!="Unknown") %>%
-  filter(imptype=="ConSen-Sig") %>%
-  mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>% 
-  group_by(drug) %>% 
-  summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = imp,event_level = "first")) %>% 
-  ungroup() %>% 
-  pull(AUC) %>% summary
-
-# Consensig (imp <0) => imp = 0
-CTRP_binary_PPIold_data %>%
-  filter(anno_type1!="Unknown") %>%
-  filter(imptype=="ConSen-Sig") %>%
-  mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>% 
-  mutate(imp = case_when(imp>0 ~ imp, 
-                         imp<0 ~ 0)) %>% 
-  group_by(drug, imptype) %>% 
-  summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = imp,event_level = "first")) %>% 
-  ungroup() %>% 
-  pull(AUC) %>% summary
-
-
-CTRP_binary_PPIold_data %>%
-  filter(anno_type1!="Unknown") %>%
-  filter(imptype=="ConSen-Sig") %>%
-  mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>% 
-  group_by(drug, imptype) %>% 
-  summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = abs(imp))) %>% 
-  ungroup() %>% 
-  pull(AUC) %>% summary
-
-# To draw the type of ROC Jing wants I need multiclass AUC
-# one truth facotr vector column and multiple columns of class prediction values
-# but that is not the case in my data. The multiclass AUC is for those each datapoint must be one # class.
-
-
-# The conexp-imp for target should be negative. 
-#The higher the abs value the more likely it is a target?
-# however in our data it is not the case
-
-#filter and abs
-CTRP_binary_PPIold_data %>%
-  filter(anno_type1!="Unknown") %>%
-  filter(imptype=="ConExp-Sig") %>%
-  filter(imp<0) %>%
-  mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>% 
-  group_by(drug, imptype) %>% 
-  summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = abs(imp))) %>% 
-  ungroup() %>% 
-  pull(AUC) %>% summary
-
-#abs
-CTRP_binary_PPIold_data %>%
-  filter(anno_type1!="Unknown") %>%
-  filter(imptype=="ConExp-Sig") %>%
-  mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>% 
-  group_by(drug, imptype) %>% 
-  summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = abs(imp))) %>% 
-  ungroup() %>% 
-  pull(AUC) %>% summary
-
-# -relu
-CTRP_binary_PPIold_data %>%
-  filter(anno_type1!="Unknown") %>%
-  filter(imptype=="ConExp-Sig") %>%
-  mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>% 
-  mutate(imp = case_when(imp<0 ~ abs(imp), 
-                       imp>0 ~ 0)) %>%  
-  group_by(drug, imptype) %>% 
-  summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = (imp))) %>% 
-  ungroup() %>% 
-  pull(AUC) %>% summary
-  
-```
-
 
 Lets just use abs(imp) to identify T, T+1 T+2 for different dataset
 ```{r}
+load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
+ctrp_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
+gdsc_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
+prism_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
 
-get_auc <- 
-  function(dataset= CTRP_binary_PPIold_data, label_level= 0){
-  dataset %>% 
-    mutate(anno_type2 = case_when(
-      anno_type!="Target" ~anno_type,
-      TRUE ~ "0")) %>%    
-    mutate(anno_type2= as.numeric(anno_type2) ) %>% 
-    drop_na() %>% 
-    mutate(abs_imp= abs(imp)) %>% 
-    mutate(anno_binary= factor(x = (anno_type2 < (label_level+1)),levels = c(TRUE,FALSE))) %>% 
-    group_by(drug, imptype) %>% 
-    summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = abs_imp)) %>% 
-    ungroup() 
-  }
+ctrp_unsupervised_auc %>% filter(imptype=="ConSen-Sig") %>% pull(AUC) %>% summary()
+ctrp_unsupervised_auc %>% filter(imptype=="ConSen-Sig") %>% pull(AUC) %>% hist()
+# tmp5 <- prism_unsupervised_auc %>% 
+#   filter(imptype == "ConSen-Sig") %>% 
+#   inner_join(acc_final1,by=c("drug"="BROAD_ID")) %>% 
+#   filter(drug_category== "noncancer") %>% filter(phase=="Launched")
 
-tmp <- get_auc(dataset = CTRP_binary_PPIold_data, label_level= 0) 
-tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-
-tmp <- get_auc(dataset = CTRP_binary_PPIold_data, label_level= 1) 
-tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-
-tmp <- get_auc(dataset = CTRP_binary_PPIold_data, label_level= 2) 
-tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-
-tmp <- get_auc(dataset = GDSC_binary_PPIold_data, label_level= 0) 
-tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-
-tmp <- get_auc(dataset = GDSC_binary_PPIold_data, label_level= 1) 
-tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-
-tmp <- get_auc(dataset = GDSC_binary_PPIold_data, label_level= 2) 
-tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-
-# tmp <- get_auc(dataset = PRISM_binary_PPIold_data, label_level= 0) 
-# tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-# 
 # tmp <- get_auc(dataset = PRISM_binary_PPIold_data, label_level= 1) 
 # tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
 # 
 # tmp <- get_auc(dataset = PRISM_binary_PPIold_data, label_level= 2) 
 # tmp %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
+
+# tmp5 %>% filter(drug_category== "noncancer") %>% filter(phase=="Launched") %>% pull(AUC) %>% summary()
+# tmp5 %>% filter(drug_category== "noncancer") %>% filter(phase=="Launched") %>% pull(acc) %>% summary()
+# 
+# summary(acc_final2$acc)
 ```
 
 
+From CTRP and GDSC for a list of drugs where unsupervised AUC=1, output their nominal target, their 
+top 5 positive and negative gene so that Huang and I and later check
+```{r}
+ctrp_bestranked_drugs <- ctrp_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
+gdsc_bestranked_drugs <- gdsc_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
+
+# get top gene table
+tmp <- bind_rows(
+  get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=5, res_type = "toppair",top_method ="top_both" ) %>% 
+    mutate(dataset= "CTRP") %>%  filter(drug %in% ctrp_bestranked_drugs) ,
+  get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=5, res_type = "toppair",top_method ="top_both") %>% 
+    mutate(dataset= "GDSC") %>%  filter(drug %in% gdsc_bestranked_drugs) %>% mutate(drug= as.character(drug))
+) %>% 
+  filter(imptype== "ConSen-Sig") %>% 
+  group_by(drug) %>% 
+  arrange(desc(imp),.by_group=T )
+
+write_csv(tmp, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_featureimp.csv")
 
 
+# get meta table
+load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+tmp1 <- ctrp_data %>% select_at(c(1,4,5)) %>% filter(broad_cpd_id %in% ctrp_bestranked_drugs)
+colnames(tmp1) <- c("MOA", "DRUG_NAME", "DRUG_ID") 
+tmp2 <- gdsc_data %>% filter(DRUG_ID %in% gdsc_bestranked_drugs) %>% 
+  rename(MOA= PATHWAY_NAME) %>% 
+  mutate(DRUG_ID= as.character(DRUG_ID)) %>% 
+  select(MOA, DRUG_NAME, DRUG_ID)
+tmp3 <- bind_rows(tmp1, tmp2)
+write_csv(tmp3, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_drugmeta.csv")
 
-To draw the type of ROC Jing wants I need multiclass AUC
-one truth facotr vector column and multiple columns of class prediction values
-but that is not the case in my data. The multiclass AUC is for those each datapoint must be one # class.
+tmp4 <- inner_join(tmp, tmp3,by=c("drug"= "DRUG_ID"))
+write_csv(tmp4, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
+```
 
-Instead what I am going to draw is the vertical averaging version of the ROC plot, similar to 
-what I have done in Finemap project. But now there are existing function to do that
+Shan asked if I can give a gene-level summary
+```{r}
+tmp <- read_csv("~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
 
-i.e. https://rdrr.io/cran/genscore/man/avgrocs.html
+top_pos <- 
+  inner_join(
+      tmp %>% filter(impdef=="toppos gene") %>% 
+        select(DRUG_NAME, gene) %>% 
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(drug_associated= paste(sort(DRUG_NAME), collapse = ";" ),
+                  NO.associated_Drugs=n()) %>% 
+        ungroup()
+      ,  
+      tmp %>% filter(impdef=="toppos gene") %>% 
+        select(gene, MOA) %>%
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(MOA= paste(sort(MOA), collapse = ";" )) %>% 
+        ungroup()         
+      
+      ) 
+  
+top_pos_target <- tmp %>% 
+  filter(impdef=="toppos gene") %>% 
+  filter(anno_type=="Target") %>% 
+  select(gene, DRUG_NAME) %>% 
+  group_by(gene) %>% 
+  summarize(drug_targeted= paste(sort(DRUG_NAME), collapse = ";" ), NO.Targeted_Drugs=n()) %>% 
+        ungroup()
 
-I will use ROCR package  (check ROCR.hiv in ROCR package reference mannual)
+top_pos_gene_df <- left_join(top_pos, top_pos_target)  %>% arrange(desc(NO.associated_Drugs))
+
+top_neg_gene_df <- inner_join(
+  tmp %>% filter(impdef=="topneg gene") %>% 
+        select(DRUG_NAME, gene) %>% 
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(drug_associated= paste(sort(DRUG_NAME), collapse = ";" ),
+                  NO.associated_Drugs=n()
+                  )
+        ,  
+      tmp %>% filter(impdef=="topneg gene") %>% 
+        select(gene, MOA) %>%
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(MOA= paste(sort(MOA), collapse = ";" )) %>% 
+        ungroup()
+) %>% 
+  arrange(desc(NO.associated_Drugs))
+
+write_csv(top_pos_gene_df,"~/cluster_wrk/drug_moa/unsupervised_target_exploration/gene-level summary(top pos).csv")
+write_csv(top_neg_gene_df, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/gene-level summary(top neg).csv")
+```
+
+
+I will use ROCR package  (check ROCR.hiv in ROCR package reference manual)
 
 ```{r}
-sig_to_pred <- function(annotated_sig_df) {
+get_ave_roc <- function(annotated_pred_df, title, addlegend= T,label_level= 0){
+  library(ROCR)
+  sig_to_inhibitortargt_pred <- function(annotated_sig_df) {
   # for con sen sig we do relu, for con exp sig we do negative relu
   data1 <- 
     annotated_sig_df %>%
     filter(imptype== "ConSen-Sig") %>% 
-    mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>%
     mutate(imp = case_when(imp>0 ~ imp, imp<0 ~ 0)) 
-    
+  
   data2 <- 
     annotated_sig_df %>%
     filter(imptype== "ConExp-Sig") %>% 
-    mutate(anno_binary= factor(anno_type1=="Target",levels = c(TRUE,FALSE))) %>%
     mutate(imp = case_when(imp<0 ~ abs(imp), imp>0 ~ 0))   
+  
   annotate_pred_df <- bind_rows(data1,data2)
   return(annotate_pred_df)
 }
 
+  sig_to_downstream_pred <- function(annotated_sig_df) {
+    # for downstream direction does not matter
+    annotate_pred_df <- annotated_sig_df %>% 
+      mutate(imp = abs(imp)) 
+    return(annotate_pred_df)
+  }
 
-
-
-get_ave_roc <- function(annotated_pred_df, title, addlegend= T){
-  library(ROCR)
-  tmp0 <- annotated_pred_df %>%
+  #prepare prediction
+    if (label_level ==0 ) {annotated_pred_df <-  sig_to_inhibitortargt_pred(annotated_pred_df)}  
+    if (label_level != 0) {annotated_pred_df <-  sig_to_downstream_pred(annotated_pred_df)}  
+  # prepare label
+  annotated_pred_df <- annotated_pred_df %>%
     filter(anno_type1!="Unknown") %>%
-    group_by(drug,imptype) %>% 
-    summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = imp,event_level = "first")) %>% 
-    ungroup() %>% 
-    drop_na()
+    mutate(anno_type2 = case_when(
+      anno_type!="Target" ~anno_type,
+      TRUE ~ "0")) %>%    
+    mutate(anno_type2= as.numeric(anno_type2) ) %>% 
+    drop_na() %>% 
+    mutate(anno_binary= factor(x = (anno_type2 < (label_level+1)),levels = c(TRUE,FALSE)))
+  
+  tmp0 <- annotated_pred_df %>%
+    group_by(drug, imptype) %>% 
+    summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = imp)) %>%
+    ungroup()
   
   tmp <- annotated_pred_df %>%
-    filter(anno_type1!="Unknown") %>%
-    mutate(labels= factor(anno_type1=="Target",levels = c(TRUE,FALSE)), predictions= abs(imp)) %>% 
+    mutate(labels=anno_binary,predictions= imp) %>% 
     select(drug, imptype, labels,predictions) %>% 
     nest_by(drug, imptype)  %>% 
-    inner_join(tmp0)
+    inner_join(tmp0) %>% drop_na() # filter out drugs where AUC calculation is not available.
   
-  ## here I used transpost from purrr package to change the index order of this multi-level list
+  ## here I used transpose from purrr package to change the index order of this multi-level list
   ROCR.consensig <- tmp %>% filter(imptype== "ConSen-Sig") %>% pull(data) %>% transpose()
   ROCR.conexpsig <- tmp %>% filter(imptype== "ConExp-Sig") %>% pull(data) %>% transpose()
   
@@ -658,14 +407,13 @@ get_ave_roc <- function(annotated_pred_df, title, addlegend= T){
 
 
 ```{r,fig.height=4, fig.width=4}
-get_ave_roc(sig_to_pred(annotated_sig_df = CTRP_binary_PPIold_data),title = "CTRP",addlegend = F)
-get_ave_roc(sig_to_pred(annotated_sig_df = GDSC_binary_PPIold_data),title = "GDSC")
-# get_ave_roc(sig_to_pred(annotated_sig_df = CTRP_binary_PPInew_data),title = "CTRP",addlegend = F)
-# get_ave_roc(sig_to_pred(annotated_sig_df = GDSC_binary_PPInew_data),title = "GDSC")
+get_ave_roc(CTRP_binary_PPIold_data, title = "CTRP", addlegend = F)
+get_ave_roc(GDSC_binary_PPIold_data, title = "GDSC")
+
 ```
 
 
-The drug level auc here should also correlate with the fitting accuracy.
+The drug level auc here should also correlate with the fitting accuracy (not really)
 but lets check it later
 
 So lets just show the AUC result for the CTRP and GDSC Target
@@ -695,6 +443,27 @@ auc_df %>%
   scale_color_npg()
 ```
 
+does the unsupervised prediction perform better in inhibitor? not really...
+```{r}
+ctrp_function_type <- ctrp_data %>% 
+  select(target_or_activity_of_compound, broad_cpd_id) %>% 
+  filter(broad_cpd_id %in% ctrp_drug_list) %>% 
+  mutate(function_type= case_when(
+    str_detect(target_or_activity_of_compound,pattern = "inhibitor") ~ "inhibitor",
+    str_detect(target_or_activity_of_compound,pattern = "agonist") ~ "agonist", 
+    str_detect(target_or_activity_of_compound,pattern = "activator") ~ "activator",
+    str_detect(target_or_activity_of_compound,pattern = "antagonist") ~ "antagonist"
+  ))  
+  
+# group_by(function_type) %>% 
+  # summarize(N=n())
+
+ctrp_unsupervised_auc %>% 
+  filter(imptype== "ConSen-Sig") %>% 
+  inner_join(ctrp_function_type, by= c("drug"= "broad_cpd_id")) %>% 
+  ggplot(aes(x= function_type, y= AUC)) + geom_point()
+```
+
 
 ```{r,fig.width=5,fig.height=3}
 # tmp <- auc_df %>% 
@@ -714,27 +483,27 @@ auc_df %>%
 #   filter(drug=="BRD-K09951645") %>% 
 #   filter(imptype== "ConSen-Sig")
 
-load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
-#does the auc coorelation with fitting accuracy:
-tmp <- auc_df %>% 
-  filter(dataset=="CTRP") %>% 
-  filter(imptype=="ConSen-Sig") %>% 
-  inner_join(res_ctrp2,by=c("drug"="broad_cpd_id")) %>% 
-  mutate(acc= (ceres+ces+demeter2)/3)
-
-tmp1 <- tmp %>% filter(AUC < 0.6) %>% 
-  filter(acc>0.45) %>% 
-  filter(sample_size >400) 
-
-
-tmp2 <- CTRP_binary_PPIold_data %>% 
-  filter(imptype=="ConSen-Sig") %>% 
-  filter(drug == "BRD-K15318909")
-  # filter(drug %in% HDAC_inhibitors$drug)
-  # filter(drug== "BRD-K77908580" )
-  # filter(drug== "BRD-K02130563" )
-
-HDAC_inhibitors <- ctrp_target_binary %>% filter(str_detect(target,pattern = "HDAC")) 
+# load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+#does the auc coorelation with fitting accuracy
+# tmp <- auc_df %>% 
+#   filter(dataset=="CTRP") %>% 
+#   filter(imptype=="ConSen-Sig") %>% 
+#   inner_join(res_ctrp2,by=c("drug"="broad_cpd_id")) %>% 
+#   mutate(acc= (ceres+ces+demeter2)/3)
+# 
+# tmp1 <- tmp %>% filter(AUC < 0.6) %>% 
+#   filter(acc>0.45) %>% 
+#   filter(sample_size >400) 
+# 
+# 
+# tmp2 <- CTRP_binary_PPIold_data %>% 
+#   filter(imptype=="ConSen-Sig") %>% 
+#   filter(drug == "BRD-K15318909")
+#   # filter(drug %in% HDAC_inhibitors$drug)
+#   # filter(drug== "BRD-K77908580" )
+#   # filter(drug== "BRD-K02130563" )
+# 
+# HDAC_inhibitors <- ctrp_target_binary %>% filter(str_detect(target,pattern = "HDAC")) 
 
 tmp2
 ```
@@ -742,32 +511,49 @@ tmp2
 
 ```{r, fig.width=4, fig.height=4}
 # library(ggrepel)
-tmp %>% 
-  ggplot(aes(y=AUC, x=acc)) + 
-  geom_point()+
-  geom_hline(yintercept = 0.6)+
-  geom_vline(xintercept = 0.45)+
-  geom_text(
-    aes(label=ifelse( cpd_name %in% c("PAC-1" ) ,cpd_name,''),hjust=0.5,vjust=0.5))+
-  xlab("Sensitivity fitting accuracy")+
-  ylab("Nominal target prioritization AUC")
+# tmp %>% 
+#   ggplot(aes(y=AUC, x=acc)) + 
+#   geom_point()+
+#   geom_hline(yintercept = 0.6)+
+#   geom_vline(xintercept = 0.45)+
+#   geom_text(
+#     aes(label=ifelse( cpd_name %in% c("PAC-1" ) ,cpd_name,''),hjust=0.5,vjust=0.5))+
+#   xlab("Sensitivity fitting accuracy")+
+#   ylab("Nominal target prioritization AUC")
 
 ```
 
+fake target example: PAC-1
 
+PAC-1 is perhaps not a good example for our method because we assume drugs to be inhibitors rather than activators of their target.
 ```{r}
-tmp1 <- tmp %>% filter(AUC < 0.6) %>% 
-  filter(acc>0.5) %>% 
-  filter(sample_size >400) #BRD-K49328571
-
-tmp1 %>% 
-  ggplot(aes(x=acc, y= AUC)) + 
-  geom_point()+
-  geom_text(aes(label= cpd_name))
-  
-tmp2 <- CTRP_binary_PPIold_data %>% filter(drug %in% "BRD-K49328571" ) %>% 
-  filter(imptype=="ConSen-Sig")
-
+# tmp1 <- tmp %>% filter(AUC < 0.6) %>% 
+#   filter(acc>0.5) %>% 
+#   filter(sample_size >400) #BRD-K49328571
+# 
+# tmp1 %>% 
+#   ggplot(aes(x=acc, y= AUC)) + 
+#   geom_point()+
+#   geom_text(aes(label= cpd_name))
+#   
+# tmp2 <- CTRP_binary_PPIold_data %>% 
+#   filter(drug %in% "BRD-K49328571" ) %>% 
+#   filter(imptype=="ConSen-Sig")
+# 
+# feature_imp_ridge_ctrp_comb1 %>% 
+#   # filter(drug %in% "BRD-K49328571") %>% 
+#   filter(drug %in% "BRD-K92991072") %>%  ##(drug PAC-1)
+#   pivot_longer(-drug, names_to="gene", values_to= "value") %>%
+#   select(-drug) %>% 
+#   arrange(desc(value)) %>% 
+#   mutate(NominalT= (gene=="KIT"))
+#   
+# CTRP_PAC1_sen <- 
+#   ctrp_data %>% 
+#   filter(broad_cpd_id=="BRD-K92991072") %>% 
+#   select(sensitivity) %>% unnest()
+# perhaps a ranked dot plot showing where the nominal target is and where the true target is. 
+# Is it worth to look back to individual level drug perturbation data and see what are the expression of this gene KIT after drug perturbation.
 ```
 
 https://www.nature.com/articles/s41375-020-0978-7
@@ -783,14 +569,14 @@ standard dataset
 
 
 ```{r}
-tmp3 <- auc_df %>% 
-  filter(dataset=="CTRP") %>% 
-  filter(imptype=="ConSen-Sig") %>% 
-  inner_join(res_ctrp2,by=c("drug"="broad_cpd_id")) %>% 
-  mutate(acc= (ceres+ces+demeter2)/3) %>% filter(AUC < 0.60) %>% 
-  filter(acc>0.45) %>% 
-  filter(sample_size >400) %>% 
-  filter(drug %in% ctrp_target_dtc$drug)
+# tmp3 <- auc_df %>% 
+#   filter(dataset=="CTRP") %>% 
+#   filter(imptype=="ConSen-Sig") %>% 
+#   inner_join(res_ctrp2,by=c("drug"="broad_cpd_id")) %>% 
+#   mutate(acc= (ceres+ces+demeter2)/3) %>% filter(AUC < 0.60) %>% 
+#   filter(acc>0.45) %>% 
+#   filter(sample_size >400) %>% 
+#   filter(drug %in% ctrp_target_dtc$drug)
 
 # will these drugs, the top genes of which have a higher binding score
 # examine the top ten positive gene for each drug
@@ -806,36 +592,36 @@ tmp3 <- auc_df %>%
 # DTC result is also limited!
 # tmp5 <- tmp4 %>% inner_join(ctrp_target_dtc %>% rename(gene= target))
 
-tmp4 <- get_drug_frac(CTRP_binary_PPIold_data,top_num = 10,top_method = "top_both",res_type = "toppair" ) %>% 
-  filter(impdef %in% "toppos gene") %>% 
-  filter(imptype == "ConSen-Sig") %>% 
-  filter(drug == "BRD-K92991072") %>% 
-  select(gene, imp, anno_type1) %>% 
-  mutate(imp= round(imp, 3))
-
-tmp5 <- CTRP_binary_PPIold_data %>% 
-   filter(anno_type1 %in% "Target") %>% 
-  filter(imptype == "ConSen-Sig") %>% 
-  filter(drug == "BRD-K92991072") %>% 
-  select(gene, imp, anno_type1) %>% 
-  mutate(imp= round(imp, 3)) %>% 
-  bind_rows(tmp4)
-
-
-tmp4 <- get_drug_frac(CTRP_binary_PPIold_data,top_num = 10,top_method = "top_both",res_type = "toppair" ) %>% 
-  filter(impdef %in% "toppos gene") %>% 
-  filter(imptype == "ConSen-Sig") %>% 
-  filter(drug == "BRD-K49328571") %>% 
-  select(gene, imp, anno_type1) %>% 
-  mutate(imp= round(imp, 3))
-
-tmp5 <- CTRP_binary_PPIold_data %>% 
-   filter(anno_type1 %in% "Target") %>% 
-  filter(imptype == "ConSen-Sig") %>% 
-  filter(drug == "BRD-K49328571") %>% 
-  select(gene, imp, anno_type1) %>% 
-  mutate(imp= round(imp, 3)) %>% 
-  bind_rows(tmp4)
+# tmp4 <- get_drug_frac(CTRP_binary_PPIold_data,top_num = 10,top_method = "top_both",res_type = "toppair" ) %>% 
+#   filter(impdef %in% "toppos gene") %>% 
+#   filter(imptype == "ConSen-Sig") %>% 
+#   filter(drug == "BRD-K92991072") %>% 
+#   select(gene, imp, anno_type1) %>% 
+#   mutate(imp= round(imp, 3))
+# 
+# tmp5 <- CTRP_binary_PPIold_data %>% 
+#    filter(anno_type1 %in% "Target") %>% 
+#   filter(imptype == "ConSen-Sig") %>% 
+#   filter(drug == "BRD-K92991072") %>% 
+#   select(gene, imp, anno_type1) %>% 
+#   mutate(imp= round(imp, 3)) %>% 
+#   bind_rows(tmp4)
+# 
+# 
+# tmp4 <- get_drug_frac(CTRP_binary_PPIold_data,top_num = 10,top_method = "top_both",res_type = "toppair" ) %>% 
+#   filter(impdef %in% "toppos gene") %>% 
+#   filter(imptype == "ConSen-Sig") %>% 
+#   filter(drug == "BRD-K49328571") %>% 
+#   select(gene, imp, anno_type1) %>% 
+#   mutate(imp= round(imp, 3))
+# 
+# tmp5 <- CTRP_binary_PPIold_data %>% 
+#    filter(anno_type1 %in% "Target") %>% 
+#   filter(imptype == "ConSen-Sig") %>% 
+#   filter(drug == "BRD-K49328571") %>% 
+#   select(gene, imp, anno_type1) %>% 
+#   mutate(imp= round(imp, 3)) %>% 
+#   bind_rows(tmp4)
 
 ```
 
@@ -892,34 +678,34 @@ I suppose they ranked highly irrespecive of drug identity.
 WEll not really..
 
 ```{r}
-tmp <- feature_imp_ridge_ctrp_comb1 %>% 
-  filter(drug %in% ctrp_drug_list) %>% 
-  pivot_longer(-drug,names_to="gene", values_to="imp") %>% 
-  group_by(drug) %>% 
-  mutate(gene_rank= rank(imp)) %>% 
-  ungroup() %>% 
-  group_by(gene) %>% 
-  summarize(meanrank= mean(gene_rank))
-
-tmp <- feature_imp_ridge_ctrp_comb1 %>% 
-  filter(drug %in% ctrp_drug_list) %>% 
-  pivot_longer(-drug,names_to="gene", values_to="imp") %>% 
-  group_by(drug) %>% 
-  mutate(gene_rank= rank(imp)) %>% 
-  ungroup() %>% 
-  filter(gene=="ABCB1")
-
-
-tmp2 <- apply(feature_imp_ridge_gdsc_comb1[,-1],MARGIN = 1, rank) 
-summary(tmp[rownames(tmp)=="ABCB1","ZZZ3"])
-tmp3 <- apply(tmp2, 1, mean) 
-
-tmp4 <- 
-  bind_cols(
-as.data.frame(tmp1) %>% rownames_to_column(var = "gene") %>% arrange(gene),
-as.data.frame(tmp3) %>% rownames_to_column(var = "gene") %>% arrange(gene)
-)
-
+# tmp <- feature_imp_ridge_ctrp_comb1 %>% 
+#   filter(drug %in% ctrp_drug_list) %>% 
+#   pivot_longer(-drug,names_to="gene", values_to="imp") %>% 
+#   group_by(drug) %>% 
+#   mutate(gene_rank= rank(imp)) %>% 
+#   ungroup() %>% 
+#   group_by(gene) %>% 
+#   summarize(meanrank= mean(gene_rank))
+# 
+# tmp <- feature_imp_ridge_ctrp_comb1 %>% 
+#   filter(drug %in% ctrp_drug_list) %>% 
+#   pivot_longer(-drug,names_to="gene", values_to="imp") %>% 
+#   group_by(drug) %>% 
+#   mutate(gene_rank= rank(imp)) %>% 
+#   ungroup() %>% 
+#   filter(gene=="ABCB1")
+# 
+# 
+# tmp2 <- apply(feature_imp_ridge_gdsc_comb1[,-1],MARGIN = 1, rank) 
+# summary(tmp[rownames(tmp)=="ABCB1","ZZZ3"])
+# tmp3 <- apply(tmp2, 1, mean) 
+# 
+# tmp4 <- 
+#   bind_cols(
+# as.data.frame(tmp1) %>% rownames_to_column(var = "gene") %>% arrange(gene),
+# as.data.frame(tmp3) %>% rownames_to_column(var = "gene") %>% arrange(gene)
+# )
+# 
 
 
 ```
