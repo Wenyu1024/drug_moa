@@ -205,8 +205,8 @@ acc_df$TargetType <-  factor(
 # )
 ```
 
-```{r,fig.width= 3.5,fig.height=8}
-acc_df %>% 
+```{r,fig.width= 6,fig.height=7}
+fig <- acc_df %>% 
   ggplot(aes(x=method, y=acc, color= method)) + 
     geom_violin()+
     stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
@@ -216,10 +216,16 @@ acc_df %>%
     xlab(label = "")+
     ylab(label = "Accuracy")+
     scale_color_npg()+
-    theme(legend.position="top")+  
     facet_grid(cols = vars(Dataset), rows = vars(TargetType),scales = "free")+
-    guides(color= guide_legend(nrow = 2,title.position = "top"))+
+    # theme(legend.position="top")+  
+    # guides(color= guide_legend(nrow = 2,title.position = "top"))+
+    theme(legend.position="right")+
+    guides(color= guide_legend(nrow = 4,title.position = "top"))+
     labs(color = "Drug Representation")
+
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3B.pdf",width = 6,height = 7)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3B.tiff",width = 6,height = 7)
 ```
 
 Figure for group meeting

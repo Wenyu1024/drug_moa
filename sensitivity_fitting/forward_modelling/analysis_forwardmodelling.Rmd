@@ -24,7 +24,6 @@ res_ctrp <- map_dfr(c(1:545), .f = function(x){
     drug <- paste("~/cluster_scratch/forward_modelling/ctrp_spearman/drug_", x, ".RData", sep = "")
   load(drug)
   df <- bind_cols(ceres= ceres_perf, ces= ces1_perf, demeter2= demeter2_perf, exp= exp_perf, drug= x)
-  
 })
 
 res_ctrp1 <- res_ctrp %>% 
@@ -64,8 +63,8 @@ res_ctrp2 %>% arrange(desc(ces))
 
 
 ```{r,fig.width=3,fig.height=2}
-res_ctrp2 %>%
-  filter(!drug_pair) %>% 
+fig <- res_ctrp2 %>%
+  filter(!drug_pair) %>%
   select_at(c(1:4)) %>% 
   pivot_longer(cols = 1:4,names_to= "predictor", values_to= "spearman_cor") %>%
   ggplot(aes(x= predictor , y= spearman_cor ))+
@@ -77,29 +76,32 @@ res_ctrp2 %>%
   coord_flip()
 # fig
 
-# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.pdf",width = 3,height = 2)
-# 
-# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2E.tiff",width = 3,height = 2)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2B.pdf",width = 3,height = 2)
+
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2B.tiff",width = 3,height = 2)
 ```
 
 
 Supplementary figure
 ```{r,fig.width=2.5, fig.height=2.5}
-res_ctrp2 %>%
+fig <- res_ctrp2 %>%
   select(ces,sample_size) %>% 
   ggplot(aes(x=sample_size,y= ces)) +
   geom_point(size=0.5)+
   theme_classic()+
   xlab("Sample Size")+
   ylab("Median Accuracy")
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig S2A.pdf",width = 3,height = 2)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig S2A.tiff",width = 3,height = 2) 
 
-res_ctrp2 %>% 
+fig <- res_ctrp2 %>% 
   ggplot(aes(x=sample_size,y= ces_variance)) +
   geom_point(size=0.5)+
   theme_classic()+
   xlab("Sample Size")+
   ylab("Accuracy Variance")
-  
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig S2B.pdf",width = 3,height = 2)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig S2B.tiff",width = 3,height = 2)  
 ```
 
 
@@ -263,72 +265,46 @@ save.image("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
 # 4 cross dataset comparison
 
 Combine the gdsc id back to compare with the ctrp
+gdsc id is used to extract a pubchem cid tibble and then cross-referenced to prism to get broad_id
 ```{r}
-gdsc_df <- gdsc_df %>% 
-  bind_cols(res_gdsc1 %>% select(ces)) %>% 
-  mutate(sample_size= map_int(sensitivity, .f=
-                                function(x){
-                                  length(intersect( x$DepMap_ID,ces1$DepMap_ID)) 
-                                })) %>% 
-  select(- sensitivity, -target)
+id_mapping_gdsc <- read_csv("~/cluster_scratch/prior/drug_id_list/cross_ref_tibble_gdsc")
 
-gdsc_drug_list <- read_csv("~/cluster_scratch/gdsc/Drug_list.csv")
+shared_drugs <- id_mapping_gdsc %>% 
+  filter(BROAD_ID  %in% res_ctrp2$broad_cpd_id)
 
-id_mapping_gdsc <- read_tsv("~/cluster_scratch/gdsc/pubchem_cid_to_smiles.txt",
-                       col_names = c("PubCHEM", "smiles"),col_types = "cc")
-id_mapping_ctrp <- read_csv("~/cluster_scratch/ctrp/ctrpv2_smiles.csv",
-                       col_types = "ccc")
+comparison <- shared_drugs %>%
+  inner_join(res_ctrp2 %>%  filter(sample_size > 100)%>% select(ces, broad_cpd_id,sample_size) , 
+             by=c("BROAD_ID"= "broad_cpd_id")) %>%
+  inner_join(res_gdsc2 %>%  filter(sample_size > 100) %>% select(ces, DRUG_ID,sample_size) , 
+             by=c("DRUG_ID"))
 
-comparison <- id_mapping %>% 
-  inner_join(gdsc_drug_list %>% mutate(PubCHEM= as.character(PubCHEM))) %>% 
-  inner_join(gdsc_df ,by= c("drug_id"= "DRUG_ID")) %>% 
-  inner_join(
-    y= res2 %>% 
-      inner_join(id_mapping_ctrp , by= c("broad_cpd_id")) %>%
-      select(broad_cpd_id,ces, cid, sample_size),
-    by= c("PubCHEM"="cid"))
 ```
 
 
 
-```{r}
-comparison %>% 
-  ggplot(aes(x = ces.x, y = ces.y))+
-  geom_point()
-
-cor(comparison$ces.x, comparison$ces.y,method = "pearson")
+```{r,fig.width=3, fig.height=3}
 cor(comparison$ces.x, comparison$ces.y,method = "spearman")
-
-tmp <- comparison %>% 
-  mutate(sample_size_diff= abs(sample_size.x-sample_size.y)) %>% 
-  filter(sample_size_diff < 100) 
-tmp %>% 
+cor.test(comparison$ces.x, comparison$ces.y,method = "spearman")
+fig <- comparison %>%
   ggplot(aes(x = ces.x, y = ces.y))+
   geom_point()+
   theme_classic()+
-  xlab("Performance GDSC")+
-  ylab("Performance CTRP")+
-  ggtitle("Spearman COR 0.57")
+  ylab("Performance GDSC")+
+  xlab("Performance CTRP")+
+  ggtitle("Spearman COR 0.61, \
+          p= 3.7E-05")
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2C.pdf",width = 3,height = 3)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2C.tiff",width = 3,height = 3)
 
-cor(tmp$ces.x, tmp$ces.y,method = "pearson")
+tmp <- comparison %>%
+  mutate(sample_size_diff= abs(sample_size.x-sample_size.y)) %>%
+  filter(sample_size_diff < 100)
+
+
+# cor(tmp$ces.x, tmp$ces.y,method = "pearson")
 cor.test(tmp$ces.x, tmp$ces.y,method = "spearman")
-```
-
-```{r,fig.width=2.5, fig.height=2.5}
-tmp %>% 
-  ggplot(aes(x = ces.x, y = ces.y))+
-  geom_point()+
-  theme_classic()+
-  xlab("Performance GDSC")+
-  ylab("Performance CTRP")+
-  ggtitle("spearman cor=0.57, 
-          p= 0.027")
-```
 
 
-
-Additional analysis 
-```{r}
-cor(ces1$A1BG, ceres)
 ```
 

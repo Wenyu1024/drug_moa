@@ -39,114 +39,114 @@ length(intersect(gdsc_drug_list, unique(gdsc_target_dtc$drug))) #52
 length(intersect(prism_drug_list, unique(prism_target_binary$drug))) #805
 length(intersect(prism_drug_list, unique(prism_target_dtc$drug))) #137
 
-# plan(multicore)
-# #ctrp
-# acc_df_ctrp_binary_fold_cv <- get_target_pred_accuracy_batch(
-#   dataset= "ctrp",  
-#   estimation_method= "fold_cv" , 
-#   target_source= ctrp_target_binary, 
-#   id_list = ctrp_drug_list)
-# 
-# acc_df_ctrp_binary_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "ctrp",  estimation_method= "loocv" , 
-#   target_source= ctrp_target_binary, 
-#   id_list = ctrp_drug_list)
-# 
-# acc_df_ctrp_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
-#   dataset= "ctrp", estimation_method= "fold_cv" , 
-#   target_source= ctrp_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score), 
-#   id_list = ctrp_drug_list
-# )
-# 
-# acc_df_ctrp_dtcbinary_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "ctrp",  estimation_method= "loocv" , 
-#   target_source= ctrp_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score), 
-#   id_list = ctrp_drug_list
-# )
-# 
-# acc_df_ctrp_dtc_foldcv <- get_target_pred_accuracy_batch(
-#   dataset= "ctrp", estimation_method= "fold_cv" , target_source= ctrp_target_dtc%>% filter(binding_score >0), 
-#   id_list = ctrp_drug_list)
-# 
-# acc_df_ctrp_dtc_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "ctrp",  estimation_method= "loocv" , 
-#   target_source= ctrp_target_dtc%>% filter(binding_score >0), 
-#   id_list = ctrp_drug_list)
-# 
-# 
-# #gdsc
-# acc_df_gdsc_binary_fold_cv <- get_target_pred_accuracy_batch(
-#   dataset= "gdsc",  estimation_method= "fold_cv" , target_source= gdsc_target_binary, 
-#   id_list = gdsc_drug_list)
-# 
-# acc_df_gdsc_binary_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "gdsc",  estimation_method= "loocv" , 
-#   target_source= gdsc_target_binary, 
-#   id_list = gdsc_drug_list
-# )
-# 
-# acc_df_gdsc_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
-#   dataset= "gdsc", estimation_method= "fold_cv" , 
-#   target_source= gdsc_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score), 
-#   id_list = gdsc_drug_list
-# )
-# 
-# acc_df_gdsc_dtcbinary_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "gdsc",  estimation_method= "loocv" , 
-#   target_source= gdsc_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
-#   id_list = gdsc_drug_list
-# )
-# 
-# 
-# acc_df_gdsc_dtc_foldcv <- get_target_pred_accuracy_batch(
-#   dataset= "gdsc", estimation_method= "fold_cv" , 
-#   target_source= gdsc_target_dtc%>% filter(binding_score >0),
-#   id_list = gdsc_drug_list
-# )
-# 
-# acc_df_gdsc_dtc_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "gdsc",  estimation_method= "loocv" , 
-#   target_source= gdsc_target_dtc%>% filter(binding_score >0),
-#   id_list = gdsc_drug_list 
-# )
-# 
-# 
-# #prism
-# acc_df_prism_binary_fold_cv <- get_target_pred_accuracy_batch(
-#   dataset= "prism",  estimation_method= "fold_cv" , 
-#   target_source= prism_target_binary,
-#   id_list = prism_drug_list)
-# 
-# acc_df_prism_binary_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "prism",  estimation_method= "loocv" , 
-#   target_source= prism_target_binary,
-#   id_list = prism_drug_list)
-# 
-# acc_df_prism_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
-#   dataset= "prism", estimation_method= "fold_cv" ,
-#   target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
-#   id_list = prism_drug_list
-# )
-# 
-# acc_df_prism_dtcbinary_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "prism",  estimation_method= "loocv" ,
-#   target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
-#   id_list = prism_drug_list
-# )
-# 
-# acc_df_prism_dtc_foldcv <- get_target_pred_accuracy_batch(
-#   dataset= "prism", estimation_method= "fold_cv" , 
-#   target_source= prism_target_dtc%>% filter(binding_score >0),
-#   id_list = prism_drug_list)
-# 
-# acc_df_prism_dtc_loocv <- get_target_pred_accuracy_batch(
-#   dataset= "prism",  estimation_method= "loocv" , 
-#   target_source= prism_target_dtc%>% filter(binding_score >0),
-#   id_list = prism_drug_list)
-# 
-# plan(sequential)
-# save.image("/scratch/project_2003466/forward_modelling/targetpred_output_simplefiltering.RData")
-# 
+plan(multicore)
+#ctrp
+acc_df_ctrp_binary_fold_cv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",
+  estimation_method= "fold_cv" ,
+  target_source= ctrp_target_binary,
+  id_list = ctrp_drug_list)
+
+acc_df_ctrp_binary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",  estimation_method= "loocv" ,
+  target_source= ctrp_target_binary,
+  id_list = ctrp_drug_list)
+
+acc_df_ctrp_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp", estimation_method= "fold_cv" ,
+  target_source= ctrp_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = ctrp_drug_list
+)
+
+acc_df_ctrp_dtcbinary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",  estimation_method= "loocv" ,
+  target_source= ctrp_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = ctrp_drug_list
+)
+
+acc_df_ctrp_dtc_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp", estimation_method= "fold_cv" , target_source= ctrp_target_dtc%>% filter(binding_score >0),
+  id_list = ctrp_drug_list)
+
+acc_df_ctrp_dtc_loocv <- get_target_pred_accuracy_batch(
+  dataset= "ctrp",  estimation_method= "loocv" ,
+  target_source= ctrp_target_dtc%>% filter(binding_score >0),
+  id_list = ctrp_drug_list)
+
+
+#gdsc
+acc_df_gdsc_binary_fold_cv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "fold_cv" , target_source= gdsc_target_binary,
+  id_list = gdsc_drug_list)
+
+acc_df_gdsc_binary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "loocv" ,
+  target_source= gdsc_target_binary,
+  id_list = gdsc_drug_list
+)
+
+acc_df_gdsc_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc", estimation_method= "fold_cv" ,
+  target_source= gdsc_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = gdsc_drug_list
+)
+
+acc_df_gdsc_dtcbinary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "loocv" ,
+  target_source= gdsc_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = gdsc_drug_list
+)
+
+
+acc_df_gdsc_dtc_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc", estimation_method= "fold_cv" ,
+  target_source= gdsc_target_dtc%>% filter(binding_score >0),
+  id_list = gdsc_drug_list
+)
+
+acc_df_gdsc_dtc_loocv <- get_target_pred_accuracy_batch(
+  dataset= "gdsc",  estimation_method= "loocv" ,
+  target_source= gdsc_target_dtc%>% filter(binding_score >0),
+  id_list = gdsc_drug_list
+)
+
+
+#prism
+acc_df_prism_binary_fold_cv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "fold_cv" ,
+  target_source= prism_target_binary,
+  id_list = prism_drug_list)
+
+acc_df_prism_binary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "loocv" ,
+  target_source= prism_target_binary,
+  id_list = prism_drug_list)
+
+acc_df_prism_dtcbinary_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "prism", estimation_method= "fold_cv" ,
+  target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = prism_drug_list
+)
+
+acc_df_prism_dtcbinary_loocv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "loocv" ,
+  target_source= prism_target_dtc %>% filter(binding_score >0.4) %>% select(- binding_score),
+  id_list = prism_drug_list
+)
+
+acc_df_prism_dtc_foldcv <- get_target_pred_accuracy_batch(
+  dataset= "prism", estimation_method= "fold_cv" ,
+  target_source= prism_target_dtc%>% filter(binding_score >0),
+  id_list = prism_drug_list)
+
+acc_df_prism_dtc_loocv <- get_target_pred_accuracy_batch(
+  dataset= "prism",  estimation_method= "loocv" ,
+  target_source= prism_target_dtc%>% filter(binding_score >0),
+  id_list = prism_drug_list)
+
+plan(sequential)
+save.image("/scratch/project_2003466/forward_modelling/targetpred_output_simplefiltering.RData")
+
 plan(multicore)
 prism_drug_list_drh <- intersect(prism_drug_list, prism_target_binary$drug)
 ## PRISM good bad drug exploration
