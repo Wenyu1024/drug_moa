@@ -595,19 +595,27 @@ pathways_df_gdsc <-
   arrange(padj) %>% 
   inner_join(y = gdsc_data %>% select_at(1:4),
              by= c("drug"= "DRUG_ID")) %>%
-  select(-log2err, -ES, -pval, -leadingEdge) #%>%  
-  # filter(pathway %in% c("KEGG_MAPK_SIGNALING_PATHWAY","KEGG_MISMATCH_REPAIR", "KEGG_ERBB_SIGNALING_PATHWAY")) %>% 
-  # filter(padj<0.05)
+  select(-log2err, -ES, -pval, -leadingEdge,-NES, -size) %>%  
+  # filter(pathway %in% c("KEGG_MAPK_SIGNALING_PATHWAY","KEGG_MISMATCH_REPAIR", "KEGG_ERBB_SIGNALING_PATHWAY")) %>%
+  filter(padj<0.05) 
+  # select(pathway, padj, DR)
   # filter(drug %in% gdsc_drug_list) #%>%
   # filter(DRUG_NAME %in% c("Axitinib")) #"Osimertinib"))#, "MK-1775") )
 
 #
+# options(scipen = 3)
+example_gdsc_DDR <- pathways_df_gdsc %>% 
+  filter(pathway %in% c("KEGG_MISMATCH_REPAIR")) %>% 
+  select(-drug) %>% 
+  rename(REPORTED_MECHANISM=PATHWAY_NAME) %>% 
+  mutate(padj= formatC(padj, format = "e", digits = 2))
+
 #ERK_6604 in GDSC
 
-doxorubicin <- pathways_df %>% filter(cpd_name=="doxorubicin") #topoisomerase II
-# Trametinib <- pathways_df %>% filter(cpd_name=="trametinib")
-dinaciclib <- pathways_df %>% filter(cpd_name=="dinaciclib")
-alvocidib <- pathways_df %>% filter(cpd_name=="alvocidib")
+# doxorubicin <- pathways_df %>% filter(cpd_name=="doxorubicin") #topoisomerase II
+# # Trametinib <- pathways_df %>% filter(cpd_name=="trametinib")
+# dinaciclib <- pathways_df %>% filter(cpd_name=="dinaciclib")
+# alvocidib <- pathways_df %>% filter(cpd_name=="alvocidib")
 
 # check which pathway are enriched in a category of drug
 # tmp <- pathways_df %>% 
@@ -615,21 +623,49 @@ alvocidib <- pathways_df %>% filter(cpd_name=="alvocidib")
 #   group_by(pathway) %>% 
 #   summarise(mean_p =mean(padj))
 
-tmp <- pathways_df %>% 
-  filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") %>%
-  # filter(broad_cpd_id == "BRD-K64800655") %>% 
-  filter(pathway== "GOCC_CHROMOSOME_CENTROMERIC_REGION")
+# tmp <- pathways_df %>% 
+#   filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") %>%
+#   # filter(broad_cpd_id == "BRD-K64800655") %>% 
+#   filter(pathway== "GOCC_CHROMOSOME_CENTROMERIC_REGION")
+# 
+# 
+# # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4156313/
+# tmp <- res2 %>% 
+#   filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") 
+# 
+# top_5drugs <- pathways_df %>% select(broad_cpd_id) %>% distinct() %>% slice(1:5)
+# 
+# tmp  <- pathways_df %>% 
+#   filter(broad_cpd_id %in% top_5drugs$broad_cpd_id) 
 
 
-# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4156313/
-tmp <- res2 %>% 
-  filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") 
+pathways_df_ctrp <- 
+  tibble(drug=feature_imp_ridge_ctrp_comb1$drug, pathway=ctrp_kegg) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = ctrp_data %>% filter(drug_type== "single drug") %>% select_at(c(1,4,5)),
+             by= c("drug"= "broad_cpd_id")) %>%
+  select(-log2err, -ES, -pval, -leadingEdge, -NES, -size) %>%  
+  # filter(pathway %in% c("KEGG_MAPK_SIGNALING_PATHWAY","KEGG_MISMATCH_REPAIR", "KEGG_ERBB_SIGNALING_PATHWAY")) %>%
+  # filter(pathway %in% c("KEGG_MISMATCH_REPAIR")) %>%
+  filter(padj<0.05) 
 
-top_5drugs <- pathways_df %>% select(broad_cpd_id) %>% distinct() %>% slice(1:5)
 
-tmp  <- pathways_df %>% 
-  filter(broad_cpd_id %in% top_5drugs$broad_cpd_id) 
-  
+pathways_df_prism <- 
+  tibble(drug=feature_imp_ridge_prism_comb1$drug, pathway=prism_kegg) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = prism_data %>% select_at(1:4),
+             by= c("drug"= "BROAD_ID")) %>%
+  select(-log2err, -ES, -pval, -leadingEdge, -NES, -size) %>%  
+  # filter(pathway %in% c("KEGG_MAPK_SIGNALING_PATHWAY","KEGG_MISMATCH_REPAIR", "KEGG_ERBB_SIGNALING_PATHWAY")) %>%
+  # filter(pathway %in% c("KEGG_MISMATCH_REPAIR")) %>%
+  filter(padj<0.05) 
+
+write_csv(pathways_df_gdsc, "pathways_df_gdsc.csv")
+write_csv(example_gdsc_DDR, "pathway_example_gdsc_DDR.csv")
+write_csv(pathways_df_prism, "pathways_df_prism.csv")
+write_csv(pathways_df_ctrp, "pathways_df_ctrp.csv")
 ```
 
 ## 4
