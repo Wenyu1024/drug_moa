@@ -1,5 +1,5 @@
 ---
-title: "analysis_new"
+title: "Unsupervised target and network analysis for CTRP and GDSC data"
 author: "Wenyu"
 date: "5/11/2021"
 output: html_document
@@ -12,10 +12,10 @@ library(ggsci)
 library(ggpubr)
 ```
 
-## Unsupervised target and network analysis
 
 
-## 1 Load the binary target network
+
+### 1 Global analysis of top genes and target
 
 ```{r}
 CTRP_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/CTRP_binary_PPIold_data.csv") 
@@ -25,25 +25,23 @@ GDSC_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/GDSC_binary_PPIold
 check data correctness
 ```{r}
 
-#first check if sig value is correct here
-# BRD-K28360340	BCL2
-CTRP_binary_PPIold_data %>% 
-  filter(drug== "BRD-K28360340") %>% 
-  filter(gene=="BCL2")
-# Why the value is the same?? this is definately wrong
-CTRP_binary_PPIold_data %>% 
-  filter(drug== "BRD-K28392481") %>% 
-  filter(gene=="DDR1")
-
+# #first check if sig value is correct here
+# # BRD-K28360340	BCL2
+# CTRP_binary_PPIold_data %>% 
+#   filter(drug== "BRD-K28360340") %>% 
+#   filter(gene=="BCL2")
+# # Why the value is the same?? this is definately wrong
+# CTRP_binary_PPIold_data %>% 
+#   filter(drug== "BRD-K28392481") %>% 
+#   filter(gene=="DDR1")
+# 
 # setwd("~/cluster_scratch//L1000/consensus_signatures_challenge/")
 # drug_consensus_ctrp <- read_csv("feature_consensus_ctrp.csv")
-
-drug_consensus_ctrp %>% 
-  filter(drug %in% c("BRD-K28392481","BRD-K28360340")) %>% 
-  select(drug,DDR1, BCL2)
+# 
+# drug_consensus_ctrp %>% 
+#   filter(drug %in% c("BRD-K28392481","BRD-K28360340")) %>% 
+#   select(drug,DDR1, BCL2)
 ```
-
-
 
 
 2) pick top 50, 100, 200 genes and compare to what percentage of drug the target of which can be prioritized by the top genes
@@ -63,7 +61,7 @@ target_idf <- bind_rows(
 # Bar plot: pos/neg stack, top_n dodge, imptype x axis, dataset facet
 # seems impossible to both stack and dodge
 
-target_idf %>%
+fig <- target_idf %>%
   ggplot(aes(x= factor(top_n),y = frac, fill= impdef)) +
   geom_bar(stat = "identity",position = "stack")+
   facet_grid(cols = vars(dataset), rows = vars(imptype))+
@@ -78,11 +76,12 @@ target_idf %>%
     legend.justification = c("left", "top"),
     legend.box.just = "right"
     )
-
-
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.tiff",width = 4,height = 4)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.pdf",width = 4,height = 4)
 ```
 
-#lets still go back to drug percentage,
+lets still go back to drug percentage,
 checking
 ```{r}
 # get_drug_frac(CTRP_binary_PPIold_data,top_num = 100,res_type = "druglevel") %>% 
@@ -132,25 +131,16 @@ checking
 # # and all the other genes are not in the network.
 ```
 
-
+Supplementary figure 4
 ```{r, fig.width=4, fig.height=4}
 network_idf <- bind_rows(
   get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
     mutate(dataset= "CTRP") %>%  select(-drug) ,
   get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
     mutate(dataset= "GDSC") %>%  select(-drug) 
-  # get_drug_frac(dataset= PRISM_binary_PPIold_data, top_n=100, res_type = "druglevel") %>% 
-  #   mutate(dataset= "PRISM") %>%  select(-drug) 
 )
 
-# network_idf %>% 
-#   ggplot(aes(x= factor(anno_type2), fill= impdef)) +
-#   geom_bar(stat = "count",position = "stack")+
-#   facet_grid(cols = vars(dataset), rows = vars(imptype))+
-#   xlab("top N genes ranked by signature value")+
-#   ylab("number of drugs")
-
-network_idf %>% 
+fig <- network_idf %>% 
   group_by(dataset,imptype) %>% 
   mutate(num= n()) %>% 
   mutate(anno_type2 = 
@@ -172,6 +162,10 @@ network_idf %>%
   theme_classic()+
   guides(fill=guide_legend(title="",nrow = 2,title.position = "top"))+
   theme(legend.position = "none")
+
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.tiff",width = 4,height = 4)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.pdf",width = 4,height = 4)
 ```
 
 
@@ -202,34 +196,20 @@ For top genes, if the are not target then what are they (this plot is ugly)
 ```
 
 
-
-
-
-
-
-
-
 3) ROC and AUC 
 
-Lets use target, target+ 1st negibour... as binarizing threshold and plot AUC for the ranked gene list for the two type of signatures
-
-
-for each dataset I draw several such ROC curves. I think within one dataset, only one curve is drawn for all the drugs.
-
-How should I combine the  AUC curves for multiple drugs? Or should I use box plot to represent AUC for each drug?
-
-perhaps a direct comparison for the available drugs how many target are detected by the most important genes
 
 
 Lets just use abs(imp) to identify T, T+1 T+2 for different dataset
 ```{r}
+# exploration
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
-ctrp_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-gdsc_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-prism_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
-
-ctrp_unsupervised_auc %>% filter(imptype=="ConSen-Sig") %>% pull(AUC) %>% summary()
-ctrp_unsupervised_auc %>% filter(imptype=="ConSen-Sig") %>% pull(AUC) %>% hist()
+# ctrp_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
+# gdsc_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
+# prism_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
+# 
+# ctrp_unsupervised_auc %>% filter(imptype=="ConSen-Sig") %>% pull(AUC) %>% summary()
+# ctrp_unsupervised_auc %>% filter(imptype=="ConSen-Sig") %>% pull(AUC) %>% hist()
 # tmp5 <- prism_unsupervised_auc %>% 
 #   filter(imptype == "ConSen-Sig") %>% 
 #   inner_join(acc_final1,by=c("drug"="BROAD_ID")) %>% 
@@ -248,167 +228,27 @@ ctrp_unsupervised_auc %>% filter(imptype=="ConSen-Sig") %>% pull(AUC) %>% hist()
 ```
 
 
-From CTRP and GDSC for a list of drugs where unsupervised AUC=1, output their nominal target, their 
-top 5 positive and negative gene so that Huang and I and later check
-```{r}
-ctrp_bestranked_drugs <- ctrp_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
-gdsc_bestranked_drugs <- gdsc_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
-
-# get top gene table
-tmp <- bind_rows(
-  get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=5, res_type = "toppair",top_method ="top_both" ) %>% 
-    mutate(dataset= "CTRP") %>%  filter(drug %in% ctrp_bestranked_drugs) ,
-  get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=5, res_type = "toppair",top_method ="top_both") %>% 
-    mutate(dataset= "GDSC") %>%  filter(drug %in% gdsc_bestranked_drugs) %>% mutate(drug= as.character(drug))
-) %>% 
-  filter(imptype== "ConSen-Sig") %>% 
-  group_by(drug) %>% 
-  arrange(desc(imp),.by_group=T )
-
-write_csv(tmp, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_featureimp.csv")
-
-
-# get meta table
-load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
-tmp1 <- ctrp_data %>% select_at(c(1,4,5)) %>% filter(broad_cpd_id %in% ctrp_bestranked_drugs)
-colnames(tmp1) <- c("MOA", "DRUG_NAME", "DRUG_ID") 
-tmp2 <- gdsc_data %>% filter(DRUG_ID %in% gdsc_bestranked_drugs) %>% 
-  rename(MOA= PATHWAY_NAME) %>% 
-  mutate(DRUG_ID= as.character(DRUG_ID)) %>% 
-  select(MOA, DRUG_NAME, DRUG_ID)
-tmp3 <- bind_rows(tmp1, tmp2)
-write_csv(tmp3, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_drugmeta.csv")
-
-tmp4 <- inner_join(tmp, tmp3,by=c("drug"= "DRUG_ID"))
-write_csv(tmp4, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
-```
-
-Shan asked if I can give a gene-level summary
-```{r}
-tmp <- read_csv("~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
-
-top_pos <- 
-  inner_join(
-      tmp %>% filter(impdef=="toppos gene") %>% 
-        select(DRUG_NAME, gene) %>% 
-        distinct() %>% 
-        group_by(gene) %>% 
-        summarize(drug_associated= paste(sort(DRUG_NAME), collapse = ";" ),
-                  NO.associated_Drugs=n()) %>% 
-        ungroup()
-      ,  
-      tmp %>% filter(impdef=="toppos gene") %>% 
-        select(gene, MOA) %>%
-        distinct() %>% 
-        group_by(gene) %>% 
-        summarize(MOA= paste(sort(MOA), collapse = ";" )) %>% 
-        ungroup()         
-      
-      ) 
-  
-top_pos_target <- tmp %>% 
-  filter(impdef=="toppos gene") %>% 
-  filter(anno_type=="Target") %>% 
-  select(gene, DRUG_NAME) %>% 
-  group_by(gene) %>% 
-  summarize(drug_targeted= paste(sort(DRUG_NAME), collapse = ";" ), NO.Targeted_Drugs=n()) %>% 
-        ungroup()
-
-top_pos_gene_df <- left_join(top_pos, top_pos_target)  %>% arrange(desc(NO.associated_Drugs))
-
-top_neg_gene_df <- inner_join(
-  tmp %>% filter(impdef=="topneg gene") %>% 
-        select(DRUG_NAME, gene) %>% 
-        distinct() %>% 
-        group_by(gene) %>% 
-        summarize(drug_associated= paste(sort(DRUG_NAME), collapse = ";" ),
-                  NO.associated_Drugs=n()
-                  )
-        ,  
-      tmp %>% filter(impdef=="topneg gene") %>% 
-        select(gene, MOA) %>%
-        distinct() %>% 
-        group_by(gene) %>% 
-        summarize(MOA= paste(sort(MOA), collapse = ";" )) %>% 
-        ungroup()
-) %>% 
-  arrange(desc(NO.associated_Drugs))
-
-write_csv(top_pos_gene_df,"~/cluster_wrk/drug_moa/unsupervised_target_exploration/gene-level summary(top pos).csv")
-write_csv(top_neg_gene_df, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/gene-level summary(top neg).csv")
-```
-
-
-I will use ROCR package  (check ROCR.hiv in ROCR package reference manual)
-
-```{r}
-get_ave_roc <- function(annotated_pred_df, title, addlegend= T,label_level= 0){
-  library(ROCR)
-  sig_to_inhibitortargt_pred <- function(annotated_sig_df) {
-  # for con sen sig we do relu, for con exp sig we do negative relu
-  data1 <- 
-    annotated_sig_df %>%
-    filter(imptype== "ConSen-Sig") %>% 
-    mutate(imp = case_when(imp>0 ~ imp, imp<0 ~ 0)) 
-  
-  data2 <- 
-    annotated_sig_df %>%
-    filter(imptype== "ConExp-Sig") %>% 
-    mutate(imp = case_when(imp<0 ~ abs(imp), imp>0 ~ 0))   
-  
-  annotate_pred_df <- bind_rows(data1,data2)
-  return(annotate_pred_df)
-}
-
-  sig_to_downstream_pred <- function(annotated_sig_df) {
-    # for downstream direction does not matter
-    annotate_pred_df <- annotated_sig_df %>% 
-      mutate(imp = abs(imp)) 
-    return(annotate_pred_df)
-  }
-
-  #prepare prediction
-    if (label_level ==0 ) {annotated_pred_df <-  sig_to_inhibitortargt_pred(annotated_pred_df)}  
-    if (label_level != 0) {annotated_pred_df <-  sig_to_downstream_pred(annotated_pred_df)}  
-  # prepare label
-  annotated_pred_df <- annotated_pred_df %>%
-    filter(anno_type1!="Unknown") %>%
-    mutate(anno_type2 = case_when(
-      anno_type!="Target" ~anno_type,
-      TRUE ~ "0")) %>%    
-    mutate(anno_type2= as.numeric(anno_type2) ) %>% 
-    drop_na() %>% 
-    mutate(anno_binary= factor(x = (anno_type2 < (label_level+1)),levels = c(TRUE,FALSE)))
-  
-  tmp0 <- annotated_pred_df %>%
-    group_by(drug, imptype) %>% 
-    summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = imp)) %>%
-    ungroup()
-  
-  tmp <- annotated_pred_df %>%
-    mutate(labels=anno_binary,predictions= imp) %>% 
-    select(drug, imptype, labels,predictions) %>% 
-    nest_by(drug, imptype)  %>% 
-    inner_join(tmp0) %>% drop_na() # filter out drugs where AUC calculation is not available.
-  
-  ## here I used transpose from purrr package to change the index order of this multi-level list
-  ROCR.consensig <- tmp %>% filter(imptype== "ConSen-Sig") %>% pull(data) %>% transpose()
-  ROCR.conexpsig <- tmp %>% filter(imptype== "ConExp-Sig") %>% pull(data) %>% transpose()
-  
-  pred <- prediction(ROCR.consensig$predictions, ROCR.consensig$labels)
-  perf <- performance(pred,'tpr','fpr')
-  pred1 <- prediction(ROCR.conexpsig$predictions, ROCR.conexpsig$labels)
-  perf1 <- performance(pred1,'tpr','fpr')
-  plot(perf, avg="vertical", lwd=3, col="red",spread.estimate="stderror",plotCI.lwd=2,main =title)
-  plot(perf1, avg="vertical", lwd=3, col="blue",spread.estimate="stderror",plotCI.lwd=2,add=T)
-  if(addlegend== T){legend("bottomright", legend = c("ConSen-Sig", "ConExp-Sig"), lty = 1, lwd = 2, col = c("red", "blue"))}
-}
-```
-
-
+figure 4B-4C
 ```{r,fig.height=4, fig.width=4}
-get_ave_roc(CTRP_binary_PPIold_data, title = "CTRP", addlegend = F)
-get_ave_roc(GDSC_binary_PPIold_data, title = "GDSC")
+source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/plot_ave_roc.R")
+
+tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.tiff",width = 4.5,height = 4.5,units = "in",res = 300)
+# par(mar=c(1,1,1,1))
+# par("mar") 
+plot_ave_roc(CTRP_binary_PPIold_data, title = "CTRP", addlegend = F)
+dev.off() 
+
+pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.pdf",width = 5,height = 4)
+plot_ave_roc(CTRP_binary_PPIold_data, title = "CTRP", addlegend = F)
+dev.off() 
+
+tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.tiff",width = 4.5,height = 4.5,units = "in",res = 300)
+plot_ave_roc(GDSC_binary_PPIold_data, title = "GDSC", addlegend = T)
+dev.off() 
+
+pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.pdf",width = 3.5,height = 4)
+plot_ave_roc(GDSC_binary_PPIold_data, title = "GDSC", addlegend = T)
+dev.off() 
 
 ```
 
@@ -417,15 +257,14 @@ The drug level auc here should also correlate with the fitting accuracy (not rea
 but lets check it later
 
 So lets just show the AUC result for the CTRP and GDSC Target
+Supplementary figure 3
 ```{r,fig.width=5,fig.height=3}
+load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 auc_df <- 
   bind_rows(
-    get_auc(dataset = CTRP_binary_PPIold_data, label_level= 0) %>% mutate(dataset= "CTRP"),
-    get_auc(dataset = GDSC_binary_PPIold_data, label_level= 0) %>% mutate(dataset= "GDSC") %>% 
-      mutate(drug= as.character(drug))
-    # get_auc(dataset = PRISM_binary_PPIold_data, label_level= 0) %>% mutate(dataset= "PRISM")
+      ctrp_unsupervised_auc %>% select(-drug) %>% mutate(dataset= "CTRP"),
+      gdsc_unsupervised_auc %>% select(-drug) %>% mutate(dataset= "GDSC")
 )
-
 
 auc_df %>% 
   drop_na() %>% 
@@ -445,23 +284,23 @@ auc_df %>%
 
 does the unsupervised prediction perform better in inhibitor? not really...
 ```{r}
-ctrp_function_type <- ctrp_data %>% 
-  select(target_or_activity_of_compound, broad_cpd_id) %>% 
-  filter(broad_cpd_id %in% ctrp_drug_list) %>% 
-  mutate(function_type= case_when(
-    str_detect(target_or_activity_of_compound,pattern = "inhibitor") ~ "inhibitor",
-    str_detect(target_or_activity_of_compound,pattern = "agonist") ~ "agonist", 
-    str_detect(target_or_activity_of_compound,pattern = "activator") ~ "activator",
-    str_detect(target_or_activity_of_compound,pattern = "antagonist") ~ "antagonist"
-  ))  
-  
-# group_by(function_type) %>% 
-  # summarize(N=n())
-
-ctrp_unsupervised_auc %>% 
-  filter(imptype== "ConSen-Sig") %>% 
-  inner_join(ctrp_function_type, by= c("drug"= "broad_cpd_id")) %>% 
-  ggplot(aes(x= function_type, y= AUC)) + geom_point()
+# ctrp_function_type <- ctrp_data %>% 
+#   select(target_or_activity_of_compound, broad_cpd_id) %>% 
+#   filter(broad_cpd_id %in% ctrp_drug_list) %>% 
+#   mutate(function_type= case_when(
+#     str_detect(target_or_activity_of_compound,pattern = "inhibitor") ~ "inhibitor",
+#     str_detect(target_or_activity_of_compound,pattern = "agonist") ~ "agonist", 
+#     str_detect(target_or_activity_of_compound,pattern = "activator") ~ "activator",
+#     str_detect(target_or_activity_of_compound,pattern = "antagonist") ~ "antagonist"
+#   ))  
+#   
+# # group_by(function_type) %>% 
+#   # summarize(N=n())
+# 
+# ctrp_unsupervised_auc %>% 
+#   filter(imptype== "ConSen-Sig") %>% 
+#   inner_join(ctrp_function_type, by= c("drug"= "broad_cpd_id")) %>% 
+#   ggplot(aes(x= function_type, y= AUC)) + geom_point()
 ```
 
 
@@ -505,7 +344,7 @@ ctrp_unsupervised_auc %>%
 # 
 # HDAC_inhibitors <- ctrp_target_binary %>% filter(str_detect(target,pattern = "HDAC")) 
 
-tmp2
+# tmp2
 ```
 
 
@@ -627,21 +466,144 @@ standard dataset
 
 
 
-
-## 2 pathway analysis
+### 2 Find one drug for story telling
+From CTRP and GDSC for a list of drugs where unsupervised AUC=1, output their nominal target, their 
+top 5 positive and negative gene so that Huang and I and later check
 ```{r}
-load("~/cluster_scratch/ctrp/ctrpv2_data.RData")
-load("~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_go.RData")
-feature_imp_ridge_ctrp_ces1 <- read_csv("~/cluster_scratch/glmnet_modelling/result_largevm/feature_imp_ridge_ctrp_ces1.csv")
+ctrp_bestranked_drugs <- ctrp_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
+gdsc_bestranked_drugs <- gdsc_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
 
-pathways_df <- 
-  tibble(
-    broad_cpd_id=feature_imp_ridge_ctrp_ces1$broad_cpd_id,res_pathway) %>% 
+# get top gene table
+tmp <- bind_rows(
+  get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=5, res_type = "toppair",top_method ="top_both" ) %>% 
+    mutate(dataset= "CTRP") %>%  filter(drug %in% ctrp_bestranked_drugs) ,
+  get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=5, res_type = "toppair",top_method ="top_both") %>% 
+    mutate(dataset= "GDSC") %>%  filter(drug %in% gdsc_bestranked_drugs) %>% mutate(drug= as.character(drug))
+) %>% 
+  filter(imptype== "ConSen-Sig") %>% 
+  group_by(drug) %>% 
+  arrange(desc(imp),.by_group=T )
+
+# write_csv(tmp, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_featureimp.csv")
+
+# get meta table
+load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+tmp1 <- ctrp_data %>% select_at(c(1,4,5)) %>% filter(broad_cpd_id %in% ctrp_bestranked_drugs)
+colnames(tmp1) <- c("MOA", "DRUG_NAME", "DRUG_ID") 
+tmp2 <- gdsc_data %>% filter(DRUG_ID %in% gdsc_bestranked_drugs) %>% 
+  rename(MOA= PATHWAY_NAME) %>% 
+  mutate(DRUG_ID= as.character(DRUG_ID)) %>% 
+  select(MOA, DRUG_NAME, DRUG_ID)
+tmp3 <- bind_rows(tmp1, tmp2)
+# write_csv(tmp3, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_drugmeta.csv")
+
+tmp4 <- inner_join(tmp, tmp3,by=c("drug"= "DRUG_ID"))
+# write_csv(tmp4, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
+```
+
+Shan asked if I can give a gene-level summary
+```{r}
+tmp <- read_csv("~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
+
+top_pos <- 
+  inner_join(
+      tmp %>% filter(impdef=="toppos gene") %>% 
+        select(DRUG_NAME, gene) %>% 
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(drug_associated= paste(sort(DRUG_NAME), collapse = ";" ),
+                  NO.associated_Drugs=n()) %>% 
+        ungroup()
+      ,  
+      tmp %>% filter(impdef=="toppos gene") %>% 
+        select(gene, MOA) %>%
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(MOA= paste(sort(MOA), collapse = ";" )) %>% 
+        ungroup()         
+      
+      ) 
+  
+top_pos_target <- tmp %>% 
+  filter(impdef=="toppos gene") %>% 
+  filter(anno_type=="Target") %>% 
+  select(gene, DRUG_NAME) %>% 
+  group_by(gene) %>% 
+  summarize(drug_targeted= paste(sort(DRUG_NAME), collapse = ";" ), NO.Targeted_Drugs=n()) %>% 
+        ungroup()
+
+top_pos_gene_df <- left_join(top_pos, top_pos_target)  %>% arrange(desc(NO.associated_Drugs))
+
+top_neg_gene_df <- inner_join(
+  tmp %>% filter(impdef=="topneg gene") %>% 
+        select(DRUG_NAME, gene) %>% 
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(drug_associated= paste(sort(DRUG_NAME), collapse = ";" ),
+                  NO.associated_Drugs=n()
+                  )
+        ,  
+      tmp %>% filter(impdef=="topneg gene") %>% 
+        select(gene, MOA) %>%
+        distinct() %>% 
+        group_by(gene) %>% 
+        summarize(MOA= paste(sort(MOA), collapse = ";" )) %>% 
+        ungroup()
+) %>% 
+  arrange(desc(NO.associated_Drugs))
+
+# write_csv(top_pos_gene_df,"~/cluster_wrk/drug_moa/unsupervised_target_exploration/gene-level summary(top pos).csv")
+# write_csv(top_neg_gene_df, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/gene-level summary(top neg).csv")
+```
+
+one drug lapatinib seems to be a good example for story telling.
+Get the top10 and bottom 10 genes for the drug.
+
+1558 Lapatinib BRD-K19687926
+```{r}
+Lapatinib <- 
+bind_rows(
+GDSC_binary_PPIold_data %>% filter(drug == "1558") %>% filter(imptype=="ConSen-Sig" ) %>% arrange(desc(imp)) %>%  slice(1:10, 10614:10623)%>% mutate(drug=as.character(drug))
+,
+CTRP_binary_PPIold_data %>% filter(drug == "BRD-K19687926") %>% filter(imptype=="ConSen-Sig" ) %>% arrange(desc(imp))%>%  slice(1:10, 10614:10623) 
+
+) %>% 
+  mutate(direction= case_when(imp>0~"POS", imp<0~"NEG")) %>% 
+  group_by(drug, direction) %>% 
+  mutate(gene_rank= rank(desc(abs(imp))) ) %>% 
+  ungroup() %>% 
+  group_by(gene) %>% 
+  mutate(freq=n()) %>%
+  ungroup() %>% 
+  select(gene, dataset, gene_rank, direction,freq)
+  # pivot_wider(id_cols = gene, names_from= dataset, values_from= gene_rank) %>% 
+  # arrange(CTRP)
+
+# write_csv(Lapatinib, "Lapatinib.csv")
+```
+
+
+
+## 3 pathway analysis
+```{r}
+load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+load("~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathways_all.RData")
+
+pathways_df_gdsc <- 
+  tibble(drug=feature_imp_ridge_gdsc_comb1$drug, pathway=gdsc_kegg) %>% 
   unnest()%>% 
   arrange(padj) %>% 
-  inner_join(y = ctrpv2_data %>% select_at(1:5),
-             by= "broad_cpd_id")
-  
+  inner_join(y = gdsc_data %>% select_at(1:4),
+             by= c("drug"= "DRUG_ID")) %>%
+  select(-log2err, -ES, -pval, -leadingEdge) #%>%  
+  # filter(pathway %in% c("KEGG_MAPK_SIGNALING_PATHWAY","KEGG_MISMATCH_REPAIR", "KEGG_ERBB_SIGNALING_PATHWAY")) %>% 
+  # filter(padj<0.05)
+  # filter(drug %in% gdsc_drug_list) #%>%
+  # filter(DRUG_NAME %in% c("Axitinib")) #"Osimertinib"))#, "MK-1775") )
+
+#
+#ERK_6604 in GDSC
+
 doxorubicin <- pathways_df %>% filter(cpd_name=="doxorubicin") #topoisomerase II
 # Trametinib <- pathways_df %>% filter(cpd_name=="trametinib")
 dinaciclib <- pathways_df %>% filter(cpd_name=="dinaciclib")
@@ -663,8 +625,6 @@ tmp <- pathways_df %>%
 tmp <- res2 %>% 
   filter(target_or_activity_of_compound== "inhibitor of cyclin-dependent kinases") 
 
-
-
 top_5drugs <- pathways_df %>% select(broad_cpd_id) %>% distinct() %>% slice(1:5)
 
 tmp  <- pathways_df %>% 
@@ -672,7 +632,7 @@ tmp  <- pathways_df %>%
   
 ```
 
-## 3
+## 4
 What is the expectation of MDR1 and ABCB1?
 I suppose they ranked highly irrespecive of drug identity.
 WEll not really..
@@ -709,9 +669,6 @@ WEll not really..
 
 
 ```
-
-
-
 
 
 

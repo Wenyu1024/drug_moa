@@ -114,3 +114,9 @@ prism_data <- prism_drugs %>%
                                       .f=function(x){sum(x %>% pull(depmap_id) %in% predictor_df$DepMap_ID)}))
 
 save(prism_data, file = "prism_data.RData")
+
+# all the data points that failed str profiling test will not get the cell_id hence not used in the subsequent modelling analysis.
+predictor_df_new <- read_csv("~/cluster_scratch/depmap_21q4/crispr_gene_effect.csv")
+# tmp <- predictor_df_new %>% summarise(across(-DepMap_ID, function(x){sum(is.na(x))}))
+# summary(unlist(tmp))
+save(list = c("sensitivity", "predictor_df", "predictor_df_new"),file = "~/cluster_scratch/prism/prism_data_rosanna.RData")
