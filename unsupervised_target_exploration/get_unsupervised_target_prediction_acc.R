@@ -1,10 +1,10 @@
 library(tidyverse)
 # note only the drugs with both ConSensig and ConExpsig is involved
 CTRP_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/CTRP_binary_PPIold_data.csv") #217 drugs
-GDSC_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/GDSC_binary_PPIold_data.csv") #n= 
+GDSC_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/GDSC_binary_PPIold_data.csv") #n= 57
 PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv") # n= 918 drugs
 
-
+set.seed(0)
 sig_to_inhibitortargt_pred <- function(annotated_sig_df) {
   # for con sen sig we do relu, for con exp sig we do negative relu
   data1 <- 
@@ -15,7 +15,9 @@ sig_to_inhibitortargt_pred <- function(annotated_sig_df) {
   data2 <- 
     annotated_sig_df %>%
     filter(imptype== "ConExp-Sig") %>% 
-    mutate(imp = case_when(imp<0 ~ abs(imp), imp>0 ~ 0))   
+    mutate(imp = case_when(imp<0 ~ abs(imp)
+                           # , imp>0 ~ 0
+                           ))   
   
   annotate_pred_df <- bind_rows(data1,data2)
   return(annotate_pred_df)
@@ -33,7 +35,7 @@ get_auc <-
     if (label_level ==0 ) {dataset <-  sig_to_inhibitortargt_pred(dataset)}  
     if (label_level != 0) {dataset <-  sig_to_downstream_pred(dataset)}  
     dataset %>% 
-      filter(anno_type1!="Unknown") %>%
+      # filter(anno_type1!="Unknown") %>% 
       mutate(anno_type2 = case_when(
         anno_type!="Target" ~anno_type,
         TRUE ~ "0")) %>%    
@@ -41,7 +43,7 @@ get_auc <-
       drop_na() %>% 
       mutate(anno_binary= factor(x = (anno_type2 < (label_level+1)),levels = c(TRUE,FALSE))) %>%
       group_by(drug, imptype) %>% 
-      summarise(AUC= roc_auc_vec(truth = anno_binary,estimate = imp)) %>% 
+      summarise(AUC= yardstick::roc_auc_vec(truth = anno_binary,estimate = imp)) %>% 
       ungroup() 
   }
 
@@ -53,7 +55,5 @@ save(list = c("ctrp_unsupervised_auc", "gdsc_unsupervised_auc", "prism_unsupervi
 #note the analysis above is to compare between ConSensig and ConExpSig
 
 
-#write a function to generate the unsupervised prediction (either acc or top gene)for all the drugs
-# a function that give out prediction or AUC based on the input feature_imp df
 
 
