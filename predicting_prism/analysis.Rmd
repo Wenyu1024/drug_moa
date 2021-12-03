@@ -17,6 +17,9 @@ collect the screening drug and their target as well as additional annotation (cl
 ```{r}
 prism_drugs <- read_csv("~/cluster_scratch/prism/screened_drugs.csv")
 prism_sc_data <- read_csv("~/cluster_scratch/prism/secondary-screen-dose-response-curve-parameters.csv")
+load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+repurposinghub_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_nobroadid.csv")
+repurposinghub_sample <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_sample.csv")
 
 sc_druglist <- unique(prism_sc_data$broad_id)
 prism_drugs <- prism_drugs %>% 
@@ -25,8 +28,6 @@ prism_drugs <- prism_drugs %>%
     TRUE ~ 1
 ))
 
-repurposinghub_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_nobroadid.csv")
-repurposinghub_sample <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_sample.csv")
 repurposinghub_drug <- repurposinghub_drug %>% 
   left_join(repurposinghub_sample) %>% distinct()
 rm(repurposinghub_sample)
@@ -46,7 +47,7 @@ prism_sc_drug <-  prism_sc_data %>%
   group_by(broad_id, phase, drug_category) %>% 
   summarize(target = paste(target, collapse = ","),
             moa= paste(moa, collapse = ",")) 
-write_csv(prism_sc_drug, "~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
+# write_csv(prism_sc_drug, "~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
 ```
 Annotations proportions
 
@@ -91,7 +92,8 @@ tmp1 <- tmp %>%
   arrange(drug_category, drug_phase) %>% 
   select(drug_category, drug_phase,total_count,na_count,  na_percentage)
 
-tmp1 %>% 
+fig <- 
+  tmp1 %>% 
    ggplot(aes(x=drug_category, y= na_count, fill=drug_category)) +
   # geom_col(position = "fill")
   geom_bar(stat="identity",position = position_dodge())+
@@ -110,28 +112,67 @@ tmp1 %>%
   #   legend.justification = c("left", "top"),
   #   legend.box.just = "right"
   #   )
+fig
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6a.tiff",device = "tiff",width = 3,height = 3.5,units = "in",dpi = 300)
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6a.pdf",device = "pdf",width = 3,height = 3)
 ```
 
 # 2
 Explaining the sensitivity fitting accuracy of PRISM
 Bimodality coefficient and fitting accuracy 
 ```{r,fig.width=4,fig.height=4}
-bimodality <- read_csv("~/cluster_scratch/prism/biomodality.csv") %>% 
-  separate(col = broad_id, 
-           into=c("BRD","id", NA), 
-           sep = "-", remove = T, extra= "drop" ) %>% 
-  unite("drug", BRD:id, sep = "-") %>% 
-  group_by(drug) %>% 
-  summarise(bimodality_coefficient= median(bimodality_coefficient))
+# bimodality <- read_csv("~/cluster_scratch/prism/biomodality.csv") %>% 
+#   separate(col = broad_id, 
+#            into=c("BRD","id", NA), 
+#            sep = "-", remove = T, extra= "drop" ) %>% 
+#   unite("drug", BRD:id, sep = "-") %>% 
+#   group_by(drug) %>% 
+#   summarise(bimodality_coefficient= median(bimodality_coefficient))
+
+bimodality_coefficient <- function(x, na.rm=FALSE) {
   
-tmp <- inner_join(x = res_prism2, y = bimodality,by= c("BROAD_ID" = "drug")) %>% 
+  # Remove missing values, if desired
+  if (na.rm) {
+    x <- x[!is.na(x)]
+  }
+  
+  n <- length(x)
+  if (n == 0) {
+    # The coefficient is not defined for
+    # empty data
+    return(NaN)  
+  } else {
+        
+    m3 <- psych::skew(x, type=2)
+    m4 <- psych::kurtosi(x, type=2)
+    
+    # Calculate the coefficient based on
+    # the above
+    bc <- (m3^2 + 1) /
+      (m4 + 3 * ((n - 1)^2 / ((n - 2) * (n - 3))))
+    
+    return(bc)
+  }
+  
+}
+
+bimodality <- prism_data %>% 
+  mutate(bi_coef= map_dbl(sensitivity,
+                          .f =function(x){
+                            tmp <- bimodality_coefficient(x$auc)
+                          }  )) %>% 
+  select(BROAD_ID, bi_coef)
+write_csv(bimodality, "~/cluster_wrk/drug_moa/predicting_prism/bimodality_coef_auc.csv")
+
+  
+tmp <- inner_join(x = res_prism2, y = bimodality,by= "BROAD_ID") %>% 
   mutate(acc_sen= (ceres+ces+demeter2)/3) %>% 
   filter(sample_size>100)
   # filter(BROAD_ID %in% prism_drug_list)
 
 fig <- tmp %>% 
   mutate(drug_category= fct_relevel(drug_category, levels= c("targeted cancer", "chemo", "noncancer") )) %>% 
-  ggplot(aes(y=acc_sen , x= bimodality_coefficient,color= drug_category)) + 
+  ggplot(aes(y=acc_sen , x= bi_coef,color= drug_category)) + 
   geom_point(size = 0.2)+
   geom_smooth(method = "lm", se = FALSE)+
   theme_classic()+
@@ -145,13 +186,67 @@ fig <- tmp %>%
     )+
   scale_color_aaas()
 
-ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T) 
 
-# cor(tmp$acc_sen, tmp$bimodality_coefficient,use = "complete.obs")
-# 
-# pal_aaas(alpha = 1)(4)
+fig <- ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T) 
+fig
+# ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6.tiff",device = "tiff",width = 4,height = 4,units = "in",dpi = 300)
+# ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6.pdf",device = "pdf",width = 4,height = 4)
 ```
 
+
+jing proposed that the mean/variance of drug sensitivities
+may also impact sensitivity fitting accuracy
+
+generate mean and variance based on the prism_data object
+
+```{r,fig.width=3.5,fig.height=5}
+get_auc_mean <- function(df){mean(df$auc, na.rm = T)}
+get_auc_variance <- function(df){sd(df$auc, na.rm = T)}
+
+tmp1 <- prism_data %>% 
+  select(BROAD_ID, sensitivity) %>% 
+  mutate(
+    sen_mean=map_dbl(.x = sensitivity, .f = get_auc_mean),
+    sen_sd=map_dbl(.x = sensitivity, .f = get_auc_variance)
+         ) %>% 
+  select(-sensitivity)
+
+tmp <- inner_join(tmp, tmp1)
+
+fig <- tmp %>% 
+  mutate(drug_category= fct_relevel(drug_category, levels= c( "chemo","targeted cancer", "noncancer") )) %>%
+  ggplot(aes(y=acc_sen , x= sen_mean,color= drug_category)) + 
+  geom_point(size = 0.2)+
+  geom_smooth(method = "lm", se = FALSE)+
+  theme_classic()+
+  ylab("Sensitivity fitting accuracy")+
+  xlab("Average sensitivity")+
+  guides(color= guide_legend(title = "Drug Category",nrow = 3))+
+  scale_color_aaas()+
+  theme(legend.position="top")
+fig
+
+ggExtra::ggMarginal(fig, type= "boxplot",groupColour = T,groupFill = T) 
+
+
+# fig <- tmp %>% 
+#   # mutate(drug_category= fct_relevel(drug_category, levels= c("targeted cancer", "chemo", "noncancer") )) %>% 
+#   ggplot(aes(y=acc_sen , x= sen_sd,color= drug_category)) + 
+#   geom_point(size = 0.2)+
+#   geom_smooth(method = "lm", se = FALSE,)+
+#   theme_classic()+
+#   ylab("Sensitivity fitting accuracy")+
+#   xlab("Sensitibity cell line SD")+
+#   guides(color= guide_legend(title = "Drug Category"))+
+#   # theme(
+#   #   legend.position = c(1, 0.00),
+#   #   legend.justification = c("right", "bottom"),
+#   #   legend.box.just = "right"
+#   #   )+
+#   scale_color_aaas()
+# 
+# ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T) 
+```
 
 
 ## 3 Imp correlation across different dataset
@@ -192,29 +287,33 @@ get_cor_long_tibble <- function(df1,df2){
 # } 
 
 
-cor_tibble <- tibble(drug= imp_ctrp_shared$drug, 
-                     ctrp_gdsc = get_cor_long_tibble(imp_ctrp_shared, imp_gdsc_shared), 
-                     ctrp_prism = get_cor_long_tibble(imp_ctrp_shared, imp_prism_shared), 
-                     gdsc_prism = get_cor_long_tibble(imp_prism_shared, imp_gdsc_shared)) %>% 
-  inner_join(ctrp_data %>% select(broad_cpd_id, cpd_name), by= c("drug"= "broad_cpd_id")) %>% 
-  select(-drug) %>% 
-  rename(drug=cpd_name) %>% 
+cor_tibble <- tibble(
+  drug= imp_ctrp_shared$drug, 
+  ctrp_gdsc = get_cor_long_tibble(imp_ctrp_shared, imp_gdsc_shared), 
+  ctrp_prism = get_cor_long_tibble(imp_ctrp_shared, imp_prism_shared), 
+  gdsc_prism = get_cor_long_tibble(imp_prism_shared, imp_gdsc_shared)) %>% 
+  inner_join(
+    prism_data %>% select(BROAD_ID, name,drug_category), 
+    by= c("drug"= "BROAD_ID")) %>% 
+  # select(-drug) %>% 
   arrange(ctrp_gdsc)
 
+
 cor_tibble %>% 
-  pivot_longer(cols=-drug, names_to= "across_dataset", values_to= "COR") %>%
+  select(-drug, -drug_category) %>% 
+  pivot_longer(cols=-name, names_to= "across_dataset", values_to= "COR") %>%
   arrange(across_dataset, COR) %>% 
   mutate_at(1,factor,
-            levels= cor_tibble$drug) %>% 
+            levels= cor_tibble$name) %>% 
   mutate_at(2,factor,
           levels=c("ctrp_gdsc", "ctrp_prism", "gdsc_prism"),
           labels = c("CTRP-GDSC", "CTRP-PRISM", "GDSC-PRISM")
           ) %>%
-  ggplot(aes(x= drug,  y= COR, fill= across_dataset))+
+  ggplot(aes(x= name,  y= COR, fill= across_dataset))+
   geom_bar(stat = "identity", position = position_dodge())+
   scale_fill_npg()+
   theme_classic()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, colour = ))+
   theme(axis.title.x = element_blank()) +
   theme(legend.title = element_blank()) 
 ```
@@ -224,7 +323,7 @@ cor_tibble %>%
 Explore the supervised prediction of PRISM with different fitting accuracy
 ```{r}
 load("~/cluster_scratch/forward_modelling/targetpred_output_prismgoodbadexplore.RData")
-load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+# load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
 
 plot_two_group <- function(good_df, bad_df){
   df <- bind_rows(
@@ -268,21 +367,32 @@ plot_two_group(good_df = acc_df_prism_binary_fold_cv_good200,bad_df = acc_df_pri
 
 Okay, lets further check unsupervised target prediction of PRISM
 There are NA because now prediction is only available for genes with signature values.
-It is possible the only target gene of a drug does not have prediction value hence the AUC is not avaliable. 
+It is possible the only target gene of a drug does not have prediction value hence the AUC is not available. 
 
+check where the function is defined
 ```{r}
-PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
+# PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
 
+load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 prism_auc_comparison <-  prism_auc %>% filter(drug %in% prism_drug_list_drh)
 ```
 
 
 ```{r,fig.width=4, fig.height=4}
-get_ave_roc(sig_to_pred(annotated_sig_df=PRISM_binary_PPIold_data %>% filter(drug %in% prism_good_drug_list_200 )),title = "Best fitted drugs")
 
-get_ave_roc(sig_to_pred(annotated_sig_df=PRISM_binary_PPIold_data %>% filter(drug %in% prism_bad_drug_list_200 )),title = "Worst fitted drugs")
+source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/plot_ave_roc.R")
+plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
+               filter(drug %in% prism_good_drug_list_200),
+             title = "Best fitted drugs")
 
-get_ave_roc(sig_to_pred(annotated_sig_df=PRISM_binary_PPIold_data %>% filter(drug %in% prism_drug_list_drh )),title = "All drugs")
+plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
+               filter(drug %in% prism_bad_drug_list_200),
+             title = "Worst fitted drugs")
+
+plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
+               filter(drug %in% prism_drug_list_drh),
+             title = "All drugs")
+
 ```
 
 
