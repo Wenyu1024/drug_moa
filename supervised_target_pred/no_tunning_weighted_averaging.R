@@ -6,7 +6,7 @@ library(tidymodels)
 # if acc_metric= spearman_cor, target_mat has to be continues
 # if acc_metric= AUC, target_mat has to be binary.
 
-no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metric=NULL, pred_new=F){
+no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metric= "not applicable", pred_new=F,pred_all=F){
   if (pred_new){
     cor_test <- cor_mat[test_idx,-test_idx] # 
     cor_test[apply(cor_test, 1, sum) == 0, ] <- 1
@@ -58,16 +58,19 @@ no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metr
       pred1 <- as.vector(pred1)
       acc <- vector(mode = "numeric",length = length(test_idx))
       label= as.vector(target_mat[test_idx,])
+      
+      
       if (acc_metric== "AUC") { 
         res <- roc_auc_vec(truth = as.factor(label), pred1,event_level = "second",estimator = "binary") 
       }
       if (acc_metric== "spearman_cor") { 
         res <- cor(label, pred1,use = "complete.obs",method = "spearman") 
       }
-      # if (acc_metric== "NULL") {
-      #   res <- pred1
-      # }
+      
+      if ((acc_metric== "not applicable")&pred_all) {
+        res <- pred1
+      }
     }
   }
-  return(res)
+  return(res) 
 }
