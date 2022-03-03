@@ -3,12 +3,12 @@ library(tidymodels)
 
 ## 1 read in model based features
 load("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
-transform_mat_to_tibble <- function(mat){as_tibble(mat, rownames= "drug")}
+
 #confirm whether the gene is matched
 # tmp <- tibble(gene)
 # tmp <- map(res_feature$ces1_perf,function(x){bind_cols(tmp, tibble(x))} )
-gene <- sort(colnames(ces1)[-1])
-
+# gene <- sort(colnames(ces1)[-1])
+# transform_mat_to_tibble <- function(mat){as_tibble(mat, rownames= "drug")}
 
 
 # ### 1.1 CTRP
@@ -119,7 +119,6 @@ feature_imp_ridge_prism_comb1 <-
       )/3
     )
   )
-
 
 
 ## 3 read in target labels 

@@ -65,12 +65,12 @@ prism_target_binary <- prism_data %>%
   distinct() %>% 
   rename(drug=BROAD_ID)
 
-write_csv(ctrp_target_binary,
-          path = "~/cluster_scratch/prior/ctrpv2_target_binary.csv")
-write_csv(gdsc_target_binary,
-          path = "~/cluster_scratch/prior/gdsc_target_binary.csv")
-write_csv(prism_target_binary,
-          path = "~/cluster_scratch/prior/prism_target_binary.csv")
+# write_csv(ctrp_target_binary,
+#           path = "~/cluster_scratch/prior/ctrpv2_target_binary.csv")
+# write_csv(gdsc_target_binary,
+#           path = "~/cluster_scratch/prior/gdsc_target_binary.csv")
+# write_csv(prism_target_binary,
+#           path = "~/cluster_scratch/prior/prism_target_binary.csv")
 
 
 ctrp_list_to_zia <- read_csv("~/cluster_scratch/prior/drug_id_list/ctrp_idlist.csv")
@@ -109,9 +109,9 @@ prism_target_dtc <- read_csv("~/cluster_scratch/prior/dtc_return/prism_data.csv"
   ungroup()
 
 
-write_csv(ctrp_target_dtc,
-          path = "~/cluster_scratch/prior/ctrpv2_target_dtc.csv")
-write_csv(gdsc_target_dtc,
-          path = "~/cluster_scratch/prior/gdsc_target_dtc.csv")
-write_csv(prism_target_dtc,
-          path = "~/cluster_scratch/prior/prism_target_dtc.csv")
+# write_csv(ctrp_target_dtc,
+#           path = "~/cluster_scratch/prior/ctrpv2_target_dtc.csv")
+# write_csv(gdsc_target_dtc,
+#           path = "~/cluster_scratch/prior/gdsc_target_dtc.csv")
+# write_csv(prism_target_dtc,
+#           path = "~/cluster_scratch/prior/prism_target_dtc.csv")
