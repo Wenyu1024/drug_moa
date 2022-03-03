@@ -6,12 +6,12 @@ library(tidymodels)
 # if acc_metric= spearman_cor, target_mat has to be continues
 # if acc_metric= AUC, target_mat has to be binary.
 
-no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,acc_metric= "not applicable", pred_new=F,pred_all=F){
+no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,cor_test= NULL,acc_metric= "not applicable", pred_new=F,pred_all=F){
   if (pred_new){
-    cor_test <- cor_mat[test_idx,-test_idx] # 
+    if(is.null(cor_test)){cor_test <- cor_mat[test_idx,-test_idx]}
     cor_test[apply(cor_test, 1, sum) == 0, ] <- 1
     pred1 = (cor_test) %*% as.matrix(target_mat)
-    row.names(pred1) <- test_idx
+    row.names(pred1) <- colnames(cor_mat)[test_idx]
     res <- pred1
     
   }else {

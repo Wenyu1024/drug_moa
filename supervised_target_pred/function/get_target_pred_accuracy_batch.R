@@ -4,7 +4,7 @@ library(tidymodels)
 get_target_pred_accuracy_batch <- 
   function(dataset, id_list= NULL, estimation_method= "fold_cv",target_source){
     # setwd("~/cluster_wrk/drug_moa/supervised_target_pred")
-    setwd("/projappl/project_2003466/drug_moa/supervised_target_pred/")
+    setwd("/projappl/project_2003466/drug_moa/supervised_target_pred/function")
     
     if (estimation_method== "fold_cv") {
       source('return_acc_estimate_5fold_cv.R')
