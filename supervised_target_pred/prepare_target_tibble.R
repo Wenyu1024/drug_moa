@@ -10,10 +10,10 @@
 # to generate fingerprints. RDkit python.
 
 library(tidyverse)
-load("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
+load("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
 
 # Use Drugrepurposinghub 
-DRH <-  read_csv("~/cluster_scratch/prior/drug_repurposing_hub_sample.csv")
+DRH <-  read_csv("~/cluster_scratch/prior/drug_repurposing_hub_sample.csv") %>% 
   select(-vendor_name, -deprecated_broad_id, -smiles, -pert_iname) %>% 
   separate(col = broad_id,into = c("BRD", "id", NA, NA, NA),sep = "-", remove = T) %>% 
   unite(BRD, id, col = "BROAD_ID",  remove = T,sep= "-" ) %>% 

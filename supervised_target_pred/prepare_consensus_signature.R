@@ -1,7 +1,7 @@
 library(tidyverse)
 drug_consensus <- read_csv( "~/cluster_scratch/L1000/consensus_signatures_challenge/consensus_signature_drugs.csv") %>% 
   rename(drug = X1)
-load("~/cluster_scratch/forward_modelling/forwardmodelling_all.RData")
+load("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
 drug_consensus_ctrp <- drug_consensus %>% filter(drug %in% ctrp_data$broad_cpd_id)
 
 drug_consensus_prism <- drug_consensus %>% filter(drug %in% prism_data$BROAD_ID)
@@ -37,7 +37,7 @@ drug_consensus_gdsc <- cross_ref_tibble %>%
 
 
 write_csv(cross_ref_tibble,"~/cluster_scratch/prior/drug_id_list/cross_ref_tibble_gdsc")
-setwd("~/cluster_scratch//L1000/consensus_signatures_challenge/")
+setwd("~/cluster_scratch/L1000/consensus_signatures_challenge/")
 
 write_csv(drug_consensus_ctrp, "feature_consensus_ctrp.csv")
 write_csv(drug_consensus_gdsc,"feature_consensus_gdsc.csv")
