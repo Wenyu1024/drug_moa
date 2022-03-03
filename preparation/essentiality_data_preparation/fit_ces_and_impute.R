@@ -2,14 +2,9 @@ setwd("/scratch/project_2003466/ces_21q1_io/")
 library(tidyverse)
 data <- read_csv("ces_input_21q1.csv")
 
-# install.packages("speedglm")
-#cells <- unique(data$DepMap_ID)
-#data1 <- data %>% dplyr::filter(DepMap_ID %in% cells[1:20])
-
-# ptm <- proc.time()
 lm <- lm(ceres~ demeter2+mut+exp_seq+cn+exp_array+DepMap_ID ,data = data)
 pred <- predict.lm(lm)
-# 
+
 save.image("tmp.RData")
 load("tmp.RData")
 # tmp = proc.time() - ptm
