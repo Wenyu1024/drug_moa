@@ -15,9 +15,7 @@ library(tidymodels, quietly = T)
 library(furrr, quietly = T)
 
 estimate_performance_par <- function(df, fun_name){
-
   set.seed(0000)
-  # plan(multicore)
   res <-  df %>% 
     nested_cv(outside=vfold_cv(v = 5,repeats = 3), 
               inside= bootstraps(times = 10)) %>% 
@@ -28,20 +26,30 @@ estimate_performance_par <- function(df, fun_name){
       .y = inner_resamples,
       .f = fun_name,
       .options = furrr_options(seed = 0000))) %>%  
-    mutate(pred_test = future_map2(
+    mutate(final_res = future_map2(
       .x = final_fit,
       .y = test_data,
-      .f = ~predict(.x, new_data=.y),
-      .options = furrr_options(seed = 0000))) %>% 
-    mutate(spearman_cor = future_map2_dbl(
-      .x= pred_test, 
-      .y= test_data,
-      .f= function(x,y){
-        cor(x = x %>% pull(.pred), 
-            y = y %>% pull(y), 
-            method = "spearman")},
-      .options = furrr_options(seed = 0000))) %>% 
-    pull(spearman_cor)
-  # plan(sequential)
+      .f = function(model= .x,new_data=.y){
+        predict(model, new_data= new_data) %>% 
+          mutate(label= new_data$y)
+      },
+      .options = furrr_options(seed = 0000)
+      )) %>%
+    select(id, id2, final_res)
+    # mutate(spearman_cor = future_map2_dbl(
+    #   .x= pred_test, 
+    #   .y= test_data,
+    #   .f= function(x,y){
+    #     cor(x = x %>% pull(.pred), 
+    #         y = y %>% pull(y),
+    #         method = "spearman")},
+    #   .options = furrr_options(seed = 0000))) %>% 
+    # mutate(final_res = future_map2(
+    #   .x = final_fit,
+    #   .y = test_data,
+    #   .f = predict(x=.x , 
+    #                 new_data= .y) %>% 
+    #     select(y,.pred),
+    #   .options = furrr_options(seed = 0000))) %>% 
   return(res)
 }

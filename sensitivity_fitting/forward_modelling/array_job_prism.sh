@@ -1,18 +1,18 @@
 #!/bin/bash -l
-#SBATCH --job-name=run_array
+#SBATCH --job-name=run_5_session_furrr_prism
 #SBATCH --account=project_2003466
-#SBATCH --output=./message/prism_output_%A_%a.txt
-#SBATCH --error=./message/prism_error_%A_%a.txt
+#SBATCH --output=./message/outputrun_5session_allfurrr_%j.txt
+#SBATCH --error=./message/errorrun_5session_allfurrr_%j.txt
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH -p small
-#SBATCH --cpus-per-task=5  
-#SBATCH --mem-per-cpu=40000
-#SBATCH --array=1-350
+#SBATCH --cpus-per-task=3  
+#SBATCH --mem-per-cpu=2000
+#SBATCH --array=301-448
 
 
 # module purge
-module load r-env-singularity/4.0.3 
+module load r-env-singularity/4.0.5 
 
 # Clean up .Renviron file in home directory
 if test -f ~/.Renviron; then

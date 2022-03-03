@@ -1,6 +1,6 @@
 # 1 load data, function and packages
 source('/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/function/get_fixed_ridge.R')
-source('/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/function/estimate_performance_uniform.R')
+source('/projappl/project_2003466/drug_moa/sensitivity_fitting/forward_modelling/function/estimate_performance_par.R')
 load("/scratch/project_2003466/forward_modelling/gdsc_input.RData")
 library(tidyverse, quietly = T)
 library(furrr, quietly = T)
@@ -37,24 +37,32 @@ exp_df <- get_df_gdsc(predictor_df = exp_seq)
 rm(ces1, ceres,demeter2, exp_seq,data, sen_drug)
 
 # 3 accuracy estimation
-plan(multicore)
+tictoc::tic()
+plan(multisession)
+
 ces1_perf= estimate_performance_par(df= ces1_df,fun_name = get_fixed_glmnet)
 print("ces1 success")
 rm(ces1_df)
+
 ceres_perf= estimate_performance_par(df= ceres_df ,fun_name = get_fixed_glmnet)
 print("ceres success")
 rm(ceres_df)
+
 demeter2_perf= estimate_performance_par(df= demeter2_df,fun_name = get_fixed_glmnet)
 print("demeter2 success")
 rm(demeter2_df)
+
 exp_perf= estimate_performance_par(df= exp_df,fun_name = get_fixed_glmnet)
 print("exp success")
 rm(exp_df)
-plan(sequential)
 
-# 4 write out results
-file_name = paste0( '/scratch/project_2003466/forward_modelling/gdsc_spearman/drug_' ,job_id,".RData" )
+plan(sequential)
+tictoc::toc()
+
+# # 4 write out results
+file_name = paste0( '/scratch/project_2003466/forward_modelling/gdsc_modelresnew/drug_' ,job_id,".RData" )
 save(list = c('ces1_perf',"ceres_perf", "demeter2_perf","exp_perf"), file = file_name)
+# save.image(file = file_name)
 
 print("all success")
 
