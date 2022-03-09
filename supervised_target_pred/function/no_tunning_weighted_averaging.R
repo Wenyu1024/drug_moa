@@ -1,19 +1,20 @@
 library(tidyverse)
 library(tidymodels)
-# library(pROC)
 
 # acc_metric can be either "AUC" or "spearman_cor"
 # if acc_metric= spearman_cor, target_mat has to be continues
 # if acc_metric= AUC, target_mat has to be binary.
 
-no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,cor_test= NULL,acc_metric= "not applicable", pred_new=F,pred_all=F){
+no_tunning_weighted_averaging <- function(target_mat, cor_mat=NULL, test_idx=NULL,acc_metric= "not applicable", pred_new=F,pred_all=F, cor_test=NULL){
   if (pred_new){
     if(is.null(cor_test)){cor_test <- cor_mat[test_idx,-test_idx]}
     cor_test[apply(cor_test, 1, sum) == 0, ] <- 1
     pred1 = (cor_test) %*% as.matrix(target_mat)
     row.names(pred1) <- colnames(cor_mat)[test_idx]
-    res <- pred1
-    
+
+    min_max_normalization <- function(x){(x-min(x))/ (max(x)-min(x)) }
+    res= apply(pred1,1 ,min_max_normalization)
+
   }else {
     test_idx <- unlist(test_idx) 
     if (length(test_idx)>1){
@@ -43,11 +44,12 @@ no_tunning_weighted_averaging <- function(target_mat, cor_mat, test_idx,cor_test
         res <- mean(res)
       }
       
-      # if (acc_metric== "NULL") {
-      #   res <- pred1
-      # }
+      if (acc_metric== "not applicable") {
+        res <- pred1
+      }
       
     }
+    
     if (length(test_idx)==1){ 
       cor_test <- cor_mat[test_idx,-test_idx]
       # cor_test[cor_test < (mean(cor_test)+1*sd(cor_test)) ] <- 0
