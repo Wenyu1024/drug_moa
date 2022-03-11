@@ -1,5 +1,5 @@
 library(tidyverse) 
-get_target_mat <- function(target_tibble){
+get_target_mat <- function(target_tibble,return_format= "mat"){
   if (!("binding_score" %in% colnames(target_tibble))){  
     target_tibble <- target_tibble %>% mutate(binding_score = 1)}
   
@@ -17,6 +17,7 @@ get_target_mat <- function(target_tibble){
   target_mat= as.matrix(target_tibble[,-1])
   row.names(target_mat) <- target_tibble$drug
   target_mat <- target_mat[,colSums(target_mat)!=0]
-  return(target_mat)
+  if (return_format== "mat"){  return(target_mat) }
+  if (return_format== "widedf"){  return(target_tibble) }
 }
 

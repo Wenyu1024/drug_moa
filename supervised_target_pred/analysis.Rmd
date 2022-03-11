@@ -632,248 +632,167 @@ tar_gdsc_cor_mat_drugbank <- get_similarity_mat_tahimoto(get_target_mat(gdsc_tar
 tar_gdsc_cor_mat_dtc <- get_similarity_mat_tahimoto(get_target_mat(gdsc_target_dtc %>% filter(binding_score>0.4) %>% select(-binding_score)))
 
 
-# combining target space with sensitivity space and then use them for similarity calculation
-get_goldstandardcormat <- function(sen_df, target_df){
-  target_widedf <- get_target_mat(target_df,return_format= "widedf")
-  sen_df <- sen_df %>% pivot_longer(-DepMap_ID, names_to= "drug", values_to= "sen") %>% 
-    pivot_wider(id_cols = drug, names_from=DepMap_ID, values_from= sen) 
-  combined_df <- inner_join(sen_df, target_widedf, by ="drug") %>% arrange(drug)
-  cormat <- cor( t(as.matrix(combined_df %>% select(-drug))),use = "complete.obs" ,method = "spearman")
-  row.names(cormat) <- colnames(cormat) <- combined_df$drug
-  return(cormat)
-}
+# (ABONDONED! This does not work!)combining target space with sensitivity space and then use them for similarity calculation
 
-sentar_ctrp_cor_mat_drugbank <- get_goldstandardcormat(sen_df=sen_ctrp_mat, target_df=ctrp_target_binary)  
-
-sentar_ctrp_cor_mat_dtc <- get_goldstandardcormat(sen_df=sen_ctrp_mat, target_df=ctrp_target_dtc) 
-
-sentar_gdsc_cor_mat_drugbank <- get_goldstandardcormat(sen_df=sen_gdsc_mat, target_df=gdsc_target_binary %>% mutate(drug= as.character(drug))) 
-
-sentar_gdsc_cor_mat_dtc <- get_goldstandardcormat(sen_df=sen_gdsc_mat, target_df=gdsc_target_dtc%>% mutate(drug= as.character(drug))) 
+# get_goldstandardcormat <- function(sen_df, target_df){
+#   target_widedf <- get_target_mat(target_df,return_format= "widedf")
+#   sen_df <- sen_df %>% pivot_longer(-DepMap_ID, names_to= "drug", values_to= "sen") %>% 
+#     pivot_wider(id_cols = drug, names_from=DepMap_ID, values_from= sen) 
+#   combined_df <- inner_join(sen_df, target_widedf, by ="drug") %>% arrange(drug)
+#   cormat <- cor( t(as.matrix(combined_df %>% select(-drug))),use = "complete.obs" ,method = "spearman")
+#   row.names(cormat) <- colnames(cormat) <- combined_df$drug
+#   return(cormat)
+# }
+# 
+# sentar_ctrp_cor_mat_drugbank <- get_goldstandardcormat(sen_df=sen_ctrp_mat, target_df=ctrp_target_binary)  
+# 
+# sentar_ctrp_cor_mat_dtc <- get_goldstandardcormat(sen_df=sen_ctrp_mat, target_df=ctrp_target_dtc) 
+# 
+# sentar_gdsc_cor_mat_drugbank <- get_goldstandardcormat(sen_df=sen_gdsc_mat, target_df=gdsc_target_binary %>% mutate(drug= as.character(drug))) 
+# 
+# sentar_gdsc_cor_mat_dtc <- get_goldstandardcormat(sen_df=sen_gdsc_mat, target_df=gdsc_target_dtc%>% mutate(drug= as.character(drug))) 
 ```
 
 ```{r}
 # Row: drugpair name, column: sensitivity similiarity rank percentage, predicted target space rank percentage
 # transform the cor matrix to rank matrix, as.dataframe and pivot_longer, filter the same drug
 # then join together
-# min_max_normalization <- function(x){(x-min(x))/ (max(x)-min(x)) }
-# cor_mat_to_drugpair_longtibble1 <- function(mat, metric= "similiarity" ){
-#   # if (metric == "similiarity"){print("Similarity returned") } 
-#   if (metric == "rank_percentage"){print("Rank percentage returned")
-#     diag(mat) <- 0
-#     mat = apply(mat, 2, FUN = function(x){round((rank(x,ties.method = "max"))/length(x),digits = 3)})
-#     
-#     }
-#   # let avoid using rank function but normalized similarity  
-#     # mat = apply(mat, 2, FUN = min_max_normalization)
-#     mat = round(mat, digits = 2)
-#   mat[upper.tri(mat,diag = T)] <- -1000
-#   mat %>% 
-#     as.data.frame() %>% 
-#     rownames_to_column(var = "drug1") %>% 
-#     pivot_longer(cols = -drug1, names_to="drug2", values_to= "value") %>% 
-#     filter(value != -1000)
-# }
-
-cor_mat_to_drugpair_longtibble <- function(mat, metric= "similiarity" ){
-  # if (metric == "rank_percentage_all"){
-  #   print("Rank percentage all returned")
-  #   mat = apply(mat, 2, FUN = function(x){
-  #     round((rank(x,ties.method = "max"))/length(x),digits = 3)})
-  #   }
-  if (metric == "similiarity"){
-    print("Similarity returned") 
-  }
-  
-
-  if (metric == "rank_percentage_pairwise"){
-    print("Rank percentage pairwise returned")
-    diag(mat) <- -1000
-    mat = apply(
-      mat, 
-      2, 
-      FUN = function(x){rank(x,ties.method = "max")/length(x)}
-            # FUN = function(x){rank(-x,ties.method = "max")}
-      )
-    mat = (mat + t(mat))/2
-    # mat = round(mat,digits = 3)
-  }
-  
-  mat[upper.tri(mat,diag = T)] <- -1000
-  mat %>% 
-    as.data.frame() %>% 
-    rownames_to_column(var = "drug1") %>% 
-    pivot_longer(cols = -drug1, names_to="drug2", values_to= "value") %>% 
-    filter(value != -1000) %>% 
-    drop_na() 
-    # mutate(value = min_max_normalization(value))
-}
-
+source('~/cluster_wrk/drug_moa/supervised_target_pred/function/get_longtibble_from_cormat.R')
 
 pairlevel_comparison_ctrp_drugbank <-
- cor_mat_to_drugpair_longtibble(tar_ctrp_cor_mat_drugbank,metric="similiarity")%>%
+ get_longtibble_from_cormat(
+   tar_ctrp_cor_mat_drugbank,
+   metric="rank_percentage_pairwise") %>%
   rename(tar =value) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(sen_ctrp_cor_mat,metric= "similiarity") %>%
+    get_longtibble_from_cormat(sen_ctrp_cor_mat) %>%
       rename(sen =value),
     by= c("drug1", "drug2")
     ) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpess_drugbank_predictions_cormat,metric= "similiarity") %>%
+    get_longtibble_from_cormat(ctrpess_drugbank_predictions_cormat) %>%
       rename(ess =value),
     by= c("drug1", "drug2")
     ) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpexp_drugbank_predictions_cormat,metric= "similiarity") %>% rename(exp= value),
+    get_longtibble_from_cormat(ctrpexp_drugbank_predictions_cormat) %>% rename(exp= value),
     by= c("drug1", "drug2")
     ) %>%   
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpextended_drugbank_predictions_cormat,metric= "similiarity") %>%
+    get_longtibble_from_cormat(ctrpextended_drugbank_predictions_cormat) %>%
       rename(extended= value),
         by= c("drug1", "drug2")
     ) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpmaccs_drugbank_predictions_cormat,metric= "similiarity") %>%
+    get_longtibble_from_cormat(ctrpmaccs_drugbank_predictions_cormat) %>%
       rename(maccs= value),
         by= c("drug1", "drug2")
     ) %>% 
-  inner_join(
-    cor_mat_to_drugpair_longtibble(sentar_ctrp_cor_mat_drugbank,metric= "similiarity") %>%
-      rename(sentar= value),
-        by= c("drug1", "drug2")
-    ) 
-  # inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug1"= "broad_cpd_id")) %>% 
-  # inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug2"= "broad_cpd_id")) %>%  
-  # filter(target_or_activity_of_compound.x == target_or_activity_of_compound.y )
+  inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug1"= "broad_cpd_id")) %>%
+  inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug2"= "broad_cpd_id")) %>%
+  arrange(drug1,drug2)
 
-
-
-  
-# tmp <- pairlevel_comparison_ctrp_drugbank %>% 
-#   select(tar:sentar) %>% 
-#   cor(method= "spearman") %>% 
-#   round(digits = 2)
-# 
-# pairlevel_comparison_ctrp_drugbank1 <-  pairlevel_comparison_ctrp_drugbank %>% 
-#   select(tar:sentar) %>% 
-#   as.matrix() %>% 
-#   preprocessCore::normalize.quantiles()
-# 
-# pairlevel_comparison_ctrp_drugbank1 <- as.data.frame(pairlevel_comparison_ctrp_drugbank1) %>% 
-#   as_tibble() 
-# colnames(pairlevel_comparison_ctrp_drugbank1) <- colnames(pairlevel_comparison_ctrp_drugbank)[3:9]
-# 
-# pairlevel_comparison_ctrp_drugbank2 <- pairlevel_comparison_ctrp_drugbank %>%
-#   select_at(1:2) %>% 
-#   bind_cols(pairlevel_comparison_ctrp_drugbank1)
-# 
-# summary(pairlevel_comparison_ctrp_drugbank)
-# summary(pairlevel_comparison_ctrp_drugbank2)
-
-pairlevel_comparison_ctrp_drugbank3 <-
- cor_mat_to_drugpair_longtibble(tar_ctrp_cor_mat_drugbank,metric="rank_percentage_pairwise")%>%
+pairlevel_comparison_ctrp_dtc <-
+ get_longtibble_from_cormat(
+   tar_ctrp_cor_mat_dtc,
+   metric="rank_percentage_pairwise") %>%
   rename(tar =value) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(sen_ctrp_cor_mat,metric="rank_percentage_pairwise") %>%
+    get_longtibble_from_cormat(sen_ctrp_cor_mat) %>%
       rename(sen =value),
     by= c("drug1", "drug2")
     ) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpess_drugbank_predictions_cormat,metric="rank_percentage_pairwise") %>%
+    get_longtibble_from_cormat(ctrpess_dtc_predictions_cormat) %>%
       rename(ess =value),
     by= c("drug1", "drug2")
     ) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpexp_drugbank_predictions_cormat,metric="rank_percentage_pairwise") %>% rename(exp= value),
+    get_longtibble_from_cormat(ctrpexp_dtc_predictions_cormat) %>% rename(exp= value),
     by= c("drug1", "drug2")
     ) %>%   
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpextended_drugbank_predictions_cormat,metric="rank_percentage_pairwise") %>%
+    get_longtibble_from_cormat(ctrpextended_dtc_predictions_cormat) %>%
       rename(extended= value),
         by= c("drug1", "drug2")
     ) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(ctrpmaccs_drugbank_predictions_cormat,metric="rank_percentage_pairwise") %>%
+    get_longtibble_from_cormat(ctrpmaccs_dtc_predictions_cormat) %>%
       rename(maccs= value),
         by= c("drug1", "drug2")
     ) %>% 
   inner_join(
-    cor_mat_to_drugpair_longtibble(sentar_ctrp_cor_mat_drugbank,metric="rank_percentage_pairwise") %>%
+    get_longtibble_from_cormat(sentar_ctrp_cor_mat_dtc) %>%
       rename(sentar= value),
         by= c("drug1", "drug2")
-    ) 
-  
+    ) %>% 
+  inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug1"= "broad_cpd_id")) %>%
+  inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug2"= "broad_cpd_id")) %>%
+  arrange(drug1,drug2)
 
-# summary(pairlevel_comparison_ctrp_drugbank3)
-```
+pairlevel_comparison_gdsc_drugbank <- get_longtibble_from_cormat(tar_gdsc_cor_mat_drugbank) %>%
+  rename(tar =value) %>% 
+  inner_join(
+    get_longtibble_from_cormat(sen_gdsc_cor_mat) %>%
+      rename(sen =value),
+    by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscess_drugbank_predictions_cormat) %>%
+      rename(ess =value),
+    by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscexp_drugbank_predictions_cormat) %>%
+      rename(exp= value),
+    by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscextended_drugbank_predictions_cormat) %>%
+      rename(extended= value),
+        by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscmaccs_drugbank_predictions_cormat) %>%
+      rename(maccs= value),
+        by= c("drug1", "drug2")
+    ) %>%
+  mutate_at(c("drug1","drug2"), as.integer) %>%
+    inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug1"= "DRUG_ID")) %>%
+  inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug2"= "DRUG_ID")) %>%
+  mutate_at(c("drug1","drug2"), as.character) 
 
-
-```{r}
-# pairlevel_comparison_gdsc_drugbank <- cor_mat_to_drugpair_longtibble(tar_gdsc_cor_mat_drugbank,metric="similiarity") %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(sen_gdsc_cor_mat,metric= "similiarity") %>%
-#       rename(sen =value),
-#     by= c("drug1", "drug2")
-#     ) %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscess_drugbank_predictions_cormat,metric= "similiarity") %>%
-#       rename(ess =value),
-#     by= c("drug1", "drug2")
-#     ) %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscexp_drugbank_predictions_cormat,metric= "similiarity") %>% rename(exp= value),
-#     by= c("drug1", "drug2")
-#     ) %>%   
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscextended_drugbank_predictions_cormat,metric= "similiarity") %>%
-#       rename(extended= value),
-#         by= c("drug1", "drug2")
-#     ) %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscmaccs_drugbank_predictions_cormat,metric= "similiarity") %>%
-#       rename(maccs= value),
-#         by= c("drug1", "drug2")
-#     ) %>% 
-#   mutate_at(c("drug1","drug2"), as.integer) %>% 
-#     inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug1"= "DRUG_ID")) %>% 
-#   inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug2"= "DRUG_ID")) %>% 
-#   mutate_at(c("drug1","drug2"), as.character) %>% 
-#   filter(PATHWAY_NAME.x == PATHWAY_NAME.y) %>% 
-#   filter(value>0.95) %>%
-#   filter(sen>0.95)
-# 
-# pairlevel_comparison_gdsc_dtc  <- cor_mat_to_drugpair_longtibble(tar_gdsc_cor_mat_dtc,metric="similiarity") %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(sen_gdsc_cor_mat,metric= "similiarity") %>%
-#       rename(sen =value),
-#     by= c("drug1", "drug2")
-#     ) %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscess_dtc_predictions_cormat,metric= "similiarity") %>%
-#       rename(ess =value),
-#     by= c("drug1", "drug2")
-#     ) %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscexp_dtc_predictions_cormat,metric= "similiarity") %>% rename(exp= value),
-#     by= c("drug1", "drug2")
-#     ) %>%   
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscextended_dtc_predictions_cormat,metric= "similiarity") %>%
-#       rename(extended= value),
-#         by= c("drug1", "drug2")
-#     ) %>% 
-#   inner_join(
-#     cor_mat_to_drugpair_longtibble(gdscmaccs_dtc_predictions_cormat,metric= "similiarity") %>%
-#       rename(maccs= value),
-#         by= c("drug1", "drug2")
-#     ) %>% 
-#   mutate_at(c("drug1","drug2"), as.integer) %>% 
-#   inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug1"= "DRUG_ID")) %>% 
-#   inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug2"= "DRUG_ID")) %>% 
-#     mutate_at(c("drug1","drug2"), as.character) %>% 
-#   filter(PATHWAY_NAME.x == PATHWAY_NAME.y ) %>% 
-#   filter(value>0.95) %>% 
-#   filter(sen>0.95)
+pairlevel_comparison_gdsc_dtc  <- get_longtibble_from_cormat(tar_gdsc_cor_mat_dtc) %>%
+  rename(tar =value) %>% 
+  inner_join(
+    get_longtibble_from_cormat(sen_gdsc_cor_mat) %>%
+      rename(sen =value),
+    by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscess_dtc_predictions_cormat) %>%
+      rename(ess =value),
+    by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscexp_dtc_predictions_cormat) %>%
+      rename(exp= value),
+    by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscextended_dtc_predictions_cormat) %>%
+      rename(extended= value),
+        by= c("drug1", "drug2")
+    ) %>%
+  inner_join(
+    get_longtibble_from_cormat(gdscmaccs_dtc_predictions_cormat) %>%
+      rename(maccs= value),
+        by= c("drug1", "drug2")
+    ) %>%
+  mutate_at(c("drug1","drug2"), as.integer) %>%
+  inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug1"= "DRUG_ID")) %>%
+  inner_join(gdsc_data %>% select(DRUG_ID, PATHWAY_NAME, DRUG_NAME), by= c("drug2"= "DRUG_ID")) %>%
+  mutate_at(c("drug1","drug2"), as.character) 
 ```
 
 
@@ -894,6 +813,270 @@ tmp <- pairlevel_comparison_ctrp_drugbank %>%
 #                  p.adjust.method = "BH")  
 ```
 
+
+
+
+
+```{r}
+figdata <- pairlevel_comparison_ctrp_drugbank %>%
+  filter(target_or_activity_of_compound.x== target_or_activity_of_compound.y) %>%
+  filter(sen >0.99) %>% 
+  filter(tar ==1) %>% 
+  mutate(target_or_activity_of_compound.x = 
+           recode(target_or_activity_of_compound.x,
+                  "inhibitor of BCL2, BCL-xL, and BCL-W" = 
+                    "inhibitor of BCL family",
+                  "inhibitor of bromodomain (BRD) and extra-C terminal domain (BET) proteins" = "others",
+                  "inhibitor of HDAC1, HDAC2, HDAC3, HDAC6, and HDAC8" = "inhibitor of HDAC family",
+                  "inhibitor of nicotinamide phosphoribosyltransferase" = "others",
+                  "inhibitor of polo-like kinase 1 (PLK1)" = "inhibitor of polo-like kinase I",
+                  # "inhibitor of topoisomerase II" = "others",
+                  # "inhibitor of BRAF" = "others"
+                  ))%>% 
+  mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+pmain <- figdata %>% 
+  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
+  geom_point()+
+  geom_line(aes(group= method))+
+  theme_classic()+
+  theme(legend.position="bottom")+
+  guides(color= guide_legend(nrow = 2,title.position = "top"))+
+  xlab("Drug pair names")+
+  ylab("Simialirity ranking" )+
+  labs(color = "Prediction Method")+
+  coord_flip()+
+  scale_color_npg()+
+  scale_y_continuous(position = "right")+
+  scale_x_discrete(position = "top")+
+  theme(legend.position="none")
+
+xbox <- figdata %>% 
+  ggplot(
+    mapping = aes(
+      x= fct_reorder(method,value, median,.desc=T), 
+      y = value, fill = method ) 
+         ) +
+  geom_boxplot(outlier.shape = NA)+
+  theme_classic()+
+  coord_flip()+
+  scale_fill_npg()+
+  theme(legend.position="none")
+
+ybar <- figdata %>% 
+  ggplot(aes(x= drug_pair_name, fill= target_or_activity_of_compound.x), 
+      y =1 ) +
+  geom_bar()+
+  theme_classic()+
+  coord_flip()
+
+
+p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
+p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
+```
+
+
+```{r, fig.width=3.5,fig.height=5}
+ggdraw(p2)
+```
+
+```{r, fig.width=4,fig.height=7}
+ybar+
+  theme(legend.position="top")+
+  guides(fill= guide_legend(nrow = 10,title.position = "top"))+
+  labs(fill = "Drug mechanism")
+```
+
+
+```{r}
+figdata <- pairlevel_comparison_ctrp_dtc %>%
+  filter(tar >0.97 ) %>%
+  filter(sen>0.99) %>% 
+  # filter(target_or_activity_of_compound.x ==  target_or_activity_of_compound.y ) #%>%
+  mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+pmain <- figdata %>% 
+  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
+  geom_point()+
+  geom_line(aes(group= method))+
+  theme_classic()+
+  theme(legend.position="bottom")+
+  guides(color= guide_legend(nrow = 2,title.position = "top"))+
+  xlab("Drug pair names")+
+  ylab("Simialirity ranking" )+
+  labs(color = "Prediction Method")+
+  coord_flip()+
+  scale_color_npg()+
+  scale_y_continuous(position = "right")+
+  scale_x_discrete(position = "top")+
+  theme(legend.position="none")
+
+xbox <- figdata %>% 
+  ggplot(
+    mapping = aes(
+      x= fct_reorder(method,value, median,.desc=T), 
+      y = value, fill = method ) 
+         ) +
+  geom_boxplot(outlier.shape = NA)+
+  theme_classic()+
+  coord_flip()+
+  scale_fill_npg()+
+  theme(legend.position="none")
+
+ybar <- figdata %>%
+  ggplot(aes(x= drug_pair_name, fill= target_or_activity_of_compound.x),
+      y =1 ) +
+  geom_bar()+
+  theme_classic()+
+  coord_flip()+
+  theme(legend.position="top")+
+  guides(fill= guide_legend(nrow = 20,title.position = "top"))
+
+p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
+# p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
+
+```
+
+
+```{r, fig.width=4,fig.height=5.5}
+ggdraw(p1)
+```
+
+
+
+
+
+```{r}
+figdata <- 
+ pairlevel_comparison_gdsc_drugbank %>%
+  filter(PATHWAY_NAME.x == PATHWAY_NAME.y) %>%
+  filter(tar >0.95) %>%
+  filter(sen> 0.95) %>% 
+  mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>% 
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+pmain <- figdata %>% 
+  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
+  geom_point()+
+  geom_line(aes(group= method))+
+  theme_classic()+
+  theme(legend.position="bottom")+
+  guides(color= guide_legend(nrow = 2,title.position = "top"))+
+  xlab("Drug pair names")+
+  ylab("Simialirity ranking" )+
+  labs(color = "Prediction Method")+
+  coord_flip()+
+  scale_color_npg()+
+  scale_y_continuous(position = "right")+
+  scale_x_discrete(position = "top")+
+  theme(legend.position="none")
+
+xbox <- figdata %>% 
+  ggplot(
+    mapping = aes(
+      x= fct_reorder(method,value, median,.desc=T), 
+      y = value, fill = method ) 
+         ) +
+  geom_boxplot(outlier.shape = NA)+
+  theme_classic()+
+  coord_flip()+
+  scale_fill_npg()+
+  theme(legend.position="none")
+
+ybar <- figdata %>% 
+  ggplot(aes(x= drug_pair_name, fill= PATHWAY_NAME.x), 
+      y =1 ) +
+  geom_bar()+
+  theme_classic()+
+  coord_flip()+
+  theme(legend.position="top")+
+  guides(fill= guide_legend(nrow = 11,title.position = "top"))
+
+p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
+p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
+```
+
+
+```{r, fig.width=3.5,fig.height=5}
+ggdraw(p2)
+```
+
+```{r, fig.width=4,fig.height=7}
+ybar+labs(fill = "Drug mechanism")
+```
+
+
+
+
+```{r}
+figdata <- 
+ pairlevel_comparison_gdsc_dtc %>%
+  filter(tar >0.95) %>%
+  filter(sen> 0.95) %>% 
+  mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>%
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+pmain <- figdata %>% 
+  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
+  geom_point()+
+  geom_line(aes(group= method))+
+  theme_classic()+
+  theme(legend.position="bottom")+
+  guides(color= guide_legend(nrow = 2,title.position = "top"))+
+  xlab("Drug pair names")+
+  ylab("Simialirity ranking" )+
+  labs(color = "Prediction Method")+
+  coord_flip()+
+  scale_color_npg()+
+  scale_y_continuous(position = "right")+
+  scale_x_discrete(position = "top")+
+  theme(legend.position="none")
+
+xbox <- figdata %>% 
+  ggplot(
+    mapping = aes(
+      x= fct_reorder(method,value, median,.desc=T), 
+      y = value, fill = method ) 
+         ) +
+  geom_boxplot(outlier.shape = NA)+
+  theme_classic()+
+  coord_flip()+
+  scale_fill_npg()+
+  theme(legend.position="none")
+
+ybar <- figdata %>% 
+  ggplot(aes(x= drug_pair_name, fill= PATHWAY_NAME.x), 
+      y =1 ) +
+  geom_bar()+
+  theme_classic()+
+  coord_flip()+
+  theme(legend.position="top")+
+  guides(fill= guide_legend(nrow = 11,title.position = "top"))
+
+p1 <- cowplot::insert_xaxis_grob(pmain, xbox, grid::unit(0.2, "null"), position = "bottom")
+```
+
+
+```{r, fig.width=3.5,fig.height=4}
+ggdraw(p1)
+```
+
+
+Abondoned explorative analysis
 
 ```{r,fig.width=12,fig.height=12}
 # get similarity matrix from pred_mat
@@ -948,294 +1131,6 @@ tmp <- pairlevel_comparison_ctrp_drugbank %>%
 # coord_fixed()
 ```
 
-
-```{r,fig.height=8, fig.width=5}
-# bind_rows(
-#   pairlevel_comparison_ctrp_drugbank %>% mutate(target_resources= "Drugbank"), 
-#   pairlevel_comparison_ctrp_dtc %>% mutate(target_resources= "DTC")  
-#   ) %>% 
-#   # ungroup() %>% 
-#   # arrange(desc(ess)) %>% 
-#   # mutate(ess_f = factor(ess)) %>% 
-#   mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
-#   select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x, target_resources) %>% 
-#   pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") %>% 
-#   ggplot(aes(x= method, y= value  )) +
-#  geom_boxplot(outlier.shape = NA)+
-#   geom_point(aes(color= target_or_activity_of_compound.x)) +
-#   geom_line(aes(group=drug_pair_name,color= target_or_activity_of_compound.x)) +
-#   facet_grid(rows = vars(target_resources))+
-#   theme_classic()+
-#   theme(legend.position="top")+
-#   guides(color= guide_legend(nrow = 20,title.position = "top"))+
-#   xlab("Prediction method")+
-#   ylab("Simialirity ranking in the predicted target space" )+
-#   labs(color = "Drug mechanism category")
-#     # scale_color_npg()
-```
-
-```{r, fig.width=3.5,fig.height=5}
-# tmp1 <- pairlevel_comparison_ctrp_drugbank2 %>%
-#   inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug1"= "broad_cpd_id")) %>%
-#   inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug2"= "broad_cpd_id")) %>%
-#   # filter(sen >quantile(pairlevel_comparison_ctrp_drugbank2$sen,0.99)) %>%
-#   # filter(tar >quantile(pairlevel_comparison_ctrp_drugbank2$tar,0.95)) %>%
-#   filter(sentar >quantile(pairlevel_comparison_ctrp_drugbank2$sentar,0.99)) %>%
-#   filter(target_or_activity_of_compound.x == target_or_activity_of_compound.y )
-# summary(tmp)
-
-tmp <- pairlevel_comparison_ctrp_drugbank3 %>%
-  inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug1"= "broad_cpd_id")) %>%
-  inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug2"= "broad_cpd_id")) %>%
-  filter(sen >0.99) %>%
-  filter(tar ==1) %>%
-  filter(target_or_activity_of_compound.x == target_or_activity_of_compound.y ) %>% arrange(drug1,drug2)
-
-# tmp1 <- pairlevel_comparison_ctrp_drugbank2 %>%
-#   inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug1"= "broad_cpd_id")) %>%
-#   inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug2"= "broad_cpd_id")) %>%
-#   inner_join(tmp %>% select(drug1, drug2))%>% arrange(drug1,drug2)
-
-
-figdata <- tmp %>% 
- # pairlevel_comparison_ctrp_drugbank2 %>%
-  mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
-  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
-  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
-  select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
-  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
-
-pmain <- figdata %>% 
-  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
-  geom_point()+
-  geom_line(aes(group= method))+
-  theme_classic()+
-  theme(legend.position="bottom")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))+
-  xlab("Drug pair names")+
-  ylab("Normalized Simialirity" )+
-  labs(color = "Prediction Method")+
-  coord_flip()+
-  scale_color_npg()+
-  scale_y_continuous(position = "right")+
-  scale_x_discrete(position = "top")+
-  theme(legend.position="none")
-pmain
-xbox <- figdata %>% 
-  ggplot(
-    mapping = aes(
-      x= fct_reorder(method,value, median,.desc=T), 
-      y = value, fill = method ) 
-         ) +
-  geom_boxplot(outlier.shape = NA)+
-  theme_classic()+
-  coord_flip()+
-  scale_fill_npg()+
-  theme(legend.position="none")
-
-ybar <- figdata %>% 
-  ggplot(aes(x= drug_pair_name, fill= target_or_activity_of_compound.x), 
-      y =1 ) +
-  geom_bar()+
-  theme_classic()+
-  coord_flip()+
-  theme(legend.position="top")+
-  guides(fill= guide_legend(nrow = 11,title.position = "top"))
-
-p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
-p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
-ggdraw(p2)
-
-```
-
-```{r, fig.width=3,fig.height=7}
-ybar+labs(fill = "Drug mechanism category")
-```
-
-
-```{r, fig.width=3.7,fig.height=7}
-figdata <- pairlevel_comparison_ctrp_dtc %>%
-  mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
-  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
-  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
-  select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
-  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
-
-pmain <- figdata %>% 
-  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
-  geom_point()+
-  geom_line(aes(group= method))+
-  theme_classic()+
-  theme(legend.position="bottom")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))+
-  xlab("Drug pair names")+
-  ylab("Simialirity ranking" )+
-  labs(color = "Prediction Method")+
-  coord_flip()+
-  scale_color_npg()+
-  scale_y_continuous(position = "right")+
-  scale_x_discrete(position = "top")+
-  theme(legend.position="none")
-
-xbox <- figdata %>% 
-  ggplot(
-    mapping = aes(
-      x= fct_reorder(method,value, median,.desc=T), 
-      y = value, fill = method ) 
-         ) +
-  geom_boxplot(outlier.shape = NA)+
-  theme_classic()+
-  coord_flip()+
-  scale_fill_npg()+
-  theme(legend.position="none")
-
-ybar <- figdata %>% 
-  ggplot(aes(x= drug_pair_name, fill= target_or_activity_of_compound.x), 
-      y =1 ) +
-  geom_bar()+
-  theme_classic()+
-  coord_flip()+
-  theme(legend.position="top")+
-  guides(fill= guide_legend(nrow = 20,title.position = "top"))
-p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
-p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
-ggdraw(p2)
-```
-```{r, fig.width=3,fig.height=7}
-ybar+labs(fill = "Drug mechanism category")
-```
-
-```{r,fig.height=7, fig.width=3.5}
-# bind_rows(
-#   pairlevel_comparison_gdsc_drugbank %>% mutate(target_resources= "Drugbank"), 
-#   pairlevel_comparison_gdsc_dtc %>% mutate(target_resources= "DTC")  
-#   ) %>% 
-#   # filter(value> 0.95) %>%
-#   filter(value==1) %>%
-#   filter(sen>0.95) %>% 
-#   # arrange(desc(ess)) %>% 
-#   # mutate(ess_f = factor(ess)) %>% 
-#   mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>% 
-#   select(drug_pair_name, ess:maccs, PATHWAY_NAME.x, target_resources) %>% 
-#   pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") %>% 
-#   ggplot(aes(x= method, y= value,   )) +
-#   geom_boxplot(outlier.shape = NA)+
-#   geom_point(aes(color= PATHWAY_NAME.x)) +
-#   geom_line(aes(group=drug_pair_name,color= PATHWAY_NAME.x)) +
-#   facet_grid(rows = vars(target_resources))+
-#   theme_classic()+
-#   theme(legend.position="top")+
-#   guides(color= guide_legend(nrow = 11,title.position = "top"))+
-#   xlab("Prediction method")+
-#   ylab("Simialirity ranking in the predicted target space" )+
-#   labs(color = "Drug mechanism category")
-```
-
-
-```{r, fig.width=3.7,fig.height=7}
-figdata <- 
- pairlevel_comparison_gdsc_drugbank %>%
-  mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>% 
-  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
-  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
-  select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
-  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
-
-pmain <- figdata %>% 
-  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
-  geom_point()+
-  geom_line(aes(group= method))+
-  theme_classic()+
-  theme(legend.position="bottom")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))+
-  xlab("Drug pair names")+
-  ylab("Simialirity ranking" )+
-  labs(color = "Prediction Method")+
-  coord_flip()+
-  scale_color_npg()+
-  scale_y_continuous(position = "right")+
-  scale_x_discrete(position = "top")+
-  theme(legend.position="none")
-
-xbox <- figdata %>% 
-  ggplot(
-    mapping = aes(
-      x= fct_reorder(method,value, median,.desc=T), 
-      y = value, fill = method ) 
-         ) +
-  geom_boxplot(outlier.shape = NA)+
-  theme_classic()+
-  coord_flip()+
-  scale_fill_npg()+
-  theme(legend.position="none")
-
-ybar <- figdata %>% 
-  ggplot(aes(x= drug_pair_name, fill= PATHWAY_NAME.x), 
-      y =1 ) +
-  geom_bar()+
-  theme_classic()+
-  coord_flip()+
-  theme(legend.position="top")+
-  guides(fill= guide_legend(nrow = 11,title.position = "top"))
-
-p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
-p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
-ggdraw(p2)
-```
-
-```{r, fig.width=3.7,fig.height=7}
-figdata <- 
- pairlevel_comparison_gdsc_dtc %>%
-  mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>% 
-  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
-  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
-  select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
-  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
-
-pmain <- figdata %>% 
-  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
-  geom_point()+
-  geom_line(aes(group= method))+
-  theme_classic()+
-  theme(legend.position="bottom")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))+
-  xlab("Drug pair names")+
-  ylab("Simialirity ranking" )+
-  labs(color = "Prediction Method")+
-  coord_flip()+
-  scale_color_npg()+
-  scale_y_continuous(position = "right")+
-  scale_x_discrete(position = "top")+
-  theme(legend.position="none")
-
-xbox <- figdata %>% 
-  ggplot(
-    mapping = aes(
-      x= fct_reorder(method,value, median,.desc=T), 
-      y = value, fill = method ) 
-         ) +
-  geom_boxplot(outlier.shape = NA)+
-  theme_classic()+
-  coord_flip()+
-  scale_fill_npg()+
-  theme(legend.position="none")
-
-ybar <- figdata %>% 
-  ggplot(aes(x= drug_pair_name, fill= PATHWAY_NAME.x), 
-      y =1 ) +
-  geom_bar()+
-  theme_classic()+
-  coord_flip()+
-  theme(legend.position="top")+
-  guides(fill= guide_legend(nrow = 11,title.position = "top"))
-
-p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
-p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
-ggdraw(p2)
-```
-
-
-Abondoned explorative analysis
 ```{r, eval= FALSE}
 # load("~/cluster_scratch/forward_modelling/targetpred_serverinput.RData")
 
