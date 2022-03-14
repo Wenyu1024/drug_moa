@@ -577,13 +577,13 @@ then use it together with CI from performance_difference_test_res1 object
 
 Figure 2 E-F
 
-```{r, fig.width=3.5, fig.height=2}
+```{r, fig.width=2, fig.height=2}
 tmp <- combined_performance3 %>% 
   select(-variance) %>% 
   pivot_wider(names_from = input, values_from= estimate) %>% 
   mutate(ces_ceres_diff= ces- ceres) %>%  
   right_join(y = bind_rows(
-          performance_difference_test_res1 %>% mutate(diff_type= "ces - ceres")
+          performance_difference_test_res1 %>% mutate(diff_type= "ces-ceres")
     )) %>%
   filter(.metric== "rmse") %>%
   filter(dataset!="prism") %>%
@@ -600,10 +600,11 @@ tmp %>%
   theme_classic()+
   theme(axis.text.x = element_blank() , axis.title.x = element_blank())+
   facet_grid(cols= vars(dataset),scale="free")+
-  ylab("\U0394RMSE (CES - CERES)")
+  ylab("\U0394rmse (CES-CERES)")
+```
 
 
-
+```{r, fig.width=2, fig.height=2}
 tmp <- combined_performance3 %>% 
   select(-variance) %>% 
   pivot_wider(names_from = input, values_from= estimate) %>% 
