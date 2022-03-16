@@ -18,6 +18,7 @@ collect the screening drug and their target as well as additional annotation (cl
 prism_drugs <- read_csv("~/cluster_scratch/prism/screened_drugs.csv")
 prism_sc_data <- read_csv("~/cluster_scratch/prism/secondary-screen-dose-response-curve-parameters.csv")
 load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
+load("~/cluster_scratch/forward_modelling/forwardmodelling_all_update.RData")
 repurposinghub_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_nobroadid.csv")
 repurposinghub_sample <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_sample.csv")
 
@@ -48,6 +49,14 @@ prism_sc_drug <-  prism_sc_data %>%
   summarize(target = paste(target, collapse = ","),
             moa= paste(moa, collapse = ",")) 
 # write_csv(prism_sc_drug, "~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
+res_prism_long <- res_prism2
+res_prism2 <- res_prism_long %>%
+  select(BROAD_ID, .metric, input, estimate, name, drug_category, smiles,sample_size) %>% 
+  filter(.metric== "spearman coef") %>% 
+  pivot_wider(names_from = input, values_from= estimate) %>% 
+  mutate(acc_sen= (ceres+ces+demeter2)/3) %>% 
+  drop_na() %>% 
+  distinct() 
 ```
 Annotations proportions
 
@@ -322,7 +331,7 @@ cor_tibble %>%
 # 4
 Explore the supervised prediction of PRISM with different fitting accuracy
 ```{r}
-load("~/cluster_scratch/forward_modelling/targetpred_output_prismgoodbadexplore.RData")
+load("~/cluster_scratch/forward_modelling/targetpred_output_prismgoodbadexplore1.RData")
 # load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
 
 plot_two_group <- function(good_df, bad_df){
@@ -360,9 +369,9 @@ plot_two_group <- function(good_df, bad_df){
 ```{r,fig.height=3, fig.width=5}
 plot_two_group(good_df = acc_df_prism_binary_fold_cv_good200,bad_df = acc_df_prism_binary_fold_cv_bad200)
 
-# plot_two_group(good_df = acc_df_prism_binary_fold_cv_good100,bad_df = acc_df_prism_binary_fold_cv_bad100)
-# plot_two_group(good_df = acc_df_prism_binary_fold_cv_good300,bad_df = acc_df_prism_binary_fold_cv_bad300)
-# plot_two_group(good_df = acc_df_prism_binary_fold_cv_goodhalf,bad_df = acc_df_prism_binary_fold_cv_badhalf)
+plot_two_group(good_df = acc_df_prism_binary_fold_cv_good100,bad_df = acc_df_prism_binary_fold_cv_bad100)
+plot_two_group(good_df = acc_df_prism_binary_fold_cv_good300,bad_df = acc_df_prism_binary_fold_cv_bad300)
+plot_two_group(good_df = acc_df_prism_binary_fold_cv_goodhalf,bad_df = acc_df_prism_binary_fold_cv_badhalf)
 ```
 
 Okay, lets further check unsupervised target prediction of PRISM
@@ -371,10 +380,10 @@ It is possible the only target gene of a drug does not have prediction value hen
 
 check where the function is defined
 ```{r}
-# PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
+PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
 
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
-prism_auc_comparison <-  prism_auc %>% filter(drug %in% prism_drug_list_drh)
+prism_auc_comparison <-  prism_unsupervised_auc %>% filter(drug %in% prism_drug_list_drh)
 ```
 
 
