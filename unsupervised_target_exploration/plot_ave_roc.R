@@ -6,12 +6,12 @@ plot_ave_roc <- function(annotated_pred_df, title, addlegend= T,label_level= 0){
     # for con sen sig we do relu, for con exp sig we do negative relu
     data1 <- 
       annotated_sig_df %>%
-      filter(imptype== "ConSen-Sig") %>% 
+      filter(imptype== "ess-sig") %>% 
       mutate(imp = case_when(imp>0 ~ imp, imp<0 ~ 0)) 
     
     data2 <- 
       annotated_sig_df %>%
-      filter(imptype== "ConExp-Sig") %>% 
+      filter(imptype== "exp-sig") %>% 
       mutate(imp = case_when(imp<0 ~ abs(imp), imp>0 ~ 0))   
     
     annotate_pred_df <- bind_rows(data1,data2)
@@ -50,14 +50,14 @@ plot_ave_roc <- function(annotated_pred_df, title, addlegend= T,label_level= 0){
     inner_join(tmp0) %>% drop_na() # filter out drugs where AUC calculation is not available.
   
   ## here I used transpose from purrr package to change the index order of this multi-level list
-  ROCR.consensig <- tmp %>% filter(imptype== "ConSen-Sig") %>% pull(data) %>% transpose()
-  ROCR.conexpsig <- tmp %>% filter(imptype== "ConExp-Sig") %>% pull(data) %>% transpose()
+  ROCR.consensig <- tmp %>% filter(imptype== "ess-sig") %>% pull(data) %>% transpose()
+  ROCR.conexpsig <- tmp %>% filter(imptype== "exp-sig") %>% pull(data) %>% transpose()
   
   pred <- prediction(ROCR.consensig$predictions, ROCR.consensig$labels)
   perf <- performance(pred,'tpr','fpr')
   pred1 <- prediction(ROCR.conexpsig$predictions, ROCR.conexpsig$labels)
   perf1 <- performance(pred1,'tpr','fpr')
-  plot(perf, avg="vertical", lwd=3, col="red",spread.estimate="stderror",plotCI.lwd=2,main =title)
-  plot(perf1, avg="vertical", lwd=3, col="blue",spread.estimate="stderror",plotCI.lwd=2,add=T)
-  if(addlegend== T){legend("bottomright", legend = c("ConSen-sig", "ConExp-sig"), lty = 1, lwd = 2, col = c("red", "blue"))}
+  plot(perf, avg="vertical", lwd=3, col="red",spread.estimate="stderror",plotCI.lwd=2,xlab= "FPR", ylab= "TPR",main=NULL)
+  plot(perf1, avg="vertical", lwd=3, col="blue",spread.estimate="stderror",plotCI.lwd=2,add=T,xlab= "FPR", ylab= "TPR",main=NULL)
+  if(addlegend== T){legend("bottomright", legend = c("ess-sig", "exp-sig"), lty = 1, lwd = 2, col = c("red", "blue"))}
 }

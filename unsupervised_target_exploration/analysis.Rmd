@@ -46,7 +46,7 @@ check data correctness
 
 2) pick top 50, 100, 200 genes and compare to what percentage of drug the target of which can be prioritized by the top genes
 
-```{r,fig.width=4, fig.height=4}
+```{r,fig.width=3, fig.height=4}
 source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/get_drug_frac.R")
 target_idf <- bind_rows(
   map_dfr(
@@ -56,12 +56,12 @@ target_idf <- bind_rows(
   map_dfr(.x = c(50, 100, 200),
           .f = ~get_drug_frac(dataset= GDSC_binary_PPIold_data, top_num=.x)) %>%
     mutate(dataset= "GDSC")
-)
-
+) 
 # Bar plot: pos/neg stack, top_n dodge, imptype x axis, dataset facet
 # seems impossible to both stack and dodge
 
-fig <- target_idf %>%
+fig <- target_idf %>% 
+  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) %>% 
   ggplot(aes(x= factor(top_n),y = frac, fill= impdef)) +
   geom_bar(stat = "identity",position = "stack")+
   facet_grid(cols = vars(dataset), rows = vars(imptype))+
@@ -72,13 +72,13 @@ fig <- target_idf %>%
   guides(fill=guide_legend(title="",nrow = 2,title.position = "top"))+
   theme(legend.position = "top")+
   theme(
-    legend.position = c(0, 0.98),
-    legend.justification = c("left", "top"),
+    legend.position = c(0.7, 0.4),
+    # legend.justification = c("left", "middle"),
     legend.box.just = "right"
     )
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.tiff",width = 4,height = 4)
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.pdf",width = 4,height = 4)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.tiff",width = 3,height = 4)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.pdf",width = 3,height = 4)
 ```
 
 lets still go back to drug percentage,
@@ -132,7 +132,7 @@ checking
 ```
 
 Supplementary figure 4
-```{r, fig.width=4, fig.height=4}
+```{r, fig.width=3, fig.height=4}
 network_idf <- bind_rows(
   get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
     mutate(dataset= "CTRP") %>%  select(-drug) ,
@@ -141,6 +141,7 @@ network_idf <- bind_rows(
 )
 
 fig <- network_idf %>% 
+  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) %>% 
   group_by(dataset,imptype) %>% 
   mutate(num= n()) %>% 
   mutate(anno_type2 = 
@@ -164,8 +165,8 @@ fig <- network_idf %>%
   theme(legend.position = "none")
 
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.tiff",width = 4,height = 4)
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.pdf",width = 4,height = 4)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.tiff",width = 3,height = 4)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.pdf",width = 3,height = 4)
 ```
 
 
@@ -203,7 +204,7 @@ For top genes, if the are not target then what are they (this plot is ugly)
 Lets just use abs(imp) to identify T, T+1 T+2 for different dataset
 ```{r}
 # exploration
-load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
+# load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 # ctrp_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
 # gdsc_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
 # prism_unsupervised_auc %>% ggplot(aes(x= imptype, y= AUC,fill=imptype)) + geom_boxplot()
@@ -229,25 +230,32 @@ load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method
 
 
 figure 4B-4C
-```{r,fig.height=4, fig.width=4}
+```{r,fig.height=3.5, fig.width=4}
 source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/plot_ave_roc.R")
 
-tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.tiff",width = 4.5,height = 4.5,units = "in",res = 300)
+tmp <- CTRP_binary_PPIold_data %>% 
+    mutate(imptype= recode(imptype,
+                           "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig"))
+
+tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.tiff",width = 4,height = 3.5,units = "in",res = 300)
 # par(mar=c(1,1,1,1))
 # par("mar") 
-plot_ave_roc(CTRP_binary_PPIold_data, title = "CTRP", addlegend = F)
+plot_ave_roc(annotated_pred_df = tmp  , addlegend = F)
 dev.off() 
 
-pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.pdf",width = 5,height = 4)
-plot_ave_roc(CTRP_binary_PPIold_data, title = "CTRP", addlegend = F)
+pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.pdf",width = 4,height = 3.5)
+plot_ave_roc(CTRP_binary_PPIold_data%>% 
+  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) , addlegend = F)
 dev.off() 
 
-tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.tiff",width = 4.5,height = 4.5,units = "in",res = 300)
-plot_ave_roc(GDSC_binary_PPIold_data, title = "GDSC", addlegend = T)
+tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.tiff",width = 4,height = 3.5,units = "in",res = 300)
+plot_ave_roc(GDSC_binary_PPIold_data%>% 
+  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) , title = "GDSC", addlegend = T)
 dev.off() 
 
-pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.pdf",width = 3.5,height = 4)
-plot_ave_roc(GDSC_binary_PPIold_data, title = "GDSC", addlegend = T)
+pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.pdf",width = 4,height = 3.5)
+plot_ave_roc(GDSC_binary_PPIold_data%>% 
+  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) , title = "GDSC", addlegend = T)
 dev.off() 
 
 ```
@@ -258,20 +266,22 @@ but lets check it later
 
 So lets just show the AUC result for the CTRP and GDSC Target
 Supplementary figure 3
-```{r,fig.width=5,fig.height=3}
+```{r,fig.width=3,fig.height=2}
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 auc_df <- 
   bind_rows(
       ctrp_unsupervised_auc %>% select(-drug) %>% mutate(dataset= "CTRP"),
       gdsc_unsupervised_auc %>% select(-drug) %>% mutate(dataset= "GDSC")
-)
+) %>% 
+    mutate(imptype= recode(imptype,
+                           "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig"))
 
 auc_df %>% 
   drop_na() %>% 
   ggplot(aes(x=imptype, y=AUC,color= imptype)) + 
   geom_violin()+
   stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
-           colour = "black")+
+           colour = "black",size=0.2)+
   facet_wrap(~dataset)+
   theme_classic()+
   theme(axis.text.x = element_blank())+
@@ -666,6 +676,38 @@ write_csv(pathways_df_gdsc, "pathways_df_gdsc.csv")
 write_csv(example_gdsc_DDR, "pathway_example_gdsc_DDR.csv")
 write_csv(pathways_df_prism, "pathways_df_prism.csv")
 write_csv(pathways_df_ctrp, "pathways_df_ctrp.csv")
+
+GO_df_gdsc <- 
+  tibble(drug=feature_imp_ridge_gdsc_comb1$drug, pathway=gdsc_go) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = gdsc_data %>% select_at(1:4),
+             by= c("drug"= "DRUG_ID")) %>%
+  select(-log2err, -ES, -pval, -leadingEdge,-NES, -size) %>%  
+  filter(padj<0.05) 
+
+GO_df_ctrp <- 
+  tibble(drug=feature_imp_ridge_ctrp_comb1$drug, pathway=ctrp_go) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = ctrp_data %>% filter(drug_type== "single drug") %>% select_at(c(1,4,5)),
+             by= c("drug"= "broad_cpd_id")) %>%
+  select(-log2err, -ES, -pval, -leadingEdge, -NES, -size) %>%  
+  filter(padj<0.05) 
+
+
+GO_df_prism <- 
+  tibble(drug=feature_imp_ridge_prism_comb1$drug, pathway=prism_go) %>% 
+  unnest()%>% 
+  arrange(padj) %>% 
+  inner_join(y = prism_data %>% select_at(1:4),
+             by= c("drug"= "BROAD_ID")) %>%
+  select(-log2err, -ES, -pval, -leadingEdge, -NES, -size) %>%  
+  filter(padj<0.05) 
+
+write_csv(GO_df_gdsc, "GO_df_gdsc.csv")
+write_csv(GO_df_prism, "GO_df_prism.csv")
+write_csv(GO_df_ctrp, "GO_df_ctrp.csv")
 ```
 
 ## 4
