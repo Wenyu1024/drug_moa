@@ -5,3 +5,7 @@ Then the prepared PPI files (PPI old) is used to annotate unsupervised predictio
 The annotation result is further tidyed by the tidy_annotated_imp.R
 After that, the output are imported in analysis.RMD for exploring and visualization.
 
+For pathway analysis, rank of the ess gene (raw value) is used for enrichment analysis.
+Enrichment analysis is run on the server with get_pathway.sh  and pathway_enrichment.R
+Then the output is further explored in Rmd, whereKEGG-GDSC result on mismatch repair is used for case study.
+

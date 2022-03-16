@@ -597,7 +597,7 @@ CTRP_binary_PPIold_data %>% filter(drug == "BRD-K19687926") %>% filter(imptype==
 ## 3 pathway analysis
 ```{r}
 load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
-load("~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathways_all.RData")
+load("~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_all.RData")
 
 pathways_df_gdsc <- 
   tibble(drug=feature_imp_ridge_gdsc_comb1$drug, pathway=gdsc_kegg) %>% 
@@ -605,7 +605,8 @@ pathways_df_gdsc <-
   arrange(padj) %>% 
   inner_join(y = gdsc_data %>% select_at(1:4),
              by= c("drug"= "DRUG_ID")) %>%
-  select(-log2err, -ES, -pval, -leadingEdge,-NES, -size) %>%  
+  # select(-log2err, -ES, -pval, -leadingEdge,-NES, -size) %>%  
+  select(-log2err, -leadingEdge, -size) %>%  
   # filter(pathway %in% c("KEGG_MAPK_SIGNALING_PATHWAY","KEGG_MISMATCH_REPAIR", "KEGG_ERBB_SIGNALING_PATHWAY")) %>%
   filter(padj<0.05) 
   # select(pathway, padj, DR)
@@ -653,13 +654,19 @@ pathways_df_ctrp <-
   tibble(drug=feature_imp_ridge_ctrp_comb1$drug, pathway=ctrp_kegg) %>% 
   unnest()%>% 
   arrange(padj) %>% 
-  inner_join(y = ctrp_data %>% filter(drug_type== "single drug") %>% select_at(c(1,4,5)),
-             by= c("drug"= "broad_cpd_id")) %>%
-  select(-log2err, -ES, -pval, -leadingEdge, -NES, -size) %>%  
+  inner_join(
+    y = ctrp_data %>% filter(drug_type== "single drug") %>% select_at(c(1,4,5)),
+    by= c("drug"= "broad_cpd_id")) %>%
+  select(-log2err,  -pval, -leadingEdge,  -size) %>%  
   # filter(pathway %in% c("KEGG_MAPK_SIGNALING_PATHWAY","KEGG_MISMATCH_REPAIR", "KEGG_ERBB_SIGNALING_PATHWAY")) %>%
   # filter(pathway %in% c("KEGG_MISMATCH_REPAIR")) %>%
   filter(padj<0.05) 
 
+example_ctrp_DDR <- pathways_df_ctrp %>% 
+  filter(pathway %in% c("KEGG_MISMATCH_REPAIR")) %>% 
+  select(-drug) %>% 
+  rename(REPORTED_MECHANISM=target_or_activity_of_compound) %>% 
+  mutate(padj= formatC(padj, format = "e", digits = 2))
 
 pathways_df_prism <- 
   tibble(drug=feature_imp_ridge_prism_comb1$drug, pathway=prism_kegg) %>% 
@@ -714,6 +721,11 @@ write_csv(GO_df_ctrp, "GO_df_ctrp.csv")
 What is the expectation of MDR1 and ABCB1?
 I suppose they ranked highly irrespecive of drug identity.
 WEll not really..
+
+Lets further confirm which gene are more frequently ranked in the top or bottom
+in ess-sig?
+note stick to valid signatures.
+
 
 ```{r}
 # tmp <- feature_imp_ridge_ctrp_comb1 %>% 
