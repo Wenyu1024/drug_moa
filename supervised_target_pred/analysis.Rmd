@@ -551,6 +551,7 @@ gdscextended_dtc_predictions <- get_predictions(
   pred_drugs=feature_extended_gdsc$drug,
   train_label= gdsc_target_dtc,
   similarity= "tahimoto")
+save.image("~/cluster_scratch/forward_modelling/supervisedpredictedtargets.RData")
 ```
 
 
@@ -804,6 +805,7 @@ pairlevel_comparison_gdsc_drugbank %>% summary()
 pairlevel_comparison_gdsc_dtc %>% summary()
 
 apply(pairlevel_comparison_ctrp_drugbank %>% select_at(5:8), MARGIN = 2, function(x){sum(x>0.95)})
+
 tmp <- pairlevel_comparison_ctrp_drugbank %>% 
   pivot_longer(cols= 5:8, names_to = "type", values_to= "rank_percentage") 
   
