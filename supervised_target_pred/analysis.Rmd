@@ -81,22 +81,22 @@ ctrp_allvalid_list <- res_ctrp2 %>%
   slice_max(n=1, order_by=sample_size) %>% 
   pull(broad_cpd_id)
 
-#n= 122
+#n= 175
 gdsc_allvalid_list <- res_gdsc2 %>% 
   select(-.metric, -estimate, -variance, -input) %>% 
   distinct() %>% 
   filter(!sample_size <100) %>% 
-  select(smiles,DRUG_ID, sample_size) %>%
-  drop_na() %>% 
-  group_by(smiles) %>% 
+  # select(smiles,DRUG_ID, sample_size) %>%
+  # drop_na() %>% 
+  group_by(DRUG_NAME) %>%
   slice_max(n=1, order_by=sample_size) %>% 
   pull(DRUG_ID)
 
 length(intersect(ctrp_allvalid_list, unique(ctrp_target_binary$drug))) #360
 length(intersect(ctrp_allvalid_list, unique(ctrp_target_dtc$drug))) #209
 
-length(intersect(gdsc_allvalid_list, unique(gdsc_target_binary$drug))) #89
-length(intersect(gdsc_allvalid_list, unique(gdsc_target_dtc$drug))) #100
+length(intersect(gdsc_allvalid_list, unique(gdsc_target_binary$drug))) #123
+length(intersect(gdsc_allvalid_list, unique(gdsc_target_dtc$drug))) #104
 ```
 
 
