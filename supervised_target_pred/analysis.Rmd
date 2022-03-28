@@ -722,11 +722,6 @@ pairlevel_comparison_ctrp_dtc <-
       rename(maccs= value),
         by= c("drug1", "drug2")
     ) %>% 
-  inner_join(
-    get_longtibble_from_cormat(sentar_ctrp_cor_mat_dtc) %>%
-      rename(sentar= value),
-        by= c("drug1", "drug2")
-    ) %>% 
   inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug1"= "broad_cpd_id")) %>%
   inner_join(ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound, cpd_name), by= c("drug2"= "broad_cpd_id")) %>%
   arrange(drug1,drug2)
@@ -799,31 +794,97 @@ pairlevel_comparison_gdsc_dtc  <- get_longtibble_from_cormat(tar_gdsc_cor_mat_dt
 
 ```{r}
 # check how often drugpair is prioritized?
-pairlevel_comparison_ctrp_drugbank %>% summary()
-pairlevel_comparison_ctrp_dtc %>% summary()
-pairlevel_comparison_gdsc_drugbank %>% summary()
-pairlevel_comparison_gdsc_dtc %>% summary()
-
-apply(pairlevel_comparison_ctrp_drugbank %>% select_at(5:8), MARGIN = 2, function(x){sum(x>0.95)})
-
-tmp <- pairlevel_comparison_ctrp_drugbank %>% 
-  pivot_longer(cols= 5:8, names_to = "type", values_to= "rank_percentage") 
-  
-# kruskal.test(type~rank_percentage,data= tmp)
+# pairlevel_comparison_ctrp_drugbank %>% summary()
+# pairlevel_comparison_ctrp_dtc %>% summary()
+# pairlevel_comparison_gdsc_drugbank %>% summary()
+# pairlevel_comparison_gdsc_dtc %>% summary()
+# 
+# apply(pairlevel_comparison_ctrp_drugbank %>% select_at(5:8), MARGIN = 2, function(x){sum(x>0.95)})
+# 
+# tmp <- pairlevel_comparison_ctrp_drugbank %>% 
+#   pivot_longer(cols= 5:8, names_to = "type", values_to= "rank_percentage") 
+#   
 # kruskal.test(type~rank_percentage,data= tmp)
 # pairwise.wilcox.test(tmp$rank_percentage, tmp$type,
-#                  p.adjust.method = "BH")  
+#                  p.adjust.method = "BH")
 ```
 
 
 
+add a plot like this: for the same threshold.
+http://www.sthda.com/english/articles/24-ggpubr-publication-ready-plots/76-add-p-values-and-significance-levels-to-ggplots/
+```{r}
+figdata1 <- pairlevel_comparison_ctrp_drugbank %>%
+  filter(sen >0.95) %>%
+  filter(tar >0.95) %>%
+  mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+
+figdata2 <- pairlevel_comparison_ctrp_dtc %>%
+  filter(sen >0.95) %>%
+  filter(tar >0.95) %>%
+  mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+figdata3 <- 
+ pairlevel_comparison_gdsc_drugbank %>%
+  filter(tar >0.95) %>%
+  filter(sen> 0.95) %>% 
+  mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>% 
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+figdata4 <- pairlevel_comparison_gdsc_dtc %>%
+  filter(tar >0.95) %>%
+  filter(sen > 0.95) %>% 
+  mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>%
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+pairwise.wilcox.test(g = figdata1$method, x = figdata1$value, paired= T,p.adjust.method = "BH")
+pairwise.wilcox.test(g = figdata2$method, x = figdata2$value, paired= T,p.adjust.method = "BH")
+pairwise.wilcox.test(g = figdata3$method, x = figdata3$value, paired= T,p.adjust.method = "BH")
+pairwise.wilcox.test(g = figdata4$method, x = figdata4$value, paired= T,p.adjust.method = "BH")
+
+fig <- figdata1 %>% mutate(Dataset= "CTRP", TargetType= "DRUGBANK") %>% 
+  bind_rows(figdata2 %>% mutate(Dataset= "CTRP", TargetType= "DTC")) %>% 
+  bind_rows(figdata3 %>% mutate(Dataset= "GDSC", TargetType= "DRUGBANK")) %>% 
+  bind_rows(figdata4 %>% mutate(Dataset= "GDSC", TargetType= "DTC")) %>%
+  ggplot(
+    mapping = aes(
+      x= fct_reorder(method,value, median,.desc=T),
+      y = value,
+      fill = method)
+         ) +
+  geom_boxplot(outlier.shape = NA)+
+  theme_classic()+
+  scale_fill_npg()+
+  ylab("similiairity ranking")+
+  facet_grid(cols = vars(Dataset), rows = vars(TargetType),scales = "free")+
+  theme(legend.position="right",axis.text.x=element_blank(), axis.title.x=element_blank())
+```
+
+```{r,fig.width=5,fig.height=4}
+fig
+```
 
 
 ```{r}
 figdata <- pairlevel_comparison_ctrp_drugbank %>%
   filter(target_or_activity_of_compound.x== target_or_activity_of_compound.y) %>%
-  filter(sen >0.99) %>% 
-  filter(tar ==1) %>% 
+  filter(sen >0.99) %>%
+  filter(tar ==1) %>%
   mutate(target_or_activity_of_compound.x = 
            recode(target_or_activity_of_compound.x,
                   "inhibitor of BCL2, BCL-xL, and BCL-W" = 
@@ -841,6 +902,7 @@ figdata <- pairlevel_comparison_ctrp_drugbank %>%
   select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
   pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
 
+
 pmain <- figdata %>% 
   ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
   geom_point()+
@@ -848,42 +910,55 @@ pmain <- figdata %>%
   theme_classic()+
   theme(legend.position="bottom")+
   guides(color= guide_legend(nrow = 2,title.position = "top"))+
-  xlab("Drug pair names")+
+  xlab("")+
   ylab("Simialirity ranking" )+
   labs(color = "Prediction Method")+
   coord_flip()+
   scale_color_npg()+
   scale_y_continuous(position = "right")+
   scale_x_discrete(position = "top")+
-  theme(legend.position="none")
+theme(legend.position="none")
 
-xbox <- figdata %>% 
-  ggplot(
-    mapping = aes(
-      x= fct_reorder(method,value, median,.desc=T), 
-      y = value, fill = method ) 
-         ) +
-  geom_boxplot(outlier.shape = NA)+
-  theme_classic()+
-  coord_flip()+
-  scale_fill_npg()+
-  theme(legend.position="none")
+
+# xbox <- figdata %>% 
+#   ggplot(
+#     mapping = aes(
+#       x= fct_reorder(method,value, median,.desc=T), 
+#       y = value, fill = method ) 
+#          ) +
+#   geom_boxplot(outlier.shape = NA)+
+#   theme_classic()+
+#   coord_flip()+
+#   scale_fill_npg()+
+#   theme(legend.position="none")
 
 ybar <- figdata %>% 
   ggplot(aes(x= drug_pair_name, fill= target_or_activity_of_compound.x), 
       y =1 ) +
   geom_bar()+
   theme_classic()+
-  coord_flip()
+  coord_flip()+
+    # theme(legend.position="none")+
+  guides(fill= guide_legend(nrow = 8,title.position = "top"))+
+  labs(fill = "Drug mechanism")
 
+# p1 <- cowplot::insert_xaxis_grob(pmain, xbox, grid::unit(0.1, "null"), position = "bottom")
+p2 <- cowplot::insert_yaxis_grob(pmain, ybar+theme(legend.position="none"), grid::unit(0.05, "null"), position = "right")
 
-p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
-p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
+# extract the legend from one of the plots
+legend <- get_legend(
+  ybar    
+)
+
+# add the legend to the row we made earlier. Give it one-third of 
+# the width of one plot (via rel_widths).
+
 ```
 
 
-```{r, fig.width=3.5,fig.height=5}
-ggdraw(p2)
+```{r, fig.width=3.5,fig.height=7}
+# cowplot::ggdraw(p2)
+cowplot::plot_grid(p2, legend, rel_heights = c(3, 1.5),nrow = 2)
 ```
 
 ```{r, fig.width=4,fig.height=7}
@@ -896,36 +971,37 @@ ybar+
 
 ```{r}
 figdata <- pairlevel_comparison_ctrp_dtc %>%
-  filter(tar >0.97 ) %>%
-  filter(sen>0.99) %>% 
-  # filter(target_or_activity_of_compound.x ==  target_or_activity_of_compound.y ) #%>%
+  filter(tar >0.95 ) %>%
+  filter(sen>0.95) %>% 
   mutate(drug_pair_name= str_c(cpd_name.x, cpd_name.y,sep = "  ")) %>% 
   mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
   mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
   select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
   pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
 
-pmain <- figdata %>% 
-  ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
-  geom_point()+
-  geom_line(aes(group= method))+
-  theme_classic()+
-  theme(legend.position="bottom")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))+
-  xlab("Drug pair names")+
-  ylab("Simialirity ranking" )+
-  labs(color = "Prediction Method")+
-  coord_flip()+
-  scale_color_npg()+
-  scale_y_continuous(position = "right")+
-  scale_x_discrete(position = "top")+
-  theme(legend.position="none")
+pairwise.wilcox.test(g = figdata$method, x = figdata$value, paired= T,p.adjust.method = "BH")
+# pmain <- figdata %>% 
+#   ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
+#   geom_point()+
+#   geom_line(aes(group= method))+
+#   theme_classic()+
+#   theme(legend.position="bottom")+
+#   guides(color= guide_legend(nrow = 2,title.position = "top"))+
+#   xlab("Drug pair names")+
+#   ylab("Simialirity ranking" )+
+#   labs(color = "Prediction Method")+
+#   coord_flip()+
+#   scale_color_npg()+
+#   scale_y_continuous(position = "right")+
+#   scale_x_discrete(position = "top")+
+#   theme(legend.position="none")
 
-xbox <- figdata %>% 
+# xbox <- 
+  figdata %>%
   ggplot(
     mapping = aes(
-      x= fct_reorder(method,value, median,.desc=T), 
-      y = value, fill = method ) 
+      x= fct_reorder(method,value, median,.desc=T),
+      y = value, fill = method )
          ) +
   geom_boxplot(outlier.shape = NA)+
   theme_classic()+
@@ -933,33 +1009,33 @@ xbox <- figdata %>%
   scale_fill_npg()+
   theme(legend.position="none")
 
-ybar <- figdata %>%
-  ggplot(aes(x= drug_pair_name, fill= target_or_activity_of_compound.x),
-      y =1 ) +
-  geom_bar()+
-  theme_classic()+
-  coord_flip()+
-  theme(legend.position="top")+
-  guides(fill= guide_legend(nrow = 20,title.position = "top"))
-
-p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
+# ybar <- figdata %>%
+#   ggplot(aes(x= drug_pair_name, fill= target_or_activity_of_compound.x),
+#       y =1 ) +
+#   geom_bar()+
+#   theme_classic()+
+#   coord_flip()+
+#   theme(legend.position="top")+
+#   guides(fill= guide_legend(nrow = 20,title.position = "top"))
+# 
+# p1 <- cowplot::insert_xaxis_grob(pmain, xbox,  position = "bottom")
 # p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "right")
 
 ```
 
 
 ```{r, fig.width=4,fig.height=5.5}
-ggdraw(p1)
+# ggdraw(p1)
 ```
 
 
 
 
-
+GDSC
 ```{r}
 figdata <- 
  pairlevel_comparison_gdsc_drugbank %>%
-  filter(PATHWAY_NAME.x == PATHWAY_NAME.y) %>%
+  # filter(PATHWAY_NAME.x == PATHWAY_NAME.y) %>%
   filter(tar >0.95) %>%
   filter(sen> 0.95) %>% 
   mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>% 
@@ -967,6 +1043,23 @@ figdata <-
   mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
   select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
   pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+kruskal.test(method~value,data= figdata)
+pairwise.wilcox.test(g = figdata$method, x = figdata$value, paired= T,p.adjust.method = "BH")
+
+figdata <- 
+ pairlevel_comparison_gdsc_drugbank %>%
+  filter(PATHWAY_NAME.x == PATHWAY_NAME.y) %>%
+  filter(tar >0.97) %>%
+  filter(sen> 0.97) %>% 
+  mutate(drug_pair_name= str_c(DRUG_NAME.x, DRUG_NAME.y,sep = "  ")) %>% 
+  mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
+  mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
+  select(drug_pair_name, ess:maccs, PATHWAY_NAME.x) %>% 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+
+kruskal.test(method~value,data= figdata)
+pairwise.wilcox.test(g = figdata$method, x = figdata$value, paired= T,p.adjust.method = "BH")
 
 pmain <- figdata %>% 
   ggplot(mapping = aes(x=  drug_pair_name,y = value, color= method) ) +
@@ -1011,7 +1104,7 @@ p2 <- cowplot::insert_yaxis_grob(p1, ybar, grid::unit(0.1, "null"), position = "
 
 
 ```{r, fig.width=3.5,fig.height=5}
-ggdraw(p2)
+cowplot::ggdraw(p2)
 ```
 
 ```{r, fig.width=4,fig.height=7}
