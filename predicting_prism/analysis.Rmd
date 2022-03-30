@@ -230,7 +230,10 @@ fig <- sen_mean_var %>%
   scale_color_aaas()+
   theme(legend.position="top")
 fig
+```
 
+
+```{r,fig.width=3,fig.height=5}
 ggExtra::ggMarginal(fig, type= "boxplot",groupColour = T,groupFill = T) 
 ```
 
@@ -333,7 +336,7 @@ plot_two_group <- function(good_df, bad_df){
 ```
 
 
-```{r,fig.height=4, fig.width=2.5}
+```{r,fig.height=5, fig.width=3}
 plot_two_group(good_df = acc_df_prism_binary_fold_cv_good200,bad_df = acc_df_prism_binary_fold_cv_bad200)
   # theme(legend.position = c(.2, .2))
 # plot_two_group(good_df = acc_df_prism_binary_fold_cv_good100,bad_df = acc_df_prism_binary_fold_cv_bad100)
@@ -346,29 +349,24 @@ There are NA because now prediction is only available for genes with signature v
 It is possible the only target gene of a drug does not have prediction value hence the AUC is not available. 
 
 check where the function is defined
-```{r}
+```{r,r,fig.width=4, fig.height=3}
 PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
-
-# load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
-# prism_auc_comparison <-  prism_unsupervised_auc %>% filter(drug %in% prism_drug_list_drh)
-```
-
-
-```{r,fig.width=4, fig.height=4}
 source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/plot_ave_roc.R")
 plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
                filter(drug %in% prism_good_drug_list_200),
-             title = "Best fitted drugs")
+             title = "Best fitted drugs",addlegend = F)
 
 plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
                filter(drug %in% prism_bad_drug_list_200),
-             title = "Worst fitted drugs")
+             title = "Worst fitted drugs",addlegend = F)
 
 plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
                filter(drug %in% prism_drug_list_drh),
              title = "All drugs")
-
+# load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
+# prism_auc_comparison <-  prism_unsupervised_auc %>% filter(drug %in% prism_drug_list_drh)
 ```
+
 
 
 ConSensig unsupervised prediction acc and sen fitting acc, by drug type
