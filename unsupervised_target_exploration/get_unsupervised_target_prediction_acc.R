@@ -31,7 +31,7 @@ sig_to_downstream_pred <- function(annotated_sig_df) {
 }
 
 get_auc <- 
-  function(dataset= CTRP_binary_PPIold_data, label_level= 0){
+  function(dataset, label_level= 0){
     if (label_level ==0 ) {dataset <-  sig_to_inhibitortargt_pred(dataset)}  
     if (label_level != 0) {dataset <-  sig_to_downstream_pred(dataset)}  
     dataset %>% 
