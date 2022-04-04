@@ -14,7 +14,7 @@ library(tidyverse)
 library(ggsci)
 # PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
 
-source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/get_drug_frac.R")
+source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/get_drug_frac.R")
 prism_sc_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
 
 targetpanel_dtc <- data.table::fread("~/cluster_scratch/prior/DTC_data_all.csv",
@@ -42,8 +42,6 @@ cellline_hgsoc <- cell_line_info %>%
 
 
 I should focus on drugs with both moa and drug target. 
-
-go back to non-supervised prediction analysis part and check genes that are important for all drugs! they can be genes related with cell of death effect(check signature of cell death paper), or metabolic enzymes/drug efflux pumps(MDR1, ABCB1)
 ```{r}
 res_prism2_long <- res_prism2
 res_prism2 <- res_prism2_long %>%
@@ -57,19 +55,7 @@ prism_good_fitted_drugs <- res_prism2 %>%
   filter(sample_size>100) %>%
   filter(acc_sen>0.2) %>%
   arrange(BROAD_ID)
-# n=312
-
-# drh annotation include both MOA and target info N=268
-prism_good_fitted_drugs_drhannotated <- prism_good_fitted_drugs %>% 
-  select(BROAD_ID, moa) %>% 
-  drop_na() %>% 
-  filter(BROAD_ID %in% prism_target_binary$drug) %>% 
-  pull(BROAD_ID)
-  
-# DTC only care about target gene: N= 52
-prism_good_fitted_drugs_dtcannotated <- prism_good_fitted_drugs %>% 
-  filter(BROAD_ID %in% prism_target_dtc$drug) %>% 
-  pull(BROAD_ID)
+# n=312, 199 targeted cancer drugs, 50 chemo drugs and 63 noncancer drugs.
 
 # how many non-oncology drugs? N= 63
 prism_good_fitted_nononcologydrugs <-  prism_good_fitted_drugs %>% 
@@ -78,11 +64,23 @@ prism_good_fitted_nononcologydrugs <-  prism_good_fitted_drugs %>%
   pull(BROAD_ID) %>% 
   unique()
 
-  
-# 46 =58-13 +1 1 drug no moa but have target.
-prism_good_fitted_nononcologydrugs_drhannotated <- intersect(prism_good_fitted_drugs_drhannotated, prism_good_fitted_nononcologydrugs)
 
-prism_good_fitted_nononcologydrugs_drhnotannotated <- setdiff(prism_good_fitted_drugs_drhannotated, prism_good_fitted_nononcologydrugs)
+# drh annotation include both MOA and target info N=268, this will be my train set
+prism_good_fitted_drugs_drhannotated <- prism_good_fitted_drugs %>% 
+  select(BROAD_ID, moa) %>% 
+  drop_na() %>% 
+  filter(BROAD_ID %in% prism_target_binary$drug) %>% 
+  pull(BROAD_ID)
+  
+# DTC only care about target gene but not moa annotation: N= 52
+prism_good_fitted_drugs_dtcannotated <- prism_good_fitted_drugs %>% 
+  filter(BROAD_ID %in% prism_target_dtc$drug) %>% 
+  pull(BROAD_ID)
+
+# 46 = 58-13 +1 1 drug no moa but have target.
+# prism_good_fitted_nononcologydrugs_drhannotated <- intersect(prism_good_fitted_drugs_drhannotated, prism_good_fitted_nononcologydrugs)
+# 
+# prism_good_fitted_nononcologydrugs_drhnotannotated <- setdiff(prism_good_fitted_drugs_drhannotated, prism_good_fitted_nononcologydrugs)
 
 # prism_good_fitted_nononcologydrugs <-  prism_good_fitted_drugs %>% 
 #   filter(drug_category== "noncancer") %>% 
@@ -115,15 +113,16 @@ prism_63_sen_hgsoc <- full_join(
   y = prism_63_sen %>% filter(depmap_id == "ACH-000524")
     )
 
-write_csv(prism_63_sen_hgsoc, path = "~/cluster_wrk/drug_moa/predicting_prism/prism_63_sen_hgsoc.csv")
+# write_csv(prism_63_sen_hgsoc, path = "~/cluster_wrk/drug_moa/predicting_prism/prism_63_sen_hgsoc.csv")
 
-tmp= prism_data %>% filter(BROAD_ID %in% prism_good_fitted_nononcologydrugs) %>% 
-  filter(!(BROAD_ID  %in% prism_good_fitted_drugs_drhannotated )) %>%  select(BROAD_ID, moa)
+# tmp <- prism_data %>% filter(BROAD_ID %in% prism_good_fitted_nononcologydrugs) %>% 
+#   filter(!(BROAD_ID  %in% prism_good_fitted_drugs_drhannotated )) %>%  select(BROAD_ID, moa)
 ```
 
 
 Get supervised and nonsupervised prediction accuracy
 ```{r}
+# note the unsupervised auc is precalculated in get_unsupervised_target_prediction_auc.R code
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_ConSenSig.RData")
 
 acc_unsupervised_prism268 <- prism_unsupervised_auc %>% 
@@ -149,7 +148,7 @@ prism_268_all <- acc_supervised_prism268 %>%
   rename(supervised_auc= acc) %>% 
   rename(unsupervised_auc = auc) %>% 
   rename(sample_size= n_forward_modelling) %>% 
-  select(drug, name, drug_category, moa,target,phase, supervised_auc, unsupervised_auc,sample_size)
+  select(drug, name, drug_category,Drug_category, moa,target,phase, supervised_auc, unsupervised_auc,sample_size)
 
 ```
 
@@ -158,9 +157,19 @@ check the median accuracy and significance
 prism_268_all %>% 
   group_by(drug_category) %>%
   summarise(
-    median_unsupervised= median(unsupervised_auc, na.rm = T),
-    median_supervised= median(supervised_auc),
+    N= n(),
+    median_unsupervised= round(median(unsupervised_auc, na.rm = T),2),
+    median_supervised= round(median(supervised_auc),2),
     ) 
+
+prism_268_all %>% 
+  group_by(Drug_category) %>%
+  summarise(
+    N= n(),
+    median_unsupervised= round(median(unsupervised_auc, na.rm = T),2),
+    median_supervised= round(median(supervised_auc),2),
+    ) 
+
 prism_268_all %>% 
   t_test(supervised_auc~Drug_category)
 prism_268_all %>% 
@@ -181,10 +190,27 @@ fig <- prism_268_all %>%
   #   legend.justification = c("right", "bottom"),
   #   legend.box.just = "right"
   #   )+
-  ggsci::scale_color_npg()
+  ggsci::scale_color_aaas()
 fig <- ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T)
 fig
 
+
+fig <- prism_268_all %>% 
+  ggplot(aes(x= supervised_auc, y= unsupervised_auc, color= Drug_category)) + 
+  geom_point(size = 0.5)+
+  theme_classic()+
+  ylab("Supervised target prediction accuracy (AUC)")+
+  xlab("Unsupervised target prediction accuracy (AUC)")+
+  guides(color= guide_legend(title = "Drug Category"))+
+  theme(legend.position="bottom")+
+  # theme(
+  #   legend.position = c(1, 0.00),
+  #   legend.justification = c("right", "bottom"),
+  #   legend.box.just = "right"
+  #   )+
+  ggsci::scale_color_aaas()
+fig <- ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T)
+fig
 # ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6.tiff",device = "tiff",width = 4,height = 4,units = "in",dpi = 300)
 # ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6.pdf",device = "pdf",width = 4,height = 4)
 ```
@@ -192,12 +218,12 @@ fig
 
 
 Showing how target of noncancer drugs overlapped poorly with cancer drugs
-```{r,fig.width=3.5,fig.height=3.5}
+```{r,fig.width=6,fig.height=3}
 # Distribution of number of drugs with at least one shared target
 tmp <- inner_join(prism_target_binary, prism_268_all %>% select(drug, Drug_category))
 tmp1 <- prism_268_all %>% 
   # select(drug, Drug_category) %>% 
-  mutate(N_shared= map_int(prism_good_fitted_drugs_annotated, function(x){
+  mutate(N_shared= map_int(prism_good_fitted_drugs_drhannotated, function(x){
     gene <- tmp %>% filter(drug == x) %>% pull(target)
     N= tmp %>% filter(!(drug %in% x)) %>% filter(target %in% gene) %>% select(drug) %>% distinct() %>% nrow()
     return(N)
@@ -213,14 +239,12 @@ fig <- tmp1 %>%
     legend.box.just = "right"
     )+
   ggsci::scale_fill_npg()+
-  xlab("No.drugs with shared targets")
+  xlab("No.drugs with shared targets")+
+  guides(color= guide_legend(title = "Drug Category"))
 fig
 # ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6b.tiff",device = "tiff",width = 3.5,height = 3.5,units = "in",dpi = 300)
 # ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6b.pdf",device = "pdf",width = 3.5,height = 3.5)
-```
 
-
-```{r, fig.width=3,fig.height=3.5}
 fig <- tmp1 %>% 
   # ggplot() +
   # geom_point(aes(x= N_shared, y= acc))
@@ -229,17 +253,41 @@ fig <- tmp1 %>%
                         between(N_shared, 1,5)~"1-5",
                          between(N_shared, 6,20)~"6-20",
                         TRUE~">20")) %>% 
-  mutate(bin= fct_relevel(bin, c("0", "1-5", "6-20", ">20")) ) %>% 
-  ggplot(aes(x = bin, y = acc)) +
-  geom_violin()+
-  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
-             colour = "black",position = position_dodge(width = 0.9))+
+  mutate(bin= fct_relevel(bin, c("0", "1-5", "6-20", ">20")) ) %>%
+  pivot_longer(cols= supervised_auc:unsupervised_auc, 
+               names_to= "prediction_method",
+               values_to= "AUC") %>% 
+  ggplot(aes(x = bin, y = AUC, fill= prediction_method)) +
+  geom_boxplot()+
+  # stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
+  #            # colour = "black",
+  #            size= 0.2,
+  #            position = position_dodge(width = 0.9))+
   theme_classic()+
-  ylab("Supervised target prediction accuracy (AUC)")+
-  xlab("No.drugs with shared targets")
+  # ylab("Supervised target prediction accuracy (AUC)")+
+  ylab("AUC")+
+  xlab("No.drugs with shared targets")+
+  guides(fill= guide_legend(title = "prediction method"))
+
 fig
 # ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6c.tiff",device = "tiff",width = 3,height = 3.5,units = "in",dpi = 300)
 # ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6c.pdf",device = "pdf",width = 3,height = 3.5)
+
+
+tmp1 %>% 
+  filter(Drug_category== "noncancer") %>% 
+    mutate(bin= case_when(N_shared<1 ~ "0",
+                        between(N_shared, 1,5)~"1-5",
+                         between(N_shared, 6,20)~"6-20",
+                        TRUE~">20")) %>% 
+  mutate(bin= fct_relevel(bin, c("0", "1-5", "6-20", ">20")) ) %>%
+  pivot_longer(cols= supervised_auc:unsupervised_auc, 
+               names_to= "prediction_method",
+               values_to= "AUC") %>% 
+  ggplot(aes(x = bin, y = AUC, fill= prediction_method)) +
+  geom_boxplot()+
+  facet_wrap(~Drug_category)
+  
 ```
 
 
@@ -506,11 +554,135 @@ plot_hist_sen(drug_id = "BRD-K69726342")+xlim(c(0,2.2))
 ```
 
 
-get sensitivity data and summarize by cell
 ```{r}
 
 ```
 
+filter or not filter to category of interest before tSNE?
+
+(filter out small category and keep the big ones)
+tSNE parameters
+
+finetuning based on large categories of cancer drugs.
+ 
+```{r}
+
+cancer_drug_category <- prism_268_all %>% 
+  filter(Drug_category=="cancer") %>% 
+  add_count(moa) %>% 
+  ungroup() %>% 
+  filter(n>4)
+
+# drug_of_clustering_interest <- prism_268_all %>% 
+#   filter(drug %in% prism_good_fitted_drugs_drhannotated ) %>% 
+#   # filter((drug %in% cancer_drug_category$drug)|(Drug_category %in% "noncancer")) %>% 
+#   arrange(drug) %>% 
+#   pull(drug)
+# 
+# tmp <- feature_imp_ridge_prism_comb1 %>% 
+#   filter(drug %in% drug_of_clustering_interest ) %>% 
+#   column_to_rownames("drug") %>%
+#   scale() %>% 
+#   Rtsne::Rtsne(
+#     perplexity = 30, 
+#     theta = 0.5, 
+#     check_duplicates = TRUE,
+#     pca = TRUE, 
+#     partial_pca = FALSE, 
+#     max_iter = 1000)
+# tmp1 <- tmp$Y %>% 
+#   as.data.frame() %>% 
+#   rename(tSNE1="V1",
+#          tSNE2="V2") %>% 
+#   bind_cols(drug=drug_of_clustering_interest, cost= tmp$costs  ) %>% 
+#   inner_join(prism_268_all) 
+# 
+# ggplot() +
+#   geom_point(data = tmp1 %>% 
+#                filter( Drug_category =="noncancer"),
+#              mapping = aes(x = tSNE1, y = tSNE2), 
+#              shape= 1) + 
+#   geom_point(data = tmp1 %>% 
+#                filter( Drug_category !="noncancer") %>%
+#                filter(drug %in% cancer_drug_category),
+#            mapping = aes(x = tSNE1, y = tSNE2, color = moa), 
+#            shape= 2)+
+#   theme_classic()
+
+
+
+set.seed(1234)
+dimreduction_df <- feature_imp_ridge_prism_comb1 %>% 
+  filter(drug %in% prism_good_fitted_drugs_drhannotated) %>% 
+  arrange(drug) %>% 
+  column_to_rownames("drug") %>%
+  scale() %>% 
+  Rtsne::Rtsne() %>% 
+  pluck(2) %>% 
+  as.data.frame() %>%
+  rename(tSNE1="V1",
+         tSNE2="V2") %>% 
+  bind_cols(prism_268_all) 
+  
+
+
+  
+
+# tmp <- dimreduction_df %>% 
+#   filter((moa %in% cancer_drug_category$moa)|(Drug_category=="noncancer"))
+  # filter(Drug_category !="noncancer") %>% 
+  # mutate(anno= moa) %>%
+  # ungroup() %>% 
+  # why this is not working!!!!!!!!!!!?????
+  # mutate(anno= case_when(  
+  #   (Drug_category=="noncancer") ~ NA,
+  #   TRUE ~ anno)) %>% 
+  
+ggplot()+
+  geom_point(data =  dimreduction_df %>% filter( Drug_category =="noncancer"),
+             mapping = aes(x = tSNE1, y = tSNE2) ,
+             shape= 1)+
+  geom_point(data = dimreduction_df %>% 
+               filter( Drug_category !="noncancer") %>% 
+               filter(moa %in% cancer_drug_category$moa),
+             mapping = aes(x = tSNE1, y = tSNE2, color = moa), 
+             shape= 2)+
+  theme_classic()
+  # geom_circle(aes(x0 = 9, y0 = -2, r = 2), 
+  #             color="green",
+  #             inherit.aes = FALSE)
+```
+
+how about UMAP
+```{r}
+set.seed(1234)
+dimreduction_df <- feature_imp_ridge_prism_comb1 %>% 
+  filter(drug %in% prism_good_fitted_drugs_drhannotated) %>% 
+  arrange(drug) %>% 
+  column_to_rownames("drug") %>%
+  scale() %>% 
+  umap::umap() %>% 
+  pluck(1) %>% 
+  as.data.frame() %>%
+  rename(tSNE1="V1",
+         tSNE2="V2") %>% 
+  rownames_to_column(var = "drug") %>% 
+  inner_join(prism_268_all) 
+
+ggplot()+
+  geom_point(data =  dimreduction_df %>% filter( Drug_category =="noncancer"),
+             mapping = aes(x = tSNE1, y = tSNE2) ,
+             shape= 1)+
+  geom_point(data = dimreduction_df %>% 
+               filter( Drug_category !="noncancer") %>% 
+               filter(moa %in% cancer_drug_category$moa),
+             mapping = aes(x = tSNE1, y = tSNE2, color = moa), 
+             shape= 2)+
+  theme_classic()+
+  xlab("UMAP1")+
+  ylab("UMAP2")
+
+```
 
 
 sanity check:
