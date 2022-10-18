@@ -281,27 +281,27 @@ check the failed jobs and generate a list to rerun
 combined_performance <- bind_rows(
   res_ctrp1 %>% 
     select(input, .metric, estimate, variance) %>% 
-    mutate(dataset= "ctrp")
+    mutate(dataset= "CTRP")
   ,
   res_gdsc1 %>% 
     select(input, .metric, estimate, variance) %>% 
-    mutate(dataset= "gdsc")
+    mutate(dataset= "GDSC")
   ,
   res_prism1 %>% 
     select(input, .metric, estimate, variance) %>% 
-    mutate(dataset= "prism")
+    mutate(dataset= "PRISM")
   )
 
 # generate a object for testing difference individually for each drug on cluster
 combined_performance2 <- bind_rows(
   res_ctrp %>% 
-    mutate(dataset= "ctrp")
+    mutate(dataset= "CTRP")
   ,
   res_gdsc %>% 
-    mutate(dataset= "gdsc")
+    mutate(dataset= "GDSC")
   ,
   res_prism %>% 
-    mutate(dataset= "prism")
+    mutate(dataset= "PRISM")
   ) %>% 
   group_by(drug_id, dataset,.metric) %>% 
   nest() %>% 
@@ -309,73 +309,77 @@ combined_performance2 <- bind_rows(
 # save(combined_performance2,
 #      file = "~/cluster_scratch/forward_modelling/performance_testres/input.RData")
 
-# run the test on cluster and return the results
-# most drugs are insignificant after multiple test correction of significance.
-# plot two pie charts out of this?
-
-load("~/cluster_scratch/forward_modelling/performance_testres/output.RData")
-
-# 743, 582drugs insignificant,
-# 5 drugs ceres better,
-# 156 drugs ces better
-
-performance_difference_test_res1 %>%
-  filter(.metric== "rmse") %>%
-  filter(dataset!="prism") %>%
-  # filter(p_value< (0.05/743))
-  mutate(significance = p_value< (0.05/(743*2))) %>%
-  mutate(rest = case_when(
-    upper_ci< 0 & significance ~ "CES better",
-    lower_ci> 0 & significance  ~ "CERES better"
-  )) %>%
-  replace(is.na(.), values = "Insignificance") %>%
-  group_by(dataset,rest) %>%
-  summarise(N= n())
-
-performance_difference_test_res2 %>%
-  filter(.metric== "rmse") %>%
-  filter(dataset!="prism") %>%
-  # filter(p_value< (0.05/743))
-  mutate(significance = p_value< (0.05/(743*2))) %>%
-  mutate(rest = case_when(
-    upper_ci< 0 & significance ~ "CES better",
-    lower_ci> 0 & significance  ~ "DEMETER2 better"
-  )) %>%
-  replace(is.na(.), values = "Insignificance") %>%
-  group_by(dataset,rest) %>%
-  summarise(N= n())
+# run the test on cluster and return the resulting objects to be used in Figure2C: "performance_difference_test_res1","performance_difference_test_res2"
 
 combined_performance3 <- bind_rows(
   res_ctrp2 %>% 
-    mutate(dataset= "ctrp") %>% 
+    mutate(dataset= "CTRP") %>% 
     select( drug_id, broad_cpd_id, cpd_name, input,dataset,sample_size, .metric, estimate, variance) %>% 
     rename(drug_name=cpd_name) %>% 
     rename(ID=broad_cpd_id)
   ,
     res_gdsc2 %>% 
-    mutate(dataset= "gdsc") %>% 
+    mutate(dataset= "GDSC") %>% 
     select( drug_id, DRUG_ID, DRUG_NAME, input,dataset, sample_size,.metric, estimate, variance) %>% 
     rename(drug_name= DRUG_NAME) %>% 
     mutate(ID=as.character(DRUG_ID)) 
-
   ,
   res_prism2 %>% 
-    mutate(dataset= "prism") %>% 
+    mutate(dataset= "PRISM") %>% 
     select( drug_id, BROAD_ID, name, input,dataset,sample_size, .metric, estimate, variance) %>% 
     rename(drug_name=name) %>% 
     rename(ID=BROAD_ID)
-  ) 
+  )
+```
+
+
+```{r}
+sig_res <- 
+  combined_performance3 %>% 
+  nest_by(dataset,.metric) %>% 
+  ungroup() %>% 
+  mutate(aov_p_value=map_dbl(
+    .x = data, 
+    .f = function(df){
+        res= aov(estimate~input,data = df)
+        res= summary(res)[[1]][[5]][[1]] 
+        return(res)
+    } 
+                 )) %>% 
+  mutate(tukeyhsd_res=map(
+    .x = data, 
+    .f = function(df){
+        res= aov(estimate~input,data = df)
+        res= TukeyHSD(res, which = "input", paired=T) %>% tidy()
+        return(res)
+    }
+                 )) %>% 
+  select(-data) %>% 
+  unnest(tukeyhsd_res)
+
+```
+
+
+In general whether method is really difference
+```{r}
+# tmp <- aov(estimate ~.metric+dataset+input,data= combined_performance3)
+# summary(tmp)
+# TukeyHSD(tmp, which = "input", paired=T) 
+# no this result is not valid as explaination for estimate is different for each metric, I need split by .metric and then check. At least split by the directions.
+```
+
+```{r}
 save.image("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
-combined_performance3 %>% 
-  select(-variance) %>% 
-  group_by(.metric, dataset, input) %>% 
-  summarize(estimate_median= median(estimate))
 ```
 
 
 # 5 visualization
 ```{r}
 load("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
+combined_performance3 %>% 
+  select(-variance) %>% 
+  group_by(.metric, dataset, input) %>% 
+  summarize(estimate_median= median(estimate))
 ```
 
 
@@ -389,111 +393,231 @@ combined_performance3 %>%
 
 
 manuscript fig2b
-```{r,fig.width=3,fig.height=7}
-combined_performance3 %>%   
-  filter(dataset !="prism") %>% 
-  filter(.metric %in% c("rmse", "pr_auc", "roc_auc")) %>% 
+```{r,fig.width=4,fig.height=5}
+formatter <- function(...){
+  function(x) format(x, ..., scientific = F, digit = 2)
+}
+
+ddummy = tibble(
+  input= NA,
+  ymax= c(0.3, 1.2), 
+  dataset= c("CTRP", "GDSC"), 
+  .metric= factor(
+    x = c("rmse", "roc_auc"),
+    levels = c("rmse", "roc_auc"), 
+    labels = c("RMSE", "ROC-AUC") )
+)
+
+# my_comparisons <- list(c("CES", "EXP"), c("CERES", "EXP"), c("DEMETER2", "EXP"),c("CES", "CERES"), c("CERES", "DEMETER2"), c("DEMETER2", "CES"))
+
+fig <- combined_performance3 %>%   
+  filter(dataset !="prism") %>%
+  mutate(input= toupper(input)) %>%
+  mutate(dataset= toupper(dataset)) %>% 
+  filter(.metric %in% c("rmse", "roc_auc")) %>% 
   mutate(.metric= factor(.metric,
-                         levels = c("rmse", "pr_auc", "roc_auc"),
-                         labels = c("RMSE", "PR-AUC", "ROC-AUC"))) %>% 
-  ggplot(mapping = aes(x=input, y= estimate, color=input)) +
-  geom_boxplot(outlier.shape = NA)+
-  facet_grid(rows = vars(.metric),cols=vars(dataset) ,scale="free", space= "free_x")+
+                         levels = c("rmse", "roc_auc"),
+                         labels = c("RMSE", "AUROC"))) %>% 
+  ggplot(mapping = aes(x=input, y= estimate, fill=input)) +
+  # geom_boxplot()+
+  geom_violin()+
+  geom_blank(data = ddummy,aes(x= input, y = ymax)) +
+  # stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
+  #            colour = "black")+
+  facet_grid(rows = vars(.metric),cols=vars(dataset),
+             scale="free", space= "free_x", switch="y")+
+  ggpubr::stat_compare_means(method = "anova",
+                             paired = T,
+                             label.y.npc = 0.95,label.x.npc = 0.05)+
+                             #label.x.npc = "left")+
+  # ggpubr::stat_compare_means(method = "t.test",label= "p.signif",
+  #                            paired = T,comparisons = my_comparisons,
+  #                            label.y.npc = 0.85)+
   theme_classic()+
-  ylab("Fitting Performance metrics")+
-  theme(
-  axis.text.x = element_blank() )+
-  xlab("")+ ylab("")+ labs(color= "Input feature")+
-  ggsci::scale_color_npg()+
-  theme(legend.position="top")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))
+  xlab("")+   ylab("Model fitness")+ 
+  theme(legend.position="top", legend.title = element_blank(),
+        axis.title.x = element_blank(),axis.text.x = element_blank())+
+  guides(fill= guide_legend(nrow = 2,title.position = "top"))+
+  scale_y_continuous(labels = formatter(nsmall = 2))+
+  ggsci::scale_fill_npg()
+
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2B.pdf",width = 4,height = 5,bg = "transparent")
+
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2B.png",width = 4,height = 5,dpi = 500,bg = "transparent")
 
 ```
 
 supplementary fig
-```{r,fig.width=3,fig.height=7}
-combined_performance3 %>%   
-  filter(dataset !="prism") %>% 
-  filter(!(.metric %in% c("rmse", "pr_auc", "roc_auc"))) %>% 
+```{r,fig.width=4,fig.height=8}
+ddummy = tibble(
+  input= NA,
+  ymax= c( 0.29,1.1,0.8,0.9), 
+  dataset= c("CTRP", "CTRP", "GDSC", "GDSC"), 
+  .metric= factor(
+    x = c("mae","pr_auc", "rsq", "spearman coef"),
+    levels = c("mae","pr_auc", "rsq", "spearman coef"), 
+    labels = c("MAE","PRAUC", "R-square", "Spearman COR") )
+)
+
+fig <- combined_performance3 %>%   
+  filter(dataset !="prism") %>%
+  mutate(input= toupper(input)) %>%
+  mutate(dataset= toupper(dataset)) %>% 
+  filter(!(.metric %in% c("rmse",  "roc_auc"))) %>% 
   mutate(.metric= factor(.metric,
-                         levels = c("mae", "rsq", "spearman coef"),
-                         labels = c("MAE", "R-square", "Spearman coef"))) %>%
-  ggplot(mapping = aes(x=input, y= estimate, color=input)) +
-  geom_boxplot(outlier.shape = NA)+
-  facet_grid(rows = vars(.metric),cols=vars(dataset) ,scale="free")+
+                         levels = c("mae","pr_auc", "rsq", "spearman coef"),
+                         labels = c("MAE","PRAUC", "R-square", "Spearman coef"))) %>%
+  ggplot(mapping = aes(x=input, y= estimate, fill=input)) +
+  # geom_boxplot()+
+  geom_violin()+
+  geom_blank(data = ddummy,aes(x= input, y = ymax)) +
+  # stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
+  #            colour = "black")+
+  facet_grid(rows = vars(.metric),cols=vars(dataset),
+             scale="free", space= "free_x", switch="y")+
+  ggpubr::stat_compare_means(method = "anova",
+                             paired = T,
+                             label.y.npc = 0.95,label.x.npc = 0.05)+
+                             #label.x.npc = "left")+
+  # ggpubr::stat_compare_means(method = "t.test",label= "p.signif",
+  #                            paired = T,comparisons = my_comparisons,
+  #                            label.y.npc = 0.85)+
   theme_classic()+
-  ylab("Fitting Performance metrics")+
-  theme(
-  axis.text.x = element_blank() )+
-  xlab("")+ ylab("")+ labs(color= "Input feature")+
-  ggsci::scale_color_npg()+
-  theme(legend.position="top")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))
+  xlab("")+   ylab("Model fitness")+ 
+  theme(legend.position="top", legend.title = element_blank(),
+        axis.title.x = element_blank(),axis.text.x = element_blank())+
+  guides(fill= guide_legend(nrow = 2,title.position = "top"))+
+  scale_y_continuous(labels = formatter(nsmall = 2))+
+  ggsci::scale_fill_npg()
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/supplementary figure.pdf",width = 4,height = 8, bg="transparent")
+
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/supplementary figure.png",width = 4,height = 8,dpi = 500,bg="transparent")
 ```
 
+figure2d
 
-
-```{r,fig.height=7,fig.width=3}
-combined_performance3 %>% 
+```{r,fig.height=3,fig.width=6}
+plot_df1 <- combined_performance3 %>% 
   filter(.metric=="rmse") %>%
-  filter(dataset!="prism") %>%
-  mutate(sample_size = cut(sample_size, breaks = seq(0,500,by = 100))) %>%
-  mutate(sample_size = fct_relabel(sample_size, .fun = str_extract, pattern = "(?<=,)\\d{3}")) %>% 
-  ggplot(mapping = aes(x=sample_size, y= variance, color=input)) +
-  # geom_point()+
-  # geom_boxplot()+
-  geom_boxplot(outlier.shape = NA)+
-  facet_grid(rows = vars(input),cols= vars(dataset),scale="free", space= "free_x")+
+  filter(dataset !="prism") %>%
+  # filter(dataset !="GDSC") %>%
+  mutate(input= toupper(input)) %>%
+  mutate(dataset= toupper(dataset)) %>% 
+  mutate(sample_size = cut(sample_size, breaks = seq(0,500,by = 100))) %>%  
+  mutate(sample_size = fct_relabel(sample_size, .fun = str_extract, pattern = "(?<=,)\\d{3}")) %>%  ungroup() %>% 
+  filter(!((sample_size== "200")&(dataset=="GDSC")))
+#too little sample size in this group
+
+sig_res1 <- 
+  plot_df1 %>% 
+  nest_by(dataset, input) %>% 
+  ungroup() %>% 
+  mutate(aov_p_value=map_dbl(
+    .x = data, 
+    .f = function(df){
+        res= aov(variance~sample_size,data = df)
+        res= summary(res)[[1]][[5]][[1]] 
+        return(res)
+    } 
+                 )) %>% 
+  mutate(DunnettTest_res=map(
+    .x = data, 
+    .f = function(df){
+        # res= aov(variance~sample_size,data = df)
+        # res= TukeyHSD(res, which = "sample_size", paired=T) %>% tidy()
+      res=DescTools::DunnettTest(df$variance, g= df$sample_size)
+      res= tibble(comparison= row.names(res[[1]]), 
+                  diff= res[[1]][,1],
+                  p.value= res[[1]][,4])
+      return(res)
+    }
+                 )) %>% 
+  select(-data) %>% 
+  unnest(cols = c(DunnettTest_res))
+```
+
+the Dunnett test is not directly avaliable in ggpubr
+
+https://www.datanovia.com/en/blog/ggpubr-how-to-add-p-values-generated-elsewhere-to-a-ggplot/#:~:text=GGPUBR%3A%20How%20to%20Add%20P%2DValues%20Generated%20Elsewhere%20to%20a%20GGPLOT,-Alboukadel&text=The%20following%20key%20ggpubr%20functions,label%20annotation%20to%20a%20ggplot.
+```{r,fig.height=4,fig.width=8}
+# plot_df1  %>%filter(input=="CERES") %>%
+#   count(dataset,input,sample_size)
+
+# my_comparisons <- list(c("100", "200"), c("100", "300"), c("100", "400"),c("100", "500"))
+stat.test <-sig_res1 %>% 
+  separate(comparison, "-", into= c("group1","group2")) %>% 
+  mutate(p.signif= "****") 
+stat.test
+
+
+fig <- plot_df1 %>% 
+  ggplot(mapping = aes(x=sample_size, y= variance, fill=input)) +
+  geom_violin()+
+  # ggpubr::stat_compare_means(aes(group=sample_size),method = "anova",label.y = 0.006,label.x = 2)+
+  # ggpubr::stat_compare_means(
+  #   aes(group=sample_size),label = "p.signif",label.y = 0.006,
+  #   method = "t.test",vjust = 0.4,tip.length = 0.01,bracket.size=0.1,
+  #   comparisons = my_comparisons)+
+  #   # ref.group = "100")+
+  ggpubr::stat_pvalue_manual(data = stat.test, x= "group1", y.position = 0.006,label= "p.signif")+
+  facet_grid(cols = vars(input),rows= vars(dataset),switch = "y")+
   theme_classic()+
-  xlab("Sample Size")+ ylab("")+
-  ggsci::scale_color_npg()+
+  xlab("Maximum Sample Size")+ ylab(expression(VAR["RMSE"]))+
+  ggsci::scale_fill_npg()+
   theme(legend.position="none")
 
-```
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2D.pdf",width = 8,height = 4,bg="transparent")
 
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2D.png",width = 8,height = 4,dpi = 500,bg="transparent")
+```
 
 Compare CTRP and GDSC differences
 Combine the gdsc id back to compare with the ctrp
 gdsc id is used to extract a pubchem cid tibble and then cross-referenced to prism to get broad_id
 
+To investigate how disparerances between different drug screening dataset impact the model fitting, we compared the correlation of CES fitting accuracy between CTRP and GDSC drug sensitivity dataset. We noticed that despite prediction accuracy was systematically higher in CTRP, drugs that are better fitted in CTRP and also better fitted using the GDSC (Figure 2F, 41 drugs). The correlation of fitting accuracy between CTRP and GDSC was even higher with sample size difference controlled (sample size difference <100, n = 10 drugs, spearman correlation= 0.84, p= 4.5E-03). This suggested that the reconstruction of drug response from essentiality scores are robust across different drug screening dataset. 
+
 ```{r,fig.width=2, fig.height=2}
-id_mapping_gdsc <- read_csv("~/cluster_scratch/prior/drug_id_list/cross_ref_tibble_gdsc")
-
-shared_drugs <- id_mapping_gdsc %>% 
-  filter(BROAD_ID  %in% res_ctrp2$broad_cpd_id)
-
-shared_drug_acc_comparison <- shared_drugs %>%
-  inner_join(y= res_ctrp2 %>% 
-               select(input,.metric, estimate, broad_cpd_id,sample_size) 
-             , 
-             by=c("BROAD_ID"= "broad_cpd_id")
-             ) %>%
-  inner_join(y= res_gdsc2 %>%  
-               select(input,.metric, estimate, DRUG_ID,sample_size) , 
-             by=c("DRUG_ID", "input", ".metric")) %>% 
-  filter(sample_size.x>100) %>% 
-  filter(sample_size.y>100) %>% 
-  group_by(input, .metric) %>% 
-  nest()  %>% 
-  mutate(
-    test = map(data, ~ cor.test(.x$estimate.x, .x$estimate.y,method = "spearman") %>% tidy)
-    ) %>% 
-  unnest(test) 
-View(shared_drugs)
-
-
-rmse_comparison <- shared_drug_acc_comparison[[3]][[9]] %>% 
-  mutate(sample_difference= abs(sample_size.x -sample_size.y) ) 
-  
-fig <- shared_drug_acc_comparison[[3]][[9]] %>%
-  ggplot(aes(x = estimate.x, y = estimate.y))+
-  geom_point()+
-  theme_classic()+
-  ylab("RMSE ctrp")+
-  xlab("RMSE gdsc")
-  # ggtitle("Spearman COR 0.74, \
-  #         p= 1.96E-07")
-fig
+# id_mapping_gdsc <- read_csv("~/cluster_scratch/prior/drug_id_list/cross_ref_tibble_gdsc")
+# 
+# shared_drugs <- id_mapping_gdsc %>% 
+#   filter(BROAD_ID  %in% res_ctrp2$broad_cpd_id)
+# 
+# shared_drug_acc_comparison <- shared_drugs %>%
+#   inner_join(y= res_ctrp2 %>% 
+#                select(input,.metric, estimate, broad_cpd_id,sample_size) 
+#              , 
+#              by=c("BROAD_ID"= "broad_cpd_id")
+#              ) %>%
+#   inner_join(y= res_gdsc2 %>%  
+#                select(input,.metric, estimate, DRUG_ID,sample_size) , 
+#              by=c("DRUG_ID", "input", ".metric")) %>% 
+#   filter(sample_size.x>100) %>% 
+#   filter(sample_size.y>100) %>% 
+#   group_by(input, .metric) %>% 
+#   nest()  %>% 
+#   mutate(
+#     test = map(data, ~ cor.test(.x$estimate.x, .x$estimate.y,method = "spearman") %>% tidy)
+#     ) %>% 
+#   unnest(test) 
+# View(shared_drugs)
+# 
+# 
+# rmse_comparison <- shared_drug_acc_comparison[[3]][[9]] %>% 
+#   mutate(sample_difference= abs(sample_size.x -sample_size.y) ) 
+#   
+# fig <- shared_drug_acc_comparison[[3]][[9]] %>%
+#   ggplot(aes(x = estimate.x, y = estimate.y))+
+#   geom_point()+
+#   theme_classic()+
+#   ylab("RMSE CTRP")+
+#   xlab("RMSE GDSC")
+#   # ggtitle("Spearman COR 0.74, \
+#   #         p= 1.96E-07")
+# fig
 # ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2C.pdf",width = 3,height = 3)
 # ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2C.tiff",width = 3,height = 3)
 # 
@@ -511,9 +635,7 @@ fig
 # do this for rsme or all the features?
 
 # a heat map showing rmse cor heat map across shared drugs between ctrp and gdsc
-```{r}
 
-```
 
 # shared_drug_acc_comparison2 <- shared_drugs %>% 
 #   inner_join(
@@ -575,61 +697,104 @@ Showing how three versions of essentiality deconvolution results are not signifi
 derive the difference between ceres, ces, demeter from combined performance and
 then use it together with CI from performance_difference_test_res1 object
 
-Figure 2 E-F
+Figure 2 C
 
-```{r, fig.width=2, fig.height=2}
-tmp <- combined_performance3 %>% 
+```{r}
+# most drugs are insignificant after multiple test correction of significance.
+# plot two pie charts out of this?
+load("~/cluster_scratch/forward_modelling/performance_testres/output_ceresbased.RData")
+# report numbers 
+# 545+198=743
+
+performance_difference_test_res1 %>%
+  filter(.metric== "roc_auc") %>%
+  filter(dataset!="prism") %>%
+  mutate(significance = p_value< (0.05/(743*2))) %>%
+  mutate(rest = case_when(
+    upper_ci< 0 & significance ~ "CES better",
+    lower_ci> 0 & significance  ~ "CERES better"
+  )) %>%
+  replace(is.na(.), values = "Insignificance") %>%
+  group_by(dataset,rest) %>%
+  summarise(N= n())
+46/545 #insignficant percentage for CTRP
+17/198 # GDSC
+performance_difference_test_res2 %>%
+  filter(.metric== "roc_auc") %>%
+  filter(dataset!="prism") %>%
+  mutate(significance = p_value< (0.05/(743*2))) %>%
+  mutate(rest = case_when(
+    upper_ci< 0 & significance ~ "DEMETER2 better",
+    lower_ci> 0 & significance  ~ "CERES better"
+  )) %>%
+  replace(is.na(.), values = "Insignificance") %>%
+  group_by(dataset,rest) %>%
+  summarise(N= n())
+25/545 #insignficant percentage for CTRP
+9/198 # GDSC
+
+roc_auc_diff_drug_level1 <- combined_performance3 %>% 
   select(-variance) %>% 
   pivot_wider(names_from = input, values_from= estimate) %>% 
-  mutate(ces_ceres_diff= ces- ceres) %>%  
+  mutate(ceres_ces_diff= ceres-ces) %>%  
   right_join(y = bind_rows(
-          performance_difference_test_res1 %>% mutate(diff_type= "ces-ceres")
+          performance_difference_test_res1 %>% mutate(diff_type= "ceres-ces")
     )) %>%
-  filter(.metric== "rmse") %>%
-  filter(dataset!="prism") %>%
-  arrange(ces_ceres_diff) %>% 
-  mutate(ID = fct_reorder(ID, ces_ceres_diff) )
+  filter(.metric== "roc_auc") %>%
+  filter(dataset!="prism") %>% 
+  arrange(ceres_ces_diff) %>% 
+  mutate(ID = fct_reorder(ID, ceres_ces_diff) )
+
+roc_auc_diff_drug_level2 <- combined_performance3 %>% 
+  select(-variance) %>% 
+  pivot_wider(names_from = input, values_from= estimate) %>% 
+  mutate(ceres_demeter_diff= ceres- demeter2) %>% 
+  right_join(y = bind_rows(
+          performance_difference_test_res2 %>% mutate(diff_type= "ceres-demeter2")
+    )) %>%
+  filter(.metric== "roc_auc") %>%
+  filter(dataset!="prism") %>% 
+  arrange(ceres_demeter_diff) %>% 
+  mutate(ID = fct_reorder(ID, ceres_demeter_diff) )
+
+plot_df <- bind_rows(roc_auc_diff_drug_level1, roc_auc_diff_drug_level2)  %>% 
+  mutate(dataset= toupper(dataset)) %>% 
+  mutate(diff_type= factor(diff_type, 
+                      levels = c("ceres-ces", "ceres-demeter2"),
+                      labels=    c("CERES - CES","CERES - DEMETER2")
+                      )
+         )
+```
 
 
-tmp %>%   
+```{r, fig.width=3, fig.height=4}
+fig <- plot_df%>% 
   ggplot(aes(x=ID)) + 
   # geom_point(aes(y=ces_ceres_diff), size = 0.1)+
   geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), width=.1,alpha= 0.3) +
   # geom_line(aes(x=ces, y=ces_ceres_diff, colour=dataset))+
   # geom_ribbon(aes(ymin=lower_ci, ymax=upper_ci), fill= "grey70")+
+  geom_hline(yintercept = 0,color= "red", lty=2)+
+  facet_grid(rows = vars(diff_type),cols= vars(dataset),scales = "free",switch="y")+
   theme_classic()+
-  theme(axis.text.x = element_blank() , axis.title.x = element_blank())+
-  facet_grid(cols= vars(dataset),scale="free")+
-  ylab("\U0394rmse (CES-CERES)")
+  theme(axis.text.x = element_blank() , axis.title.x = element_blank(), axis.ticks.x = element_blank())+
+  ylab("\U0394AUROC")
+
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2C.pdf",width = 3,height = 4,bg="transparent")
+
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2C.png",width = 3,height = 4,dpi = 500,bg="transparent")
 ```
 
 
-```{r, fig.width=2, fig.height=2}
-tmp <- combined_performance3 %>% 
-  select(-variance) %>% 
-  pivot_wider(names_from = input, values_from= estimate) %>% 
-  mutate(ces_demeter_diff= ces- demeter2) %>% 
-  right_join(y = bind_rows(
-          performance_difference_test_res2 %>% mutate(diff_type= "ces - demeter2")
-    )) %>%
-  filter(.metric== "rmse") %>%
-  filter(dataset!="prism") %>%
-  arrange(ces_demeter_diff) %>% 
-  mutate(ID = fct_reorder(ID, ces_demeter_diff) )
+```{r}
+save.image("~/cluster_scratch/forward_modelling/forwardmodelling_paper_result.RData")
 
-tmp %>%   
-  ggplot(aes(x=ID)) + 
-  geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), width=.1,alpha= 0.3) +
-  theme_classic()+
-  theme(axis.text.x = element_blank() , axis.title.x = element_blank())+
-  facet_grid(cols= vars(dataset),scale="free")+
-  ylab("\U0394RMSE (CES - DEMETER2)")  
+write_csv(sig_res, "sig_res.csv")
+write_csv(sig_res1, "sig_res1.csv")
+write_csv(roc_auc_diff_drug_level1, "roc_auc_diff_drug_level1.csv")
+write_csv(roc_auc_diff_drug_level2, "roc_auc_diff_drug_level2.csv")
 ```
-
-
-
-
-
 
 
 
