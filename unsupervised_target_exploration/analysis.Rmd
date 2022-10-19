@@ -47,7 +47,7 @@ check data correctness
 2) pick top 50, 100, 200 genes and compare to what percentage of drug the target of which can be prioritized by the top genes
 
 ```{r,fig.width=3, fig.height=4}
-source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/get_drug_frac.R")
+source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/get_drug_frac.R")
 target_idf <- bind_rows(
   map_dfr(
     .x = c(50, 100, 200),
@@ -56,16 +56,17 @@ target_idf <- bind_rows(
   map_dfr(.x = c(50, 100, 200),
           .f = ~get_drug_frac(dataset= GDSC_binary_PPIold_data, top_num=.x)) %>%
     mutate(dataset= "GDSC")
-) 
+) %>% 
+  mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")) %>% 
+  mutate(impdef=recode(impdef, "topneg gene"= "Bottom genes" , "toppos gene"= "Top genes")) 
 # Bar plot: pos/neg stack, top_n dodge, imptype x axis, dataset facet
 # seems impossible to both stack and dodge
 
-fig <- target_idf %>% 
-  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) %>% 
+fig <- target_idf %>%   
   ggplot(aes(x= factor(top_n),y = frac, fill= impdef)) +
   geom_bar(stat = "identity",position = "stack")+
   facet_grid(cols = vars(dataset), rows = vars(imptype))+
-  xlab("top N genes ranked by signature value")+
+  xlab("Top N genes ranked by signature value")+
   ylab("% drugs") +
   scale_fill_manual(values=c("#999999", "#56B4E9"))+
   theme_classic()+
@@ -77,9 +78,76 @@ fig <- target_idf %>%
     legend.box.just = "right"
     )
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.tiff",width = 3,height = 4)
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.pdf",width = 3,height = 4)
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.pdf",width = 3,height = 4)
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4A.png",width = 3,height = 4,dpi = 500)
 ```
+
+quantify and test significance
+
+In contrast, drug targets were much less identified by the top or the bottom genes in the gene expression signatures
+```{r,fig.width=3, fig.height=4}
+CTRP_binary_PPIold_data %>%
+  select(drug) %>%
+  distinct() %>%
+  nrow() #217
+GDSC_binary_PPIold_data %>%
+  select(drug) %>%
+  distinct()  %>%
+  nrow() #57
+test_data1 <-  target_idf %>%
+  filter(impdef== "Bottom genes") %>%
+  mutate(dataset= "GDSC", frac=0, count=0) %>%
+  bind_rows(target_idf ) %>%
+  arrange(imptype, top_n, dataset,impdef) %>%
+  mutate(
+    # frac_notidentified= 100-frac,
+    count_notidentified=case_when(
+      dataset=="CTRP" ~ 217-count, dataset=="GDSC" ~ 57-count) ) %>%
+  # pivot_longer(
+  #   cols = one_of("frac", "frac_notidentified"),
+  #   names_to="type", values_to= "perc" )
+  pivot_longer(
+    cols = one_of("count", "count_notidentified"),
+    names_to="type", values_to= "perc" )
+
+# impdef is not a concern here
+Table1 = xtabs(perc ~ imptype +  type+ dataset,
+              data=test_data1)
+Table1
+mantelhaen.test(Table1,exact = T) # fisher exact test
+```
+
+As shown in Figure 4A, many drugs had their primary targets enriched in their top essentiality signatures genes(Fisher’test P = 1.2e-07). For example, the primary targets for 30.4% of CTRP drugs and 57.1% of GDSC drugs were found within the top 50 genes in the gene essentiality signatures. The primary targets showed no enrichment in bottom genes (Fisher’test P > 0.05) in the gene essentiality signatures.
+
+```{r}
+test_data2 <- target_idf %>% 
+  filter(imptype=="Ess-sig") %>% 
+  filter(impdef== "Bottom genes") %>% 
+  mutate(dataset= "GDSC", frac=0, count=0) %>% 
+  bind_rows(target_idf %>% filter(imptype=="Ess-sig")) %>%  
+  arrange(imptype, top_n, dataset,impdef) %>% 
+  mutate(
+    # frac_notidentified= 100-frac, 
+    count_notidentified=case_when(
+      dataset=="CTRP" ~ 217-count, dataset=="GDSC" ~ 57-count) ) %>%
+  # pivot_longer(
+  #   cols = one_of("frac", "frac_notidentified"),
+  #   names_to="type", values_to= "perc" ) 
+  pivot_longer(
+    cols = one_of("count", "count_notidentified"),
+    names_to="type", values_to= "perc" )
+
+Table2 = xtabs(perc ~  impdef + type+dataset,
+              data=test_data2)
+mantelhaen.test(Table2)
+rcompanion::groupwiseCMH(Table2, group=1, fisher=T)
+# Instead I want to focus only on Ess
+
+188/(188+8)
+Table2
+# hypergeometric test whether target is enriched in the top or bottom
+```
+
 
 lets still go back to drug percentage,
 checking
@@ -131,27 +199,26 @@ checking
 # # and all the other genes are not in the network.
 ```
 
-Supplementary figure 4
+Supplementary figure 5
 ```{r, fig.width=3, fig.height=4}
 network_idf <- bind_rows(
   get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
     mutate(dataset= "CTRP") %>%  select(-drug) ,
   get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
-    mutate(dataset= "GDSC") %>%  select(-drug) 
-)
+    mutate(dataset= "GDSC") %>%  select(-drug) ) %>% 
+    mutate(impdef=recode(impdef, "topneg gene"= "Bottom genes" , "toppos gene"= "Top genes")) %>% 
+    mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")) 
 
 fig <- network_idf %>% 
-  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) %>% 
   group_by(dataset,imptype) %>% 
   mutate(num= n()) %>% 
-  mutate(anno_type2 = 
-           case_when(
+  mutate(anno_type2 = case_when(
              anno_type2 <1 ~ "Target",
              between(anno_type2,1,2) ~as.character(anno_type2),
              anno_type2>2 ~ "over 2")) %>%    
   ungroup() %>% 
   group_by(impdef, anno_type2,dataset, imptype) %>% 
-  summarize(perc= n()/num) %>% 
+  summarize(perc= n()/num*100) %>% 
   ungroup() %>% distinct() %>% 
   mutate(anno_type2= factor(anno_type2,c("Target", "1", "2", "over 2"))) %>% 
   ggplot(aes(x= anno_type2,y=perc, fill= impdef)) +
@@ -160,13 +227,19 @@ fig <- network_idf %>%
   xlab("Gene category by PPI target network")+
   ylab("% drugs")  +
     scale_fill_manual(values=c("#999999", "#56B4E9"))+
+    # scale_fill_manual(values=c("#E64B35FF", "#4DBBD5FF"))+
   theme_classic()+
-  guides(fill=guide_legend(title="",nrow = 2,title.position = "top"))+
-  theme(legend.position = "none")
+  guides(fill=guide_legend(nrow = 1))+
+  theme(legend.title= element_blank(), legend.position = "top")
+  # theme(
+  #   legend.position = c(0.2, 0.90)
+  #   # legend.justification = c("left", "middle"),
+  #   # legend.box.just = "right"
+  #   )
 
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.tiff",width = 3,height = 4)
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig s4.pdf",width = 3,height = 4)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure2.png",width = 3,height = 4,dpi = 500,bg= "transparent")
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure2.pdf",width = 3,height = 4,bg= "transparent")
 ```
 
 
@@ -231,31 +304,39 @@ Lets just use abs(imp) to identify T, T+1 T+2 for different dataset
 
 figure 4B-4C
 ```{r,fig.height=3.5, fig.width=4}
-source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/plot_ave_roc.R")
+source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/plot_ave_roc.R")
 
 tmp <- CTRP_binary_PPIold_data %>% 
     mutate(imptype= recode(imptype,
                            "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig"))
 
-tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.tiff",width = 4,height = 3.5,units = "in",res = 300)
-# par(mar=c(1,1,1,1))
-# par("mar") 
-plot_ave_roc(annotated_pred_df = tmp  , addlegend = F)
+# tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.tiff",width = 4,height = 3.5,units = "in",res = 300)
+# # par(mar=c(1,1,1,1))
+# # par("mar") 
+# plot_ave_roc(annotated_pred_df = tmp  , addlegend = F)
+# dev.off() 
+
+pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.pdf",width = 3.25,height = 3.25)
+par(mar=c(4.5,4.5,0.5,0.5))
+plot_ave_roc(
+  annotated_pred_df = CTRP_binary_PPIold_data %>% 
+    mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")) ,
+  addlegend = T
+  )
 dev.off() 
 
-pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4b.pdf",width = 4,height = 3.5)
-plot_ave_roc(CTRP_binary_PPIold_data%>% 
-  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) , addlegend = F)
-dev.off() 
+# tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.tiff",width = 4,height = 3.5,units = "in",res = 300)
+# plot_ave_roc(GDSC_binary_PPIold_data%>% 
+#   mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) , title = "GDSC", addlegend = T)
+# dev.off() 
 
-tiff("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.tiff",width = 4,height = 3.5,units = "in",res = 300)
-plot_ave_roc(GDSC_binary_PPIold_data%>% 
-  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) , title = "GDSC", addlegend = T)
-dev.off() 
-
-pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.pdf",width = 4,height = 3.5)
-plot_ave_roc(GDSC_binary_PPIold_data%>% 
-  mutate(imptype=recode(imptype, "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig")) , title = "GDSC", addlegend = T)
+pdf("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/fig 4c.pdf",width = 3.25,height = 3.25)
+par(mar=c(4.5,4.5,0.5,0.5))
+plot_ave_roc(
+  annotated_pred_df = 
+    GDSC_binary_PPIold_data %>% 
+    mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")), 
+  addlegend = T)
 dev.off() 
 
 ```
@@ -265,8 +346,8 @@ The drug level auc here should also correlate with the fitting accuracy (not rea
 but lets check it later
 
 So lets just show the AUC result for the CTRP and GDSC Target
-Supplementary figure 3
-```{r,fig.width=3,fig.height=2}
+Supplementary figure 4
+```{r,fig.width=3,fig.height=3}
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 auc_df <- 
   bind_rows(
@@ -274,22 +355,50 @@ auc_df <-
       gdsc_unsupervised_auc %>% select(-drug) %>% mutate(dataset= "GDSC")
 ) %>% 
     mutate(imptype= recode(imptype,
-                           "ConExp-Sig"= "exp-sig" , "ConSen-Sig"= "ess-sig"))
+                           "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig"))
 
-auc_df %>% 
+
+fig <- auc_df %>% 
   drop_na() %>% 
-  ggplot(aes(x=imptype, y=AUC,color= imptype)) + 
+  ggplot(aes(x=imptype, y=AUC,fill= imptype, color= imptype)) + 
   geom_violin()+
+  ggpubr::stat_compare_means(
+    aes(group=imptype),
+    label = "p.signif",label.y = 1.1,
+    method = "t.test",vjust = 1,ref.group = "Ess-sig")+
   stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
-           colour = "black",size=0.2)+
+           colour = "black",size=0.3)+
   facet_wrap(~dataset)+
   theme_classic()+
   theme(axis.text.x = element_blank())+
   xlab(label = "")+
-  ylab(label = "AUC")+
+  ylab(label = "AUROC")+
+  guides(fill=guide_legend(nrow = 1))+
+  theme(legend.title = element_blank(),legend.position = "top")+
   # scale_color_manual(name="Cylinders",
   #                  labels=c("ConSen-sig", "ConExp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" ))+
-  scale_color_npg()
+  scale_fill_npg()
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure1.pdf",width = 3,height = 3,bg= "transparent")
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure1.png",width = 3,height = 3,dpi = 500,bg= "transparent")
+
+```
+
+
+```{r,fig.width=5,fig.height=4}
+auc_df %>% 
+  group_by(imptype, dataset) %>% 
+  summarize(AUC_ave=round(mean(AUC, na.rm=T),2))
+
+sig_res1 <- auc_df %>% 
+  nest_by(dataset) %>% 
+  ungroup() %>% 
+  mutate(test_res= map(
+    .x = data, 
+    .f = function(df){
+      res= t.test(df$AUC~df$imptype) 
+      res= res%>% broom::tidy()}
+                         ))
 ```
 
 does the unsupervised prediction perform better in inhibitor? not really...
@@ -598,6 +707,27 @@ CTRP_binary_PPIold_data %>% filter(drug == "BRD-K19687926") %>% filter(imptype==
 ```{r}
 load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
 load("~/cluster_scratch/glmnet_modelling/target_pred_server/res_pathway_all.RData")
+ctrp_allvalid_list <- res_ctrp2 %>% 
+  select(-.metric, -estimate, -variance, -input) %>% 
+  distinct() %>% 
+  filter(!sample_size <100) %>% 
+  filter(!drug_pair) %>% 
+  select(cpd_smiles,broad_cpd_id, sample_size) %>%
+  drop_na() %>% 
+  group_by(cpd_smiles) %>% 
+  slice_max(n=1, order_by=sample_size) %>% 
+  pull(broad_cpd_id)
+
+#n= 175
+gdsc_allvalid_list <- res_gdsc2 %>% 
+  select(-.metric, -estimate, -variance, -input) %>% 
+  distinct() %>% 
+  filter(!sample_size <100) %>% 
+  # select(smiles,DRUG_ID, sample_size) %>%
+  # drop_na() %>% 
+  group_by(DRUG_NAME) %>%
+  slice_max(n=1, order_by=sample_size) %>% 
+  pull(DRUG_ID)
 
 pathways_df_gdsc <- 
   tibble(drug=feature_imp_ridge_gdsc_comb1$drug, pathway=gdsc_kegg) %>% 
@@ -619,7 +749,12 @@ example_gdsc_DDR <- pathways_df_gdsc %>%
   filter(pathway %in% c("KEGG_MISMATCH_REPAIR")) %>% 
   select(-drug) %>% 
   rename(REPORTED_MECHANISM=PATHWAY_NAME) %>% 
-  mutate(padj= formatC(padj, format = "e", digits = 2))
+  select(-pval) %>% 
+  filter(NES>1.5) %>% 
+  arrange(padj) %>% 
+  mutate(padj= formatC(padj, format = "e", digits = 2),
+         ES= round(ES,2), NES=round(NES, 2))
+
 
 #ERK_6604 in GDSC
 
@@ -664,7 +799,8 @@ example_ctrp_DDR <- pathways_df_ctrp %>%
   filter(pathway %in% c("KEGG_MISMATCH_REPAIR")) %>% 
   select(-drug) %>% 
   rename(REPORTED_MECHANISM=target_or_activity_of_compound) %>% 
-  mutate(padj= formatC(padj, format = "e", digits = 2))
+  mutate(padj= formatC(padj, format = "e", digits = 2),
+         ES= round(ES,2), NES=roud(NES, 2))
 
 pathways_df_prism <- 
   tibble(drug=feature_imp_ridge_prism_comb1$drug, pathway=prism_kegg) %>% 
@@ -730,95 +866,95 @@ note stick to valid signatures.
 # Specificity. MCL1 
 ```{r}
 
-generank_ctrp <- feature_imp_ridge_ctrp_comb1 %>%
-  filter(drug %in% ctrp_allvalid_list) %>%
-  # filter(drug %in% ctrp_target_binary$drug) %>%
-  pivot_longer(-drug,names_to="gene", values_to="imp") %>%
-  group_by(drug) %>%
-  mutate(gene_rank= rank(-imp,ties.method = "min")) %>%
-  ungroup() %>%
-  group_by(gene) %>%
-  summarize(medianrank= median(gene_rank),
-            meanrank= mean(gene_rank),
-            percent1rank= quantile(gene_rank, 0.01,type = 1),
-            percent5rank= quantile(gene_rank, 0.05,type = 1),
-            percent10rank= quantile(gene_rank, 0.10,type = 1),
-            percent25rank= quantile(gene_rank, 0.25,type = 1),
-            percent75rank= quantile(gene_rank, 0.75,type = 1),
-            percent90rank= quantile(gene_rank, 0.90,type = 1),
-            percent95rank= quantile(gene_rank, 0.95,type = 1),
-            percent99rank= quantile(gene_rank, 0.99,type = 1),
-            Numdrugranked50= sum(gene_rank< 51),
-            Numdrugranked100= sum(gene_rank< 101),
-            Numdrugrankedbottom50= sum(gene_rank> 10573),
-            Numdrugrankedbottom100= sum(gene_rank>10523)
-            ) %>% 
-  ungroup()
-
-target_freq_ctrp <- ctrp_target_binary %>% 
-  filter(drug %in% ctrp_allvalid_list) %>% 
-  count(target) %>% 
-  arrange(desc(n))
-
-MCL1_ctrp <- feature_imp_ridge_ctrp_comb1 %>%
-  filter(drug %in% ctrp_allvalid_list) %>%
-  # filter(drug %in% ctrp_target_binary$drug) %>%
-  pivot_longer(-drug,names_to="gene", values_to="imp") %>%
-  group_by(drug) %>%
-  mutate(gene_rank= rank(-imp,ties.method = "min")) %>%
-  ungroup() %>% 
-  filter(gene == "MCL1") %>% 
-  inner_join(
-    y= ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound,cpd_name,target),
-    by=c("drug" = "broad_cpd_id")
-    ) %>% 
-  mutate(BCL_pathway= str_detect(target_or_activity_of_compound, pattern = "BCL|MCL1")) %>% 
-  mutate(target= map_chr(target, function(x){paste(x$gene_symbol_of_protein_target,collapse = ",")}))
-
-setwd("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res")
-write_csv(MCL1_ctrp,"MCL1_ctrp.csv")
-write_csv(generank_ctrp,"generank_ctrp.csv")
-write_csv(target_freq_ctrp,"target_freq_ctrp.csv")
-
-  
-
-generank_gdsc <- feature_imp_ridge_gdsc_comb1 %>%
-  filter(drug %in% gdsc_allvalid_list) %>%
-  pivot_longer(-drug,names_to="gene", values_to="imp") %>%
-  group_by(drug) %>%
-  mutate(gene_rank= rank(-imp,ties.method = "min")) %>%
-  ungroup() %>%
-  group_by(gene) %>%
-  summarize(medianrank= median(gene_rank),
-            meanrank= mean(gene_rank),
-            percent1rank= quantile(gene_rank, 0.01,type = 1),
-            percent5rank= quantile(gene_rank, 0.05,type = 1),
-            percent10rank= quantile(gene_rank, 0.10,type = 1),
-            percent25rank= quantile(gene_rank, 0.25,type = 1),
-            percent75rank= quantile(gene_rank, 0.75,type = 1),
-            percent90rank= quantile(gene_rank, 0.90,type = 1),
-            percent95rank= quantile(gene_rank, 0.95,type = 1),
-            percent99rank= quantile(gene_rank, 0.99,type = 1),
-            Numdrugranked50= sum(gene_rank< 51),
-            Numdrugranked100= sum(gene_rank< 101),
-            Numdrugrankedbottom50= sum(gene_rank> 10573),
-            Numdrugrankedbottom100= sum(gene_rank>10523)
-            ) %>% 
-  ungroup()
-
-
-# what are the most commonly affected pathway?
-gdsc_data %>% filter(DRUG_ID %in% gdsc_allvalid_list) %>% 
-  count(PATHWAY_NAME) %>% 
-  arrange(desc(n))
-
-target_freq_gdsc <- gdsc_target_binary %>% 
-  filter(drug %in% gdsc_allvalid_list) %>% 
-  count(target) %>% 
-  arrange(desc(n))
-setwd("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res")
-write_csv(generank_gdsc,"generank_gdsc.csv")
-write_csv(target_freq_gdsc,"target_freq_gdsc.csv")
+# generank_ctrp <- feature_imp_ridge_ctrp_comb1 %>%
+#   filter(drug %in% ctrp_allvalid_list) %>%
+#   # filter(drug %in% ctrp_target_binary$drug) %>%
+#   pivot_longer(-drug,names_to="gene", values_to="imp") %>%
+#   group_by(drug) %>%
+#   mutate(gene_rank= rank(-imp,ties.method = "min")) %>%
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarize(medianrank= median(gene_rank),
+#             meanrank= mean(gene_rank),
+#             percent1rank= quantile(gene_rank, 0.01,type = 1),
+#             percent5rank= quantile(gene_rank, 0.05,type = 1),
+#             percent10rank= quantile(gene_rank, 0.10,type = 1),
+#             percent25rank= quantile(gene_rank, 0.25,type = 1),
+#             percent75rank= quantile(gene_rank, 0.75,type = 1),
+#             percent90rank= quantile(gene_rank, 0.90,type = 1),
+#             percent95rank= quantile(gene_rank, 0.95,type = 1),
+#             percent99rank= quantile(gene_rank, 0.99,type = 1),
+#             Numdrugranked50= sum(gene_rank< 51),
+#             Numdrugranked100= sum(gene_rank< 101),
+#             Numdrugrankedbottom50= sum(gene_rank> 10573),
+#             Numdrugrankedbottom100= sum(gene_rank>10523)
+#             ) %>% 
+#   ungroup()
+# 
+# target_freq_ctrp <- ctrp_target_binary %>% 
+#   filter(drug %in% ctrp_allvalid_list) %>% 
+#   count(target) %>% 
+#   arrange(desc(n))
+# 
+# MCL1_ctrp <- feature_imp_ridge_ctrp_comb1 %>%
+#   filter(drug %in% ctrp_allvalid_list) %>%
+#   # filter(drug %in% ctrp_target_binary$drug) %>%
+#   pivot_longer(-drug,names_to="gene", values_to="imp") %>%
+#   group_by(drug) %>%
+#   mutate(gene_rank= rank(-imp,ties.method = "min")) %>%
+#   ungroup() %>% 
+#   filter(gene == "MCL1") %>% 
+#   inner_join(
+#     y= ctrp_data %>% select(broad_cpd_id, target_or_activity_of_compound,cpd_name,target),
+#     by=c("drug" = "broad_cpd_id")
+#     ) %>% 
+#   mutate(BCL_pathway= str_detect(target_or_activity_of_compound, pattern = "BCL|MCL1")) %>% 
+#   mutate(target= map_chr(target, function(x){paste(x$gene_symbol_of_protein_target,collapse = ",")}))
+# 
+# setwd("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res")
+# write_csv(MCL1_ctrp,"MCL1_ctrp.csv")
+# write_csv(generank_ctrp,"generank_ctrp.csv")
+# write_csv(target_freq_ctrp,"target_freq_ctrp.csv")
+# 
+#   
+# 
+# generank_gdsc <- feature_imp_ridge_gdsc_comb1 %>%
+#   filter(drug %in% gdsc_allvalid_list) %>%
+#   pivot_longer(-drug,names_to="gene", values_to="imp") %>%
+#   group_by(drug) %>%
+#   mutate(gene_rank= rank(-imp,ties.method = "min")) %>%
+#   ungroup() %>%
+#   group_by(gene) %>%
+#   summarize(medianrank= median(gene_rank),
+#             meanrank= mean(gene_rank),
+#             percent1rank= quantile(gene_rank, 0.01,type = 1),
+#             percent5rank= quantile(gene_rank, 0.05,type = 1),
+#             percent10rank= quantile(gene_rank, 0.10,type = 1),
+#             percent25rank= quantile(gene_rank, 0.25,type = 1),
+#             percent75rank= quantile(gene_rank, 0.75,type = 1),
+#             percent90rank= quantile(gene_rank, 0.90,type = 1),
+#             percent95rank= quantile(gene_rank, 0.95,type = 1),
+#             percent99rank= quantile(gene_rank, 0.99,type = 1),
+#             Numdrugranked50= sum(gene_rank< 51),
+#             Numdrugranked100= sum(gene_rank< 101),
+#             Numdrugrankedbottom50= sum(gene_rank> 10573),
+#             Numdrugrankedbottom100= sum(gene_rank>10523)
+#             ) %>% 
+#   ungroup()
+# 
+# 
+# # what are the most commonly affected pathway?
+# gdsc_data %>% filter(DRUG_ID %in% gdsc_allvalid_list) %>% 
+#   count(PATHWAY_NAME) %>% 
+#   arrange(desc(n))
+# 
+# target_freq_gdsc <- gdsc_target_binary %>% 
+#   filter(drug %in% gdsc_allvalid_list) %>% 
+#   count(target) %>% 
+#   arrange(desc(n))
+# setwd("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res")
+# write_csv(generank_gdsc,"generank_gdsc.csv")
+# write_csv(target_freq_gdsc,"target_freq_gdsc.csv")
 
 #on the other hand, ABCB1 is not a gene of interest??
 # tmp <- feature_imp_ridge_ctrp_comb1 %>% 
