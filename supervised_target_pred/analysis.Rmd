@@ -207,10 +207,10 @@ https://ggplot2.tidyverse.org/reference/label_bquote.html
 acc_df <- 
   bind_rows(acc_df_ctrp_binary_fold_cv %>% mutate(Dataset= "CTRP", TargetType= "Primary")) %>% 
   bind_rows(acc_df_ctrp_dtcbinary_foldcv %>% mutate(Dataset= "CTRP", TargetType= "Kinome-wide Binarized")) %>% 
-  bind_rows(acc_df_ctrp_dtc_foldcv %>% mutate(Dataset= "CTRP", TargetType= "Kinome-wide Continues")) %>% 
+  # bind_rows(acc_df_ctrp_dtc_foldcv %>% mutate(Dataset= "CTRP", TargetType= "Kinome-wide Continues")) %>% 
 bind_rows(acc_df_gdsc_binary_fold_cv %>% mutate(Dataset= "GDSC", TargetType= "Primary")) %>% 
   bind_rows(acc_df_gdsc_dtcbinary_foldcv %>% mutate(Dataset= "GDSC", TargetType= "Kinome-wide Binarized")) %>% 
-  bind_rows(acc_df_gdsc_dtc_foldcv %>% mutate(Dataset= "GDSC", TargetType= "Kinome-wide Continues")) %>% 
+  # bind_rows(acc_df_gdsc_dtc_foldcv %>% mutate(Dataset= "GDSC", TargetType= "Kinome-wide Continues")) %>% 
   filter(method %in% c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS") )
   # mutate(Y_names= case_when(TargetTpue %in% "Kinome-wide Continues" ~ "COR"),TRUE~AUC)
 
@@ -221,12 +221,17 @@ acc_df$method <-  factor(
 
 
 
-acc_df$facet = factor(acc_df$TargetType, 
-                      levels = c("Primary", "Kinome-wide Binarized", "Kinome-wide Continues"),
-                      labels=    c(
-                        "AUC['primary targets']",
-                        "AUC['binarized kinome targets']",
-                        "COR['continues kinome targets']"
+acc_df$facet = factor(
+  acc_df$TargetType, 
+  levels = c("Primary", 
+             "Kinome-wide Binarized"
+             # "Kinome-wide Continues"
+             ),
+  labels=    c(
+                        "Primary targets",
+                        "Kinome targets"
+                        # "AUC['binarized kinome targets']",
+                        # "COR['continues kinome targets']"
                                ))
 
 acc_df
@@ -248,7 +253,7 @@ acc_df
 acc_df %>% 
   group_by(method,Dataset,TargetType) %>% 
   summarise(median_acc= median(acc)) %>% 
-  filter(TargetType=="Primary (AUC)")
+  filter(TargetType=="Primary")
 
 sig_res1 <- acc_df %>% 
   nest_by(Dataset,TargetType) %>%
@@ -277,7 +282,7 @@ write_csv(sig_res1, "sig_res1.csv")
 ```
 
 figure 3a
-```{r,fig.width= 3.5,fig.height=8}
+```{r,fig.width= 3.5,fig.height=5}
 
 stat.test <- sig_res1 %>%
   mutate(comparison= factor(
@@ -296,11 +301,13 @@ stat.test <- sig_res1 %>%
     ((p.value<0.001) & (p.value>=0.0001))~ "***",
     p.value <=0.0001  ~ "****"
     ) ) %>%
-  mutate(y.position= case_when(
-    TargetType== "Primary"~0.8,
-    TargetType== "Kinome-wide Binarized"~0.8,
-    TargetType== "Kinome-wide Continues"~0.3,
-    )) 
+  mutate(y.position= 0.7
+    #        case_when(
+    # TargetType== "Primary"~0.75,
+    # TargetType== "Kinome-wide Binarized"~0.75
+    # # TargetType== "Kinome-wide Continues"~0.3,
+    # )
+    ) 
 # for unknown reason stat_pvalue_manual function is not working properly. I will use stat_compare_mean and then manually adjust significance level.
 
 fig <- acc_df %>% 
@@ -308,7 +315,7 @@ fig <- acc_df %>%
   geom_violin()+
   ggpubr::stat_compare_means(
     aes(group=method),label = "p.signif",vjust = 0.4,
-    method = "t.test",ref.group = "Ess-sig")+
+    method = "t.test",ref.group = "Ess-sig",label.y = 0.75)+
   stat_summary(
     fun.data = "mean_cl_boot",
     geom = "pointrange",
@@ -318,8 +325,8 @@ fig <- acc_df %>%
   #   label= "p.signif")+
   theme_classic() +
   theme(axis.text.x = element_blank())+
-  xlab(label = "")+
-  ylab(label ="")+
+  ylab(label = "AUROC")+
+  xlab(label ="")+
   scale_color_npg()+
   scale_fill_npg()+
   theme(legend.position="top")+
@@ -327,15 +334,16 @@ fig <- acc_df %>%
   guides(fill= guide_legend(nrow = 2,title.position = "top"))+
   labs(color = "Signature type", fill="Signature type" )+
   facet_grid(facet~Dataset,
-             scales = "free",switch="y",
-             labeller = label_parsed
+             scales = "free",switch="y"
+             # labeller = label_parsed
              )+
   theme(legend.title =element_blank())
 
 
 fig
 
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3A.pdf",width = 3.5,height = 8)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3A.pdf",width = 3.5,height = 5,bg='transparent')
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3A.png",width = 3.5,height = 5,bg='transparent')
 ```
 
 
@@ -981,6 +989,10 @@ fig <- fig_data %>%
                       levels = c("ess","exp", "extended", "maccs"),
                       labels= c("Ess-sig", "Exp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" )
                       ) )%>% 
+  mutate(TargetType= factor(
+    TargetType, 
+    levels = c("Primary target", "Kinome target")
+                               )) %>% 
   ggplot(
     mapping = aes(
       # x= fct_reorder(method,value, median,.desc=T),
@@ -1006,8 +1018,7 @@ fig <- fig_data %>%
   facet_grid(cols = vars(Dataset), rows = vars(TargetType),scales = "free",switch = "y")+
   theme(legend.title = element_blank(),legend.position="top",axis.text.x=element_blank(), axis.title.x=element_blank())
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/supplementary figure1.pdf",width = 3.5,height = 5)
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/supplementary figure1.png",width = 3.5,height = 5,dpi = 500)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/supplementary figure1.pdf",width = 3.5,height = 5,bg = 'transparent')
 ```
 
 Figure 3B
@@ -1033,7 +1044,12 @@ figdata <- pairlevel_comparison_ctrp_drugbank %>%
   mutate(drug_pair_name = as.factor(drug_pair_name) ) %>%
   mutate(drug_pair_name = fct_reorder(drug_pair_name,ess))%>% 
   select(drug_pair_name, ess:maccs, target_or_activity_of_compound.x) %>% 
-  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") 
+  pivot_longer(ess:maccs, names_to="method", values_to= "value",names_repair = "unique") %>% 
+  mutate(method= factor(
+    method, 
+    levels = c("ess","exp", "extended", "maccs"),
+    labels= c("Ess-sig", "Exp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" )
+    ))
 
 levels(figdata$target_or_activity_of_compound.x) <- c("BCL family","BRAF","EGFR and HER2","HDAC family","MTOR","PLK1","TOP2A","others" )
 
@@ -1043,7 +1059,7 @@ pmain <- figdata %>%
   geom_line(aes(group= method))+
   theme_classic()+
   theme(legend.position="bottom")+
-  guides(color= guide_legend(nrow = 2,title.position = "top"))+
+  guides(color= guide_legend(nrow = 4,title.position = "top"))+
   xlab("")+
   ylab("Similarity percentile" )+
   labs(color = "Prediction Method")+
@@ -1051,9 +1067,8 @@ pmain <- figdata %>%
   scale_color_npg()+
   scale_y_continuous(position = "right")+
   scale_x_discrete(position = "top")+
-  guides(fill= guide_legend(nrow = 2))+
+  guides(fill= guide_legend(nrow = 4))+
   theme(legend.position="top",legend.title = element_blank())
-
 
 # xbox <- figdata %>% 
 #   ggplot(
@@ -1089,14 +1104,14 @@ legend <- cowplot::get_legend(
 
 # add the legend to the row we made earlier. Give it one-third of 
 # the width of one plot (via rel_widths).
-fig <- cowplot::plot_grid(p2, legend, rel_heights = c(3, 1.5),nrow = 2)
+fig <- cowplot::plot_grid(p2, legend, rel_heights = c(5, 1),nrow = 2)
 ```
 
 
-```{r, fig.width=4,fig.height=8}
+```{r, fig.width=4,fig.height=6}
 # cowplot::ggdraw(p2)
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3B.pdf",width = 4,height = 8)
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3B.pdf",width = 4,height = 6,bg = 'transparent')
 ```
 
 ```{r, fig.width=4,fig.height=7}
