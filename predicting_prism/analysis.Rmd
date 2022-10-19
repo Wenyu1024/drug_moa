@@ -22,6 +22,14 @@ load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RDat
 repurposinghub_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_nobroadid.csv")
 repurposinghub_sample <- read_csv("~/cluster_scratch/prism/drug_repurposing_hub_sample.csv")
 
+res_prism2 <- res_prism2 %>%
+  select(BROAD_ID, .metric, input, estimate, name, drug_category, smiles,sample_size) %>% 
+  filter(.metric== "spearman coef") %>% 
+  pivot_wider(names_from = input, values_from= estimate) %>% 
+  mutate(acc_sen= (ceres+ces+demeter2)/3) %>% 
+  drop_na() %>% 
+  distinct() 
+
 sc_druglist <- unique(prism_sc_data$broad_id)
 prism_drugs <- prism_drugs %>% 
   mutate(phase= case_when(
@@ -49,14 +57,27 @@ prism_sc_drug <-  prism_sc_data %>%
   summarize(target = paste(target, collapse = ","),
             moa= paste(moa, collapse = ",")) 
 # write_csv(prism_sc_drug, "~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
-res_prism_long <- res_prism2
-res_prism2 <- res_prism_long %>%
-  select(BROAD_ID, .metric, input, estimate, name, drug_category, smiles,sample_size) %>% 
-  filter(.metric== "spearman coef") %>% 
-  pivot_wider(names_from = input, values_from= estimate) %>% 
-  mutate(acc_sen= (ceres+ces+demeter2)/3) %>% 
-  drop_na() %>% 
-  distinct() 
+
+
+# drug_by_category <-  prism_sc_data %>% 
+#   select(broad_id, target, phase) %>% 
+#   left_join(prism_drugs %>% select(broad_id, drug_category)) %>% 
+#   distinct() %>% 
+#   separate(col = broad_id, 
+#            into=c("BRD","id", NA), 
+#            sep = "-", remove = T, extra= "drop" ) %>% 
+#   unite("broad_id", BRD:id, sep = "-") %>%
+#   filter(broad_id %in% prism_data$BROAD_ID) %>% 
+#   filter(!is.na(drug_category)) %>%
+#   group_by(broad_id, phase, drug_category) %>% 
+#   summarize(target = paste(target, collapse = ",")) 
+
+table(prism_sc_drug %>%  filter(drug_category=="noncancer") %>% pull(phase))
+
+tmp <- prism_sc_drug %>% 
+  filter(target=="NA")
+
+tmp1 <- tmp %>% filter(moa=="NA")
 ```
 Annotations proportions
 
@@ -64,28 +85,19 @@ Non-Cancer drugs is poorly studied
 even it is approved drugs
 
 check specifically how many drug target pairs available for different target
-```{r,fig.height=3.5, fig.width=3}
-drug_by_category <-  prism_sc_data %>% 
-  select(broad_id, target, phase) %>% 
-  left_join(prism_drugs %>% select(broad_id, drug_category)) %>% 
-  distinct() %>% 
-  separate(col = broad_id, 
-           into=c("BRD","id", NA), 
-           sep = "-", remove = T, extra= "drop" ) %>% 
-  unite("broad_id", BRD:id, sep = "-") %>%
-  filter(broad_id %in% prism_data$BROAD_ID) %>% 
-  filter(!is.na(drug_category)) %>% 
-  group_by(broad_id, phase, drug_category) %>% 
-  summarize(target = paste(target, collapse = ",")) 
+
+Figure 5A
+```{r,fig.height=3.5, fig.width=3.6}
+
 
 # 1448 drugs including the withdrawn drugs. Could the withdrawn be due to the wrong target information that lead to unexpected result?
 # there are too little of them to draw conclusions.
 
-targetinfo_drug_by_category <- drug_by_category %>% 
-  filter(phase!="Withdrawn") %>% 
+targetinfo_drug_by_category <- prism_sc_drug %>% 
+  # filter(phase!="Withdrawn") %>% 
   mutate(drug_phase= case_when(
-    phase =="Launched" ~  "Launched",
-    TRUE ~ "Under Development"
+    phase =="Launched" ~  "Approved",
+    TRUE ~ "Investigational"
   )) %>%
   # mutate(drug_phase= case_when(
   #   phase %in%  c("Phase 1",  "Phase 1/Phase 2",  "Phase 2", "Phase 2/Phase 3", "Phase 3") ~  "In trail",
@@ -96,9 +108,12 @@ targetinfo_drug_by_category <- drug_by_category %>%
   group_by(drug_phase, drug_category) %>% 
   summarize(na_count= sum(target_missing),
             total_count= n()) %>% 
-  mutate(na_percentage= na_count/ total_count) %>% 
-  mutate(drug_category= fct_relevel(drug_category, levels= c("targeted cancer", "chemo", "noncancer") )) %>% 
-  mutate(drug_phase= fct_relevel(drug_phase, levels= c("Launched", "Under Development") )) %>%
+  mutate(na_percentage= round(na_count/ total_count,3)*100) %>%
+  mutate(drug_category= factor(
+    drug_category,
+    levels= c("targeted cancer", "chemo", "noncancer"),
+    labels = c(  "Targeted cancer","Chemo","Noncancer"))) %>% 
+  # mutate(drug_phase= fct_relevel(drug_phase, levels= c("Approved", "Investigational") )) %>%
   arrange(drug_category, drug_phase) %>% 
   select(drug_category, drug_phase,total_count,na_count,  na_percentage)
 
@@ -113,17 +128,80 @@ fig <- targetinfo_drug_by_category %>%
   # scale_y_continuous(labels = scales::percent)+
   facet_wrap(~drug_phase)+
   theme(axis.text.x   = element_blank(), axis.title.x = element_blank())+
-  ylab("No. of drugs lacking target info")+
-  guides(fill=guide_legend(title="Drug Category",nrow = 2,title.position = "top"))+
-  theme(legend.position = "top")
+  ylab("Number of drugs lacking target genes")+
+  guides(fill=guide_legend(nrow = 1))+
+  theme(legend.position = "top",legend.title = element_blank())
   # theme(
   #   legend.position = c(0, 0.95),
   #   legend.justification = c("left", "top"),
   #   legend.box.just = "right"
   #   )
 fig
-ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6a.tiff",device = "tiff",width = 3,height = 3.5,units = "in",dpi = 300)
-ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig6a.pdf",device = "pdf",width = 3,height = 3)
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5a.png",width = 3.6,height = 3.5,units = "in",dpi = 500)
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5a.pdf",device = "pdf",width = 3.6,height = 3.5)
+write_csv(targetinfo_drug_by_category, "targetinfo_drug_by_categor.csv")
+
+
+#new figure 5a
+targetinfo_drug_by_category <- prism_sc_drug %>% 
+  # filter(phase!="Withdrawn") %>% 
+  mutate(drug_phase= case_when(
+    phase =="Launched" ~  "Approved",
+    TRUE ~ "Investigational"
+  )) %>%
+  # mutate(drug_phase= case_when(
+  #   phase %in%  c("Phase 1",  "Phase 1/Phase 2",  "Phase 2", "Phase 2/Phase 3", "Phase 3") ~  "In trail",
+  #   TRUE ~ phase
+  # )) %>% 
+  select(-phase) %>% 
+  mutate(target_missing= (target == "NA")) %>% 
+  group_by(drug_phase, drug_category) %>% 
+  summarize(na_count= sum(target_missing),
+            total_count= n()) %>% 
+  mutate(na_percentage= round(na_count/ total_count,3)*100) %>%
+  mutate(drug_category= factor(
+    drug_category,
+    levels= c("targeted cancer", "chemo", "noncancer"),
+    labels = c(  "Targeted cancer","Chemo","Noncancer"))) %>% 
+  # mutate(drug_phase= fct_relevel(drug_phase, levels= c("Approved", "Investigational") )) %>%
+  arrange(drug_category, drug_phase) %>% 
+  select(drug_category, drug_phase,total_count,na_count,  na_percentage)
+
+fig <- targetinfo_drug_by_category %>% 
+   ggplot(aes(x=drug_category, y= na_count, fill=drug_category)) +
+  # geom_col(position = "fill")
+  geom_bar(stat="identity",position = position_dodge())+
+  # geom_text(aes(label=na_count), size=3, nudge_y = 0.01) +
+  ggsci::scale_fill_aaas()+
+  theme_classic()+
+  # ylim(c(0, 0.35))+
+  # scale_y_continuous(labels = scales::percent)+
+  facet_wrap(~drug_phase)+
+  theme(axis.text.x   = element_blank(), axis.title.x = element_blank())+
+  ylab("Number of drugs lacking target genes")+
+  guides(fill=guide_legend(nrow = 1))+
+  theme(legend.position = "top",legend.title = element_blank())
+  # theme(
+  #   legend.position = c(0, 0.95),
+  #   legend.justification = c("left", "top"),
+  #   legend.box.just = "right"
+  #   )
+
+# fig <- targetinfo_drug_by_category %>% 
+#   mutate(avaliable= total_count-na_count) %>%
+#   rename(`not avaliable`= na_count) %>% 
+#   # select(-total_count) %>% 
+#   pivot_longer(one_of("not avaliable", "avaliable"), names_to= "tar_aval", values_to="count" ) %>% 
+#   ggplot(aes(x=drug_category, y=count, fill=drug_category, color=tar_aval)) +
+#   geom_bar(position=position_stack(), stat="identity") +
+#   # geom_text(aes(label=prcntlabel), position=position_stack(vjust=0.5), size=2) +
+#   facet_wrap(~drug_phase)+
+#   scale_fill_npg()+
+#   theme(axis.text.x   = element_blank(), axis.title.x = element_blank())+
+#   ylab("Number of drugs lacking target genes")+
+#   guides(fill=guide_legend(nrow = 1))+
+#   theme(legend.position = "top",legend.title = element_blank())
+# fig
 ```
 
 # 2
@@ -199,13 +277,59 @@ Bimodality coefficient and fitting accuracy
 # fig
 ```
 
+report the sensitivity fitting accuracy
+```{r}
+load("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
+# combined_performance3 %>% 
+#   filter(sample_size>100) %>% 
+#   group_by(.metric, input, dataset) %>% 
+#   summarise(mean_acc= mean(estimate,na.rm = T))
+
+# test whether the performance metric for PRISM is significantly worse.
+tmp_error <- combined_performance3 %>% 
+  filter(sample_size>100)  %>%
+  filter(input !="exp") %>% 
+  mutate(input= toupper(input)) %>%
+  mutate(dataset= toupper(dataset)) %>% 
+  mutate(dataset= factor(dataset, levels= c("PRISM", "CTRP","GDSC"))) %>% 
+  filter(.metric %in% c("mae", "rmse"))
+
+tmp_error_aov <- aov(estimate ~.metric+dataset+input,data= tmp_error)
+# tmp <- summary(tmp_error_aov)[[1]]
+
+# I don't care about the difference between CTRP and GDSC
+# TukeyHSD(tmp_error_aov, which = "dataset", paired=T) 
+error_dunnett <- data.frame(
+  DescTools::DunnettTest(tmp_error$estimate, g= tmp_error$dataset)$PRISM) %>%
+  rownames_to_column("comparison") %>% 
+  mutate(performance_metric_category= "error")
+  
+tmp_acc <- combined_performance3 %>% 
+  filter(sample_size>100)  %>%
+  filter(input !="exp") %>% 
+  mutate(input= toupper(input)) %>%
+  mutate(dataset= toupper(dataset)) %>% 
+  mutate(dataset= factor(dataset, levels= c("PRISM", "CTRP","GDSC"))) %>% 
+  filter(!(.metric %in% c("mae", "rmse")))
+
+tmp_acc_aov <- aov(estimate ~.metric+dataset+input,data= tmp_acc)
+summary(tmp_acc_aov)
+
+# TukeyHSD(tmp_acc_aov, which = "dataset", paired=T)
+acc_dunnett <- data.frame(
+  DescTools::DunnettTest(tmp_acc$estimate, g= tmp_acc$dataset)$PRISM) %>%
+  rownames_to_column("comparison") %>% 
+  mutate(performance_metric_category= "acc")
+sig_res <- bind_rows(error_dunnett, acc_dunnett)
+write_csv(sig_res, "sig_res.csv")
+```
 
 jing proposed that the mean/variance of drug sensitivities
 may also impact sensitivity fitting accuracy
 
 generate mean and variance based on the prism_data object
 
-```{r,fig.width=3.5,fig.height=5}
+```{r}
 get_auc_mean <- function(df){mean(df$auc, na.rm = T)}
 get_auc_variance <- function(df){sd(df$auc, na.rm = T)}
 
@@ -216,32 +340,56 @@ sen_mean_var <- prism_data %>%
     sen_sd=map_dbl(.x = sensitivity, .f = get_auc_variance)
          ) %>% 
   select(-sensitivity) %>% 
-  inner_join(res_prism2)
+  inner_join(res_prism2 %>% 
+               filter(.metric=="spearman coef") %>% 
+               filter(input== "ces") %>% 
+               filter(sample_size>100)
+             ) %>% 
+  mutate(drug_category= factor(
+    drug_category,
+    levels= c(  "noncancer","targeted cancer","chemo"),
+    labels = c(  "Noncancer","Targeted cancer","Chemo")))
+  # mutate(drug_category= fct_relevel(drug_category, levels= c(  "noncancer","targeted cancer","chemo") )) 
 
+sen_mean_var %>%
+  group_by(drug_category) %>% 
+  summarise(median_sen=  median(sen_mean), median_spearman= median(estimate))
+
+DescTools::DunnettTest(sen_mean_var$sen_mean, 
+                       g= sen_mean_var$drug_category,paired=T)
+DescTools::DunnettTest(sen_mean_var$estimate,
+                       g= sen_mean_var$drug_category,paired=T)
+# whether prediction accuracy is correlated with drug sensitivity level?
+cor.test(sen_mean_var$sen_mean, sen_mean_var$estimate,method = "spearman")
+```
+
+Figure 5B
+```{r,fig.width=3.5,fig.height=4}
 fig <- sen_mean_var %>% 
-  mutate(drug_category= fct_relevel(drug_category, levels= c( "chemo","targeted cancer", "noncancer") )) %>%
-  ggplot(aes(y=acc_sen , x= sen_mean,color= drug_category)) + 
+  ggplot(aes(y=estimate, x= sen_mean,color= drug_category)) + 
   geom_point(size = 0.2)+
   geom_smooth(method = "lm", se = FALSE)+
   theme_classic()+
-  ylab("Sensitivity fitting accuracy")+
+  ylab("Prediction accuracy (Spearman coef)")+
   xlab("Average sensitivity")+
-  guides(color= guide_legend(title = "Drug Category",nrow = 3))+
+  guides(color= guide_legend(title = element_blank(),nrow = 1))+
   scale_color_aaas()+
   theme(legend.position="top")
+# fig
+
+fig <- ggExtra::ggMarginal(fig, type= "boxplot",groupColour = T,groupFill = T) 
 fig
-```
-
-
-```{r,fig.width=3,fig.height=5}
-ggExtra::ggMarginal(fig, type= "boxplot",groupColour = T,groupFill = T) 
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5b.png",width = 3.5,height = 4,units = "in",dpi = 500)
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5b.pdf",device = "pdf",width = 3.5,height = 4)
 ```
 
 
 ## 3 Imp correlation across different dataset
 imp correlation across different dataset
 get a shared list of drugs across three set
-```{r,fig.width=10,fig.height=3}
+
+Figure 5C
+```{r,fig.width=3,fig.height=7}
 cross_ref_tibble_gdsc <- read_csv("~/cluster_scratch/prior/drug_id_list/cross_ref_tibble_gdsc")
 overlapping_drug_list <- sort(intersect(intersect(cross_ref_tibble_gdsc$BROAD_ID, ctrp_data$broad_cpd_id), prism_data$BROAD_ID)) # 44 drugs available (in nature cancer paper 84 compound and median 236 cell line)
 
@@ -277,9 +425,11 @@ cor_tibble <- tibble(
     by= c("drug"= "BROAD_ID")) %>% 
   # select(-drug) %>% 
   arrange(ctrp_gdsc)
+```
 
 
-cor_tibble %>% 
+```{r,fig.width=3,fig.height=7}
+fig <- cor_tibble %>% 
   select(-drug, -drug_category) %>% 
   pivot_longer(cols=-name, names_to= "across_dataset", values_to= "COR") %>%
   arrange(across_dataset, COR) %>% 
@@ -292,10 +442,81 @@ cor_tibble %>%
   ggplot(aes(x= name,  y= COR, fill= across_dataset))+
   geom_bar(stat = "identity", position = position_dodge())+
   scale_fill_npg()+
+  coord_flip()+
   theme_classic()+
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, colour = ))+
-  theme(axis.title.x = element_blank()) +
-  theme(legend.title = element_blank()) 
+  guides(fill=guide_legend(nrow = 3))+
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+    axis.title.y = element_blank(),
+    legend.title = element_blank(),
+    legend.position = c(0.7, 0.1),
+    legend.direction = "horizontal"
+    )
+fig
+
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5c.png",width = 3,height = 7,units = "in",dpi = 500)
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5c.pdf",device = "pdf",width = 7,height = 3)
+```
+
+for the 44 shared drugs'ssig whether CTRP and GDSC are more correlated?
+```{r,fig.width=3,fig.height=7}
+summary(cor_tibble)
+tmp <- cor_tibble %>% 
+  pivot_longer(cols = 2:4, names_to= "comparison", values_to= "cor") %>% 
+  mutate(comparison= factor(
+    comparison, levels = c("ctrp_gdsc", "ctrp_prism", "gdsc_prism")))
+DescTools::DunnettTest(tmp$cor, g= tmp$comparison,paired=T)
+```
+for these 44 drugs whether drug sensitivity fitting acc is lower
+```{r}
+# 3 dataset, 3input, 6metrics,44 drugs
+fitting_acc44 <- bind_rows(
+  cor_tibble %>%
+  select(drug, name, drug_category) %>% 
+  inner_join(y= cross_ref_tibble_gdsc %>% 
+               rename(GDSC_ID=DRUG_ID) %>% 
+               mutate(GDSC_ID=as.character(GDSC_ID)),
+             by=c("drug"= "BROAD_ID")) %>% 
+  inner_join(combined_performance3, c("drug"="ID")),
+
+  cor_tibble %>%
+  select(drug, name, drug_category) %>% 
+  inner_join(y= cross_ref_tibble_gdsc %>% 
+               rename(GDSC_ID=DRUG_ID) %>% 
+               mutate(GDSC_ID=as.character(GDSC_ID)),
+             by=c("drug"= "BROAD_ID")) %>% 
+  inner_join(combined_performance3, c("GDSC_ID"="ID"))) %>% 
+  select(-DRUG_ID) %>% 
+  distinct() %>% 
+  filter(input !="exp")
+
+fitting_acc44 %>% 
+  group_by(input, dataset,.metric) %>% 
+  summarise(mean_acc= mean(estimate))
+
+tmp_error <- fitting_acc44 %>% 
+  mutate(input= toupper(input)) %>%
+  mutate(dataset= toupper(dataset)) %>% 
+  mutate(dataset= factor(dataset, levels= c("PRISM", "CTRP","GDSC"))) %>% 
+  filter((.metric %in% c("mae", "rmse")))
+error_dunnett <- data.frame(
+  DescTools::DunnettTest(tmp_error$estimate, g= tmp_error$dataset)$PRISM) %>%
+  rownames_to_column("comparison") %>% 
+  mutate(performance_metric_category= "error")
+  
+
+tmp_acc <- fitting_acc44 %>% 
+  mutate(input= toupper(input)) %>%
+  mutate(dataset= toupper(dataset)) %>% 
+  mutate(dataset= factor(dataset, levels= c("PRISM", "CTRP","GDSC"))) %>% 
+  filter(!(.metric %in% c("mae", "rmse")))
+acc_dunnett <- data.frame(
+  DescTools::DunnettTest(tmp_acc$estimate, g= tmp_acc$dataset)$PRISM) %>%
+  rownames_to_column("comparison") %>% 
+  mutate(performance_metric_category= "acc")
+sig_res1 <- bind_rows(error_dunnett, acc_dunnett)
+write_csv(sig_res1, "sig_res1.csv")
+
 ```
 
 
@@ -304,45 +525,201 @@ Explore the supervised prediction of PRISM with different fitting accuracy
 ```{r}
 load("~/cluster_scratch/forward_modelling/targetpred_output_prismgoodbadexplore1.RData")
 
-plot_two_group <- function(good_df, bad_df){
-  df <- bind_rows(
-    good_df %>% mutate(fitting_quality= "good"),
-    bad_df %>% mutate(fitting_quality= "bad"),
-    acc_df_prism_binary_fold_cv %>% mutate(fitting_quality= "general")
+# df <- bind_rows(
+#   acc_df_prism_binary_fold_cv_good200 %>% 
+#     mutate(fitting_quality= "Top"),
+#   acc_df_prism_binary_fold_cv_bad200 %>% 
+#     mutate(fitting_quality= "Bottom"),
+#   acc_df_prism_binary_fold_cv %>% 
+#     mutate(fitting_quality= "All")   
+#   ) %>% 
+#   mutate(fitting_quality= 
+#            fct_relevel(fitting_quality, c("All", "Top", "Bottom"))) %>%
+#   mutate(method= factor(
+#     method,
+#     levels = c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS"),
+#     labels = c("ConSen-sig", "ConExp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" ),
+#     ) )
+# sig_res2 <- df %>% 
+#   nest_by(fitting_quality) %>% 
+#   ungroup() %>% 
+#   mutate(aov_p_value=map_dbl(
+#     .x = data, 
+#     .f = function(df){
+#         res= aov(acc~method,data = df)
+#         res= summary(res)[[1]][[5]][[1]] 
+#         return(res)
+#     } 
+#                  )) %>% 
+#   mutate(Test_res=map(
+#     .x = data, 
+#     .f = function(data){
+#       res=DescTools::DunnettTest(data$acc, g= data$method)
+#       res= tibble(comparison= row.names(res[[1]]),
+#                   diff= res[[1]][,1],
+#                   p.value= res[[1]][,4])     
+#       return(res)
+#     }
+#                  ))
+
+get_supervised_df <- function(good_df, bad_df){
+   df <- bind_rows(
+    good_df %>% mutate(fitting_quality= "Top"),
+    bad_df %>% mutate(fitting_quality= "Bottom"),
+    acc_df_prism_binary_fold_cv %>% mutate(fitting_quality= "All")
   ) %>% 
-    mutate(fitting_quality= fct_relevel(fitting_quality, c("general", "good", "bad")) ) 
-    # mutate(method= fct_relevel(method, c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS")) ) %>% 
-    # mutate(method= fct_relabel(method, ... = c("ConSen-sig", "ConExp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" )) )    
-  
-    df$method <-
-     factor(df$method,
-            levels= c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS"),
-            labels = c("ess-sig", "exp-sig", "ECFP","MACCS" ))
-  
+    mutate(fitting_quality= fct_relevel(fitting_quality, c("All", "Top", "Bottom")) ) %>%  
+    mutate(method= factor(
+      method,
+      levels = c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS"),
+      labels = c("Ess-sig", "Exp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" ),
+    ) )
+   return(df)
+   }
+
+df_200 <- get_supervised_df(good_df = acc_df_prism_binary_fold_cv_good200,
+                        bad_df = acc_df_prism_binary_fold_cv_bad200)
+df_200 %>% 
+  filter(fitting_quality=="All") %>% 
+  group_by(method) %>% 
+  summarise(median_acc= median(acc))
+
+sig_res2 <- df_200 %>% 
+  nest_by(fitting_quality) %>% 
+  ungroup() %>% 
+  mutate(DunnettTest_res=map(
+    .x = data, 
+    .f = function(df){
+      res=DescTools::DunnettTest(df$acc, g= df$method)
+      res= tibble(comparison= row.names(res[[1]]), 
+                  diff= res[[1]][,1],
+                  p.value= res[[1]][,4])
+      return(res)
+    }
+                 )) %>% 
+  select(-data) %>% 
+  unnest(cols = c(DunnettTest_res))
+write_csv(sig_res2, "sig_res2.csv")
+```
+
+```{r,fig.height=3, fig.width=4.5}
+plot_two_group <- function(df){
+  # my_comparisons <- list(c("Ess-sig", "Exp-sig"), c("Ess-sig", "Fingerprint-ECFP"), c("Ess-sig", "Fingerprint-MACCS"))
   df %>% 
-    ggplot(aes(x= method,y=acc, fill= method )) + 
+    ggplot(aes(x= method,y=acc, fill= method,color= method )) + 
     geom_violin()+
+    ggpubr::stat_compare_means(
+      aes(group=method),label = "p.signif",
+      method = "t.test",paired = T,vjust = 0.4,ref.group = 1)+
     stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
              colour = "black",position = position_dodge(width = 0.9),size=0.2)+
     ggsci::scale_fill_npg()+
+    ggsci::scale_color_npg()+
     facet_wrap(~fitting_quality)+
     theme_classic()+
-    ylab(label = "Supervised Target Prediction (AUC)")+
-    theme(legend.position="top")+
-    theme(axis.text.x = element_blank(), axis.title.x = element_blank())+
-    # labs(fill= "Drug Representation")
-    guides(fill= guide_legend(title = "Drug Representation", nrow = 2,title.position = "top"))
+    ylab(label = "Supervised target prediction (AUC)")+
+    guides(fill= guide_legend(nrow = 4))+
+    theme(
+          legend.title = element_blank(),
+          axis.text.x = element_blank(), 
+          axis.title.x = element_blank(),
+          legend.position = c(.25, .25))
 }
+
+
+fig <- plot_two_group(df_200)
+fig
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5d.png",width = 4.5,height = 3,dpi = 500)
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5d.pdf",width = 4.5,height = 3)
+```
+
+```{r}
+#How about not comparing to other signatures
+  # my_comparison1 <- list(c("Top", "All"), c("Top", "Bottom"), c("All", "Bottom"))
+  # df %>% 
+  #   filter(method %in% c("Ess-sig")) %>% 
+  #   ggplot(aes(y=acc, x= fitting_quality)) + 
+  #   geom_violin()+
+  #   ggpubr::stat_compare_means(
+  #     aes(group=fitting_quality),label = "p.signif",
+  #     method = "t.test",comparisons = my_comparison1,vjust = 0.4)+
+  #   stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
+  #            colour = "black",position = position_dodge(width = 0.9),size=0.2)+
+  #   ggsci::scale_fill_npg()+
+  #   ggsci::scale_color_npg()+
+  #   # facet_wrap(~fitting_quality)+
+  #   theme_classic()+
+  #   ylab(label = "Supervised Target Prediction (AUC)")+
+  #   theme(axis.title.x = element_blank())
+
+  
+load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
+unsupervised_df <- bind_rows(
+  prism_unsupervised_auc %>% 
+    filter(drug %in% prism_good_drug_list_200) %>%
+    mutate(fitting_quality= "Top")
+  ,
+  prism_unsupervised_auc %>% 
+    filter(drug %in% prism_bad_drug_list_200) %>%
+    mutate(fitting_quality= "Bottom")
+  ) #%>% 
+  # mutate(AUC= replace_na(AUC,0.5))
+
+unsupervised_df %>% 
+  group_by(imptype, fitting_quality) %>% 
+  summarize(median_auc=median(AUC,na.rm = T))
 ```
 
 
-```{r,fig.height=5, fig.width=3}
-plot_two_group(good_df = acc_df_prism_binary_fold_cv_good200,bad_df = acc_df_prism_binary_fold_cv_bad200)
-  # theme(legend.position = c(.2, .2))
-# plot_two_group(good_df = acc_df_prism_binary_fold_cv_good100,bad_df = acc_df_prism_binary_fold_cv_bad100)
-# plot_two_group(good_df = acc_df_prism_binary_fold_cv_good300,bad_df = acc_df_prism_binary_fold_cv_bad300)
-# plot_two_group(good_df = acc_df_prism_binary_fold_cv_goodhalf,bad_df = acc_df_prism_binary_fold_cv_badhalf)
+```{r,fig.height=3,fig.width=2.5}
+fig <- unsupervised_df %>% 
+  mutate(imptype= factor(
+    imptype,
+    levels = c("ConSen-Sig", "ConExp-Sig"),
+    labels = c("Ess-sig", "Exp-sig" ),
+    ) ) %>% 
+  ggplot(aes(y=AUC, x= fitting_quality,fill= imptype,color=imptype)) + 
+  geom_violin()+
+  ggpubr::stat_compare_means(
+    aes(group=imptype),
+    method = "t.test",vjust = 0.4,hide.ns = F,label.y = 1.1,label = "p.signif",bracket.size = 1)+
+  ggpubr::stat_compare_means(
+    data = unsupervised_df %>% filter(imptype=="ConSen-Sig"),
+    aes(group=fitting_quality),
+    method = "t.test",vjust = 0.6,hide.ns = F,label.y = 1.2,
+    label = "p.signif")+
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
+           colour = "black",position = position_dodge(width = 0.9),size=0.2)+
+  ggsci::scale_fill_npg()+
+  ggsci::scale_color_npg()+
+  guides(fill=guide_legend(nrow = 1))+
+  theme_classic()+
+  ylab(label = "Unsupervised target prediction (AUC)")+
+  theme(axis.title.x = element_blank(),legend.position = "top",
+        legend.title = element_blank())
+fig
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5e.png",width = 2.5,height = 3,units = "in",dpi = 500)
+ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5e.pdf",device = "pdf",width = 2.5,height = 3)
 ```
+
+
+```{r}
+auc_df %>% 
+  group_by(imptype, dataset) %>% 
+  summarize(AUC_ave=round(mean(AUC, na.rm=T),2))
+
+sig_res1 <- auc_df %>% 
+  nest_by(dataset) %>% 
+  ungroup() %>% 
+  mutate(test_res= map(
+    .x = data, 
+    .f = function(df){
+      res= t.test(df$AUC~df$imptype) 
+      res= res%>% broom::tidy()}
+                         ))
+```
+
+
 
 Okay, lets further check unsupervised target prediction of PRISM
 There are NA because now prediction is only available for genes with signature values.
@@ -350,19 +727,19 @@ It is possible the only target gene of a drug does not have prediction value hen
 
 check where the function is defined
 ```{r,r,fig.width=4, fig.height=3}
-PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
-source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/plot_ave_roc.R")
-plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
-               filter(drug %in% prism_good_drug_list_200),
-             title = "Best fitted drugs",addlegend = F)
-
-plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
-               filter(drug %in% prism_bad_drug_list_200),
-             title = "Worst fitted drugs",addlegend = F)
-
-plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
-               filter(drug %in% prism_drug_list_drh),
-             title = "All drugs")
+# PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
+# source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/plot_ave_roc.R")
+# plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
+#                filter(drug %in% prism_good_drug_list_200),
+#              title = "Best fitted drugs",addlegend = F)
+# 
+# plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
+#                filter(drug %in% prism_bad_drug_list_200),
+#              title = "Worst fitted drugs",addlegend = F)
+# 
+# plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
+#                filter(drug %in% prism_drug_list_drh),
+#              title = "All drugs")
 # load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 # prism_auc_comparison <-  prism_unsupervised_auc %>% filter(drug %in% prism_drug_list_drh)
 ```

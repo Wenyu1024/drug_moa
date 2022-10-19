@@ -14,3 +14,7 @@ sensitivity_fitting/forward_modelling/message/
 *png
 *tiff
 *gmt
+.gitignore
+*fig_res/
+*.gitignore
+
