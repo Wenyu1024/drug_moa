@@ -23,11 +23,9 @@ checking whether there are failed jobs
 
 # 1 CTRP
 
-add auc, and spearman cor.
- because rmse or mae are influenced by the value,
- I should standardize y before calculation.
- 
- note binarization may lead to only one class (no sensitive cell lines.)
+
+Because rmse or mae are influenced by the value, I standardized the AUC before calculation.
+note binarization may lead to only one class (no sensitive cell lines.)
 ```{r}
 load("~/cluster_scratch/forward_modelling/ctrp_input.RData")
 ctrp_data <- data
@@ -97,23 +95,6 @@ res_ctrp2 <- res_ctrp1 %>%
       bind_cols(drug_id= 1:545)
   ) %>% 
   mutate(drug_pair= str_detect(cpd_smiles, "\\."))
-
-# res_ctrp2 <- res_ctrp1 %>% 
-#   select(-drug) %>% 
-#   bind_cols(ctrp_data) %>% 
-#   mutate(sample_size= map_int(.x=sensitivity, 
-#                               .f=function(x){sum(x %>% pull(DepMap_ID) %in% ces1$DepMap_ID)})) %>%
-#   select(-target, -sensitivity) %>% 
-#   bind_cols(
-#     res_ctrp %>% 
-#       select(ces,drug) %>%
-#       group_by(drug) %>% 
-#       summarize(ces_variance= var(ces)) %>% 
-#       ungroup() %>% 
-#       arrange(drug) %>% 
-#       select(-drug)
-#   ) %>% 
-#   mutate(drug_pair= str_detect(cpd_smiles, "\\."))
 ```
 
 
@@ -359,15 +340,6 @@ sig_res <-
 
 ```
 
-
-In general whether method is really difference
-```{r}
-# tmp <- aov(estimate ~.metric+dataset+input,data= combined_performance3)
-# summary(tmp)
-# TukeyHSD(tmp, which = "input", paired=T) 
-# no this result is not valid as explaination for estimate is different for each metric, I need split by .metric and then check. At least split by the directions.
-```
-
 ```{r}
 save.image("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
 ```
@@ -408,8 +380,6 @@ ddummy = tibble(
     labels = c("RMSE", "ROC-AUC") )
 )
 
-# my_comparisons <- list(c("CES", "EXP"), c("CERES", "EXP"), c("DEMETER2", "EXP"),c("CES", "CERES"), c("CERES", "DEMETER2"), c("DEMETER2", "CES"))
-
 fig <- combined_performance3 %>%   
   filter(dataset !="prism") %>%
   mutate(input= toupper(input)) %>%
@@ -419,20 +389,13 @@ fig <- combined_performance3 %>%
                          levels = c("rmse", "roc_auc"),
                          labels = c("RMSE", "AUROC"))) %>% 
   ggplot(mapping = aes(x=input, y= estimate, fill=input)) +
-  # geom_boxplot()+
   geom_violin()+
   geom_blank(data = ddummy,aes(x= input, y = ymax)) +
-  # stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
-  #            colour = "black")+
   facet_grid(rows = vars(.metric),cols=vars(dataset),
              scale="free", space= "free_x", switch="y")+
   ggpubr::stat_compare_means(method = "anova",
                              paired = T,
                              label.y.npc = 0.95,label.x.npc = 0.05)+
-                             #label.x.npc = "left")+
-  # ggpubr::stat_compare_means(method = "t.test",label= "p.signif",
-  #                            paired = T,comparisons = my_comparisons,
-  #                            label.y.npc = 0.85)+
   theme_classic()+
   xlab("")+   ylab("Model fitness")+ 
   theme(legend.position="top", legend.title = element_blank(),
@@ -469,20 +432,13 @@ fig <- combined_performance3 %>%
                          levels = c("mae","pr_auc", "rsq", "spearman coef"),
                          labels = c("MAE","PRAUC", "R-square", "Spearman coef"))) %>%
   ggplot(mapping = aes(x=input, y= estimate, fill=input)) +
-  # geom_boxplot()+
   geom_violin()+
   geom_blank(data = ddummy,aes(x= input, y = ymax)) +
-  # stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
-  #            colour = "black")+
   facet_grid(rows = vars(.metric),cols=vars(dataset),
              scale="free", space= "free_x", switch="y")+
   ggpubr::stat_compare_means(method = "anova",
                              paired = T,
                              label.y.npc = 0.95,label.x.npc = 0.05)+
-                             #label.x.npc = "left")+
-  # ggpubr::stat_compare_means(method = "t.test",label= "p.signif",
-  #                            paired = T,comparisons = my_comparisons,
-  #                            label.y.npc = 0.85)+
   theme_classic()+
   xlab("")+   ylab("Model fitness")+ 
   theme(legend.position="top", legend.title = element_blank(),
@@ -538,29 +494,16 @@ sig_res1 <-
   unnest(cols = c(DunnettTest_res))
 ```
 
-the Dunnett test is not directly avaliable in ggpubr
 
-https://www.datanovia.com/en/blog/ggpubr-how-to-add-p-values-generated-elsewhere-to-a-ggplot/#:~:text=GGPUBR%3A%20How%20to%20Add%20P%2DValues%20Generated%20Elsewhere%20to%20a%20GGPLOT,-Alboukadel&text=The%20following%20key%20ggpubr%20functions,label%20annotation%20to%20a%20ggplot.
 ```{r,fig.height=4,fig.width=8}
-# plot_df1  %>%filter(input=="CERES") %>%
-#   count(dataset,input,sample_size)
-
-# my_comparisons <- list(c("100", "200"), c("100", "300"), c("100", "400"),c("100", "500"))
 stat.test <-sig_res1 %>% 
   separate(comparison, "-", into= c("group1","group2")) %>% 
   mutate(p.signif= "****") 
 stat.test
 
-
 fig <- plot_df1 %>% 
   ggplot(mapping = aes(x=sample_size, y= variance, fill=input)) +
   geom_violin()+
-  # ggpubr::stat_compare_means(aes(group=sample_size),method = "anova",label.y = 0.006,label.x = 2)+
-  # ggpubr::stat_compare_means(
-  #   aes(group=sample_size),label = "p.signif",label.y = 0.006,
-  #   method = "t.test",vjust = 0.4,tip.length = 0.01,bracket.size=0.1,
-  #   comparisons = my_comparisons)+
-  #   # ref.group = "100")+
   ggpubr::stat_pvalue_manual(data = stat.test, x= "group1", y.position = 0.006,label= "p.signif")+
   facet_grid(cols = vars(input),rows= vars(dataset),switch = "y")+
   theme_classic()+
@@ -574,134 +517,15 @@ ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_model
 ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2D.png",width = 8,height = 4,dpi = 500,bg="transparent")
 ```
 
-Compare CTRP and GDSC differences
-Combine the gdsc id back to compare with the ctrp
-gdsc id is used to extract a pubchem cid tibble and then cross-referenced to prism to get broad_id
-
-To investigate how disparerances between different drug screening dataset impact the model fitting, we compared the correlation of CES fitting accuracy between CTRP and GDSC drug sensitivity dataset. We noticed that despite prediction accuracy was systematically higher in CTRP, drugs that are better fitted in CTRP and also better fitted using the GDSC (Figure 2F, 41 drugs). The correlation of fitting accuracy between CTRP and GDSC was even higher with sample size difference controlled (sample size difference <100, n = 10 drugs, spearman correlation= 0.84, p= 4.5E-03). This suggested that the reconstruction of drug response from essentiality scores are robust across different drug screening dataset. 
-
-```{r,fig.width=2, fig.height=2}
-# id_mapping_gdsc <- read_csv("~/cluster_scratch/prior/drug_id_list/cross_ref_tibble_gdsc")
-# 
-# shared_drugs <- id_mapping_gdsc %>% 
-#   filter(BROAD_ID  %in% res_ctrp2$broad_cpd_id)
-# 
-# shared_drug_acc_comparison <- shared_drugs %>%
-#   inner_join(y= res_ctrp2 %>% 
-#                select(input,.metric, estimate, broad_cpd_id,sample_size) 
-#              , 
-#              by=c("BROAD_ID"= "broad_cpd_id")
-#              ) %>%
-#   inner_join(y= res_gdsc2 %>%  
-#                select(input,.metric, estimate, DRUG_ID,sample_size) , 
-#              by=c("DRUG_ID", "input", ".metric")) %>% 
-#   filter(sample_size.x>100) %>% 
-#   filter(sample_size.y>100) %>% 
-#   group_by(input, .metric) %>% 
-#   nest()  %>% 
-#   mutate(
-#     test = map(data, ~ cor.test(.x$estimate.x, .x$estimate.y,method = "spearman") %>% tidy)
-#     ) %>% 
-#   unnest(test) 
-# View(shared_drugs)
-# 
-# 
-# rmse_comparison <- shared_drug_acc_comparison[[3]][[9]] %>% 
-#   mutate(sample_difference= abs(sample_size.x -sample_size.y) ) 
-#   
-# fig <- shared_drug_acc_comparison[[3]][[9]] %>%
-#   ggplot(aes(x = estimate.x, y = estimate.y))+
-#   geom_point()+
-#   theme_classic()+
-#   ylab("RMSE CTRP")+
-#   xlab("RMSE GDSC")
-#   # ggtitle("Spearman COR 0.74, \
-#   #         p= 1.96E-07")
-# fig
-# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2C.pdf",width = 3,height = 3)
-# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/fig_res/fig 2C.tiff",width = 3,height = 3)
-# 
-# tmp <- shared_drug_acc_comparison %>%
-#   mutate(sample_size_diff= abs(sample_size.x-sample_size.y)) %>%
-#   filter(sample_size_diff < 100)
-# 
-# 
-# # cor(tmp$ces.x, tmp$ces.y,method = "pearson")
-# cor.test(tmp$ces.x, tmp$ces.y,method = "spearman")
-
-```
-  
-#there are 49 shared drugs. randomly sample 49 drugs from ctrp and gdsc, calculate their correlations.
-# do this for rsme or all the features?
-
-# a heat map showing rmse cor heat map across shared drugs between ctrp and gdsc
-
-
-# shared_drug_acc_comparison2 <- shared_drugs %>% 
-#   inner_join(
-#     y= ctrp_data %>% 
-#        rownames_to_column() %>% 
-#        select(rowname,broad_cpd_id) %>% 
-#        mutate(rowname= as.integer(rowname))
-#     , 
-#     by=c("BROAD_ID"= "broad_cpd_id")) %>%
-#   inner_join(y= res_ctrp %>% rename(estimate_ctrp = .estimate)
-#            , 
-#            by=c("rowname"= "drug_id")
-#            ) %>%
-#   select(-rowname) %>% 
-#   inner_join(
-#     y= gdsc_data %>% 
-#       rownames_to_column() %>% 
-#       select(rowname,DRUG_ID) %>% 
-#       mutate(drug_id= as.integer(rowname)) %>% 
-#      select(-rowname)
-#     , 
-#     by="DRUG_ID") %>%
-#   inner_join(y= res_gdsc %>% rename(estimate_gdsc = .estimate)
-#            , 
-#            by=c("drug_id","id", "id2", ".metric", ".estimator", "input" )
-#            ) %>% 
-#   select(-drug_id)
-#  
-#   
-# shared_drug_acc_comparison3 <- shared_drug_acc_comparison2 %>% 
-#   filter(input=="ces") %>% 
-#   filter(.metric == "rmse")
-# 
-# shared_drug_acc_comparison3 %>%   
-#   group_by_at(1:3) %>%
-#   summarize(cor_spearman= cor(.data$estimate_ctrp, .data$estimate_gdsc, method = "spearman")) %>%
-#   ungroup()
-# 
-# shared_drug_acc_comparison_ctrp <- shared_drug_acc_comparison3 %>% 
-#   pivot_wider(id_cols = BROAD_ID, names_from= id:id2, values_from= estimate_ctrp)
-#   
-# shared_drug_acc_comparison_gdsc <- shared_drug_acc_comparison3 %>% 
-#   pivot_wider(id_cols = BROAD_ID, names_from= id:id2, values_from= estimate_gdsc)  
-# 
-# 
-# cor_matrix <- cor(
-#   x = shared_drug_acc_comparison_ctrp %>% select(-BROAD_ID) %>% as.matrix() %>% t(),
-#   y =  shared_drug_acc_comparison_gdsc %>% select(-BROAD_ID) %>% as.matrix() %>% t(),
-#   method = "spearman"  )  
 
 
 
-dot and line plot showing that CI of sen fitting acc between different features 
-are largely overlapping with each other
-https://stackoverflow.com/questions/16463325/shading-confidence-intervals-manually-with-ggplot2
-
-
+Figure 2 C
 Showing how three versions of essentiality deconvolution results are not significantly different from each other.
 derive the difference between ceres, ces, demeter from combined performance and
 then use it together with CI from performance_difference_test_res1 object
-
-Figure 2 C
-
 ```{r}
 # most drugs are insignificant after multiple test correction of significance.
-# plot two pie charts out of this?
 load("~/cluster_scratch/forward_modelling/performance_testres/output_ceresbased.RData")
 # report numbers 
 # 545+198=743
@@ -770,10 +594,7 @@ plot_df <- bind_rows(roc_auc_diff_drug_level1, roc_auc_diff_drug_level2)  %>%
 ```{r, fig.width=3, fig.height=4}
 fig <- plot_df%>% 
   ggplot(aes(x=ID)) + 
-  # geom_point(aes(y=ces_ceres_diff), size = 0.1)+
   geom_errorbar(aes(ymin=lower_ci, ymax=upper_ci), width=.1,alpha= 0.3) +
-  # geom_line(aes(x=ces, y=ces_ceres_diff, colour=dataset))+
-  # geom_ribbon(aes(ymin=lower_ci, ymax=upper_ci), fill= "grey70")+
   geom_hline(yintercept = 0,color= "red", lty=2)+
   facet_grid(rows = vars(diff_type),cols= vars(dataset),scales = "free",switch="y")+
   theme_classic()+
@@ -789,7 +610,6 @@ ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_model
 
 ```{r}
 save.image("~/cluster_scratch/forward_modelling/forwardmodelling_paper_result.RData")
-
 write_csv(sig_res, "sig_res.csv")
 write_csv(sig_res1, "sig_res1.csv")
 write_csv(roc_auc_diff_drug_level1, "roc_auc_diff_drug_level1.csv")

@@ -57,27 +57,6 @@ prism_sc_drug <-  prism_sc_data %>%
   summarize(target = paste(target, collapse = ","),
             moa= paste(moa, collapse = ",")) 
 # write_csv(prism_sc_drug, "~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
-
-
-# drug_by_category <-  prism_sc_data %>% 
-#   select(broad_id, target, phase) %>% 
-#   left_join(prism_drugs %>% select(broad_id, drug_category)) %>% 
-#   distinct() %>% 
-#   separate(col = broad_id, 
-#            into=c("BRD","id", NA), 
-#            sep = "-", remove = T, extra= "drop" ) %>% 
-#   unite("broad_id", BRD:id, sep = "-") %>%
-#   filter(broad_id %in% prism_data$BROAD_ID) %>% 
-#   filter(!is.na(drug_category)) %>%
-#   group_by(broad_id, phase, drug_category) %>% 
-#   summarize(target = paste(target, collapse = ",")) 
-
-table(prism_sc_drug %>%  filter(drug_category=="noncancer") %>% pull(phase))
-
-tmp <- prism_sc_drug %>% 
-  filter(target=="NA")
-
-tmp1 <- tmp %>% filter(moa=="NA")
 ```
 Annotations proportions
 
@@ -88,8 +67,6 @@ check specifically how many drug target pairs available for different target
 
 Figure 5A
 ```{r,fig.height=3.5, fig.width=3.6}
-
-
 # 1448 drugs including the withdrawn drugs. Could the withdrawn be due to the wrong target information that lead to unexpected result?
 # there are too little of them to draw conclusions.
 
@@ -206,77 +183,6 @@ fig <- targetinfo_drug_by_category %>%
 
 # 2
 Explaining the sensitivity fitting accuracy of PRISM
-Bimodality coefficient and fitting accuracy 
-```{r,fig.width=4,fig.height=4}
-# bimodality <- read_csv("~/cluster_scratch/prism/biomodality.csv") %>% 
-#   separate(col = broad_id, 
-#            into=c("BRD","id", NA), 
-#            sep = "-", remove = T, extra= "drop" ) %>% 
-#   unite("drug", BRD:id, sep = "-") %>% 
-#   group_by(drug) %>% 
-#   summarise(bimodality_coefficient= median(bimodality_coefficient))
-
-# bimodality_coefficient <- function(x, na.rm=FALSE) {
-#   
-#   # Remove missing values, if desired
-#   if (na.rm) {
-#     x <- x[!is.na(x)]
-#   }
-#   
-#   n <- length(x)
-#   if (n == 0) {
-#     # The coefficient is not defined for
-#     # empty data
-#     return(NaN)  
-#   } else {
-#         
-#     m3 <- psych::skew(x, type=2)
-#     m4 <- psych::kurtosi(x, type=2)
-#     
-#     # Calculate the coefficient based on
-#     # the above
-#     bc <- (m3^2 + 1) /
-#       (m4 + 3 * ((n - 1)^2 / ((n - 2) * (n - 3))))
-#     
-#     return(bc)
-#   }
-#   
-# }
-# 
-# bimodality <- prism_data %>% 
-#   mutate(bi_coef= map_dbl(sensitivity,
-#                           .f =function(x){
-#                             tmp <- bimodality_coefficient(x$auc)
-#                           }  )) %>% 
-#   select(BROAD_ID, bi_coef)
-# write_csv(bimodality, "~/cluster_wrk/drug_moa/predicting_prism/bimodality_coef_auc.csv")
-# 
-#   
-# tmp <- inner_join(x = res_prism2, y = bimodality,by= "BROAD_ID") %>% 
-#   mutate(acc_sen= (ceres+ces+demeter2)/3) %>% 
-#   filter(sample_size>100)
-# 
-# fig <- tmp %>% 
-#   mutate(drug_category= fct_relevel(drug_category, levels= c("targeted cancer", "chemo", "noncancer") )) %>% 
-#   ggplot(aes(y=acc_sen , x= bi_coef,color= drug_category)) + 
-#   geom_point(size = 0.2)+
-#   geom_smooth(method = "lm", se = FALSE)+
-#   theme_classic()+
-#   ylab("Sensitivity fitting accuracy")+
-#   xlab("Bimodality coefficient")+
-#   guides(color= guide_legend(title = "Drug Category"))+
-#   theme(
-#     legend.position = c(1, 0.00),
-#     legend.justification = c("right", "bottom"),
-#     legend.box.just = "right"
-#     )+
-#   scale_color_aaas()
-# 
-# 
-# fig <- ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T) 
-# fig
-```
-
 report the sensitivity fitting accuracy
 ```{r}
 load("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
@@ -323,11 +229,6 @@ acc_dunnett <- data.frame(
 sig_res <- bind_rows(error_dunnett, acc_dunnett)
 write_csv(sig_res, "sig_res.csv")
 ```
-
-jing proposed that the mean/variance of drug sensitivities
-may also impact sensitivity fitting accuracy
-
-generate mean and variance based on the prism_data object
 
 ```{r}
 get_auc_mean <- function(df){mean(df$auc, na.rm = T)}
@@ -524,44 +425,6 @@ write_csv(sig_res1, "sig_res1.csv")
 Explore the supervised prediction of PRISM with different fitting accuracy
 ```{r}
 load("~/cluster_scratch/forward_modelling/targetpred_output_prismgoodbadexplore1.RData")
-
-# df <- bind_rows(
-#   acc_df_prism_binary_fold_cv_good200 %>% 
-#     mutate(fitting_quality= "Top"),
-#   acc_df_prism_binary_fold_cv_bad200 %>% 
-#     mutate(fitting_quality= "Bottom"),
-#   acc_df_prism_binary_fold_cv %>% 
-#     mutate(fitting_quality= "All")   
-#   ) %>% 
-#   mutate(fitting_quality= 
-#            fct_relevel(fitting_quality, c("All", "Top", "Bottom"))) %>%
-#   mutate(method= factor(
-#     method,
-#     levels = c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS"),
-#     labels = c("ConSen-sig", "ConExp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" ),
-#     ) )
-# sig_res2 <- df %>% 
-#   nest_by(fitting_quality) %>% 
-#   ungroup() %>% 
-#   mutate(aov_p_value=map_dbl(
-#     .x = data, 
-#     .f = function(df){
-#         res= aov(acc~method,data = df)
-#         res= summary(res)[[1]][[5]][[1]] 
-#         return(res)
-#     } 
-#                  )) %>% 
-#   mutate(Test_res=map(
-#     .x = data, 
-#     .f = function(data){
-#       res=DescTools::DunnettTest(data$acc, g= data$method)
-#       res= tibble(comparison= row.names(res[[1]]),
-#                   diff= res[[1]][,1],
-#                   p.value= res[[1]][,4])     
-#       return(res)
-#     }
-#                  ))
-
 get_supervised_df <- function(good_df, bad_df){
    df <- bind_rows(
     good_df %>% mutate(fitting_quality= "Top"),
@@ -634,25 +497,6 @@ ggsave(fig,filename = "~/cluster_wrk/drug_moa/predicting_prism/fig_res/fig5d.pdf
 ```
 
 ```{r}
-#How about not comparing to other signatures
-  # my_comparison1 <- list(c("Top", "All"), c("Top", "Bottom"), c("All", "Bottom"))
-  # df %>% 
-  #   filter(method %in% c("Ess-sig")) %>% 
-  #   ggplot(aes(y=acc, x= fitting_quality)) + 
-  #   geom_violin()+
-  #   ggpubr::stat_compare_means(
-  #     aes(group=fitting_quality),label = "p.signif",
-  #     method = "t.test",comparisons = my_comparison1,vjust = 0.4)+
-  #   stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
-  #            colour = "black",position = position_dodge(width = 0.9),size=0.2)+
-  #   ggsci::scale_fill_npg()+
-  #   ggsci::scale_color_npg()+
-  #   # facet_wrap(~fitting_quality)+
-  #   theme_classic()+
-  #   ylab(label = "Supervised Target Prediction (AUC)")+
-  #   theme(axis.title.x = element_blank())
-
-  
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 unsupervised_df <- bind_rows(
   prism_unsupervised_auc %>% 
@@ -718,81 +562,3 @@ sig_res1 <- auc_df %>%
       res= res%>% broom::tidy()}
                          ))
 ```
-
-
-
-Okay, lets further check unsupervised target prediction of PRISM
-There are NA because now prediction is only available for genes with signature values.
-It is possible the only target gene of a drug does not have prediction value hence the AUC is not available. 
-
-check where the function is defined
-```{r,r,fig.width=4, fig.height=3}
-# PRISM_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/PRISM_binary_PPIold_data.csv")
-# source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/plot_ave_roc.R")
-# plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
-#                filter(drug %in% prism_good_drug_list_200),
-#              title = "Best fitted drugs",addlegend = F)
-# 
-# plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
-#                filter(drug %in% prism_bad_drug_list_200),
-#              title = "Worst fitted drugs",addlegend = F)
-# 
-# plot_ave_roc(annotated_pred_df = PRISM_binary_PPIold_data %>% 
-#                filter(drug %in% prism_drug_list_drh),
-#              title = "All drugs")
-# load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
-# prism_auc_comparison <-  prism_unsupervised_auc %>% filter(drug %in% prism_drug_list_drh)
-```
-
-
-
-ConSensig unsupervised prediction acc and sen fitting acc, by drug type
-also use a scatter plot + marginal boxplot
-fitting accuracy against unsupervised target prediction.
-```{r,fig.width=5,fig.height=5}
-# tmp <- inner_join(x = res_prism2, 
-#                   y = prism_auc %>% filter(imptype== "ConSen-Sig"),
-#                   by= c("BROAD_ID" = "drug")) %>% 
-#   mutate(acc_sen= (ceres+ces+demeter2)/3) %>% 
-#   filter(sample_size>100) %>% 
-#   drop_na()
-
-# # Does withdrawn dr has bad fitting acc (no use for the paper)
-# tmp1 <-  prism_sc_data %>% 
-#   select(broad_id, target, phase) %>% 
-#   left_join(prism_drugs %>% select(broad_id, drug_category)) %>% 
-#   distinct() %>% 
-#   separate(col = broad_id, 
-#            into=c("BRD","id", NA), 
-#            sep = "-", remove = T, extra= "drop" ) %>% 
-#   unite("broad_id", BRD:id, sep = "-") %>%
-#   filter(broad_id %in% prism_data$BROAD_ID) %>% 
-#   filter(!is.na(drug_category)) %>% 
-#   group_by(broad_id, phase, drug_category) %>% 
-#   summarize(target = paste(target, collapse = ",")) 
-# 
-# tmp2 <- tmp1 %>% 
-#   filter(phase== "Withdrawn") %>% 
-#   inner_join(tmp,by=c("broad_id"= "BROAD_ID"))
-
-# fig <- tmp %>% 
-#   mutate(drug_category= fct_relevel(drug_category, levels= c("targeted cancer", "chemo", "noncancer") )) %>% 
-#   ggplot(aes(y= AUC, x= acc_sen,color= drug_category)) + 
-#   geom_point(size = 0.5,position = "dodge")+
-#   # geom_smooth(method = "lm", se = FALSE)+
-#   theme_classic()+
-#   ylab("Unsupervised target prediction")+
-#   xlab("Sensitivity fitting accuracy")+
-#   guides(color= guide_legend(title = "Drug Category"))+
-#   theme(
-#     legend.position = c(1, 0.00),
-#     legend.justification = c("right", "bottom"),
-#     legend.box.just = "right"
-#     )+
-#   scale_color_aaas()
-#   # annotate("COR ", x = 4, y = 25, label = "Some text")+
-# fig 
-#   ggExtra::ggMarginal(fig,groupColour = T,groupFill = T,size = 5,position = "dodge") 
-```
-
-
