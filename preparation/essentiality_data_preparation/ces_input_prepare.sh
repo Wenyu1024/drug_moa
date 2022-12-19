@@ -9,7 +9,8 @@
 #SBATCH --mem-per-cpu=10000
 
 # Load r-env-singularity
-module load r-env-singularity/4.0.2
+# module load r-env-singularity/4.0.2
+module load r-env-singularity
 
 # Clean up .Renviron file in home directory
 # if test -f ~/.Renviron; then

@@ -3,7 +3,7 @@ title: "Non-oncology drug validation"
 output: html_notebook
 ---
 
-```{r}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tidymodels)
@@ -13,14 +13,12 @@ library(fgsea)
 
 
 ```{r}
-
 load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
 rm(get_target_mat)
 rm(no_tunning_weighted_averaging)
 rm(get_target_pred_accuracy_batch)
 rm(return_acc_estimate_cv)
 # note the unsupervised auc is precalculated in get_unsupervised_target_prediction_auc.R code
-
 ```
 
 
@@ -92,6 +90,8 @@ prism_good_fitted_drugs_dtcannotated <- prism_good_fitted_drugs %>%
 #   filter(drug_category== "noncancer") %>% 
 #   arrange(BROAD_ID ) %>% 
 #   filter(is.na(moa))
+
+save(list = c("prism_data", "prism_target_binary", "prism_target_dtc"), file= "./fig_res/putative_targetinfo.RData")
 ```
 
 get hgsoc sensitivity for all 63 noncancer drugs
@@ -122,15 +122,14 @@ prism_63_sen_hgsoc <- full_join(
 
 # tmp <- prism_data %>% filter(BROAD_ID %in% prism_good_fitted_nononcologydrugs) %>% 
 #   filter(!(BROAD_ID  %in% prism_good_fitted_drugs_drhannotated )) %>%  select(BROAD_ID, moa)
-
-source("~/cluster_wrk/drug_moa/supervised_target_pred/function/get_target_pred_supervised.R")
-source('~/cluster_wrk/drug_moa/supervised_target_pred/function/return_acc_estimate_loocv.R')
 ```
 
 
 
 Now use the 268 drugs as the training set to predict the targets for the drugs of interest
 ```{r}
+source("~/cluster_wrk/drug_moa/supervised_target_pred/function/get_target_pred_supervised.R")
+source('~/cluster_wrk/drug_moa/supervised_target_pred/function/return_acc_estimate_loocv.R')
 prism_drh_predictions <- get_predictions(
   sig_data=feature_imp_ridge_prism_comb1,
   train_drugs=prism_good_fitted_drugs_drhannotated,
@@ -147,10 +146,11 @@ setwd("~/cluster_wrk/drug_moa/predicting_prism")
 write_csv(prism_drh_predictions, "./fig_res/prism312_drh_predictions.csv")
 write_csv(prism_unsupervised,path = "./fig_res/prism312_unsupervised.csv")
 ```
-
+y
 
 ```{r}
-rm()
+rm(list= ls())
+load("./fig_res/putative_targetinfo.RData")
 prism_drh_predictions <- read_csv("../predicting_prism/fig_res/prism312_drh_predictions.csv")
 prism_unsupervised <- read_csv("../predicting_prism/fig_res/prism312_unsupervised.csv")
 
@@ -164,21 +164,27 @@ PISA_summary <- read_csv( "~/cluster_wrk/sen_tar_validation/data/inputdata/pisa_
 PISA_summary <- PISA_summary %>% 
   janitor::clean_names() %>% 
   filter(!is.na(gene_symbol))%>%  
-  inner_join(senvalid_20drugs %>% select(Drug_name, drugid),  by=c("drug_name"="Drug_name"))
+  inner_join(senvalid_20drugs %>% select(Drug_name, drugid),  by=c("drug_name"="Drug_name")) %>% 
+  group_by(drugid, drug_name, gene_symbol) %>%
+  slice_min(p_value) %>%
+  ungroup() %>% 
+  mutate(p_adj=p.adjust(p_value, method = "fdr")) 
 
 PISA_summary <- janitor::clean_names(PISA_summary)
 
 # PISA_summary %>% group_by(drug_name) %>% summarise(res= length((gene_symbol)))
 # PISA_summary %>% group_by(drug_name) %>% summarise(res= length(unique(gene_symbol)))
 #there are duplicates in gene names, summarize by score
+hist(PISA_summary$log2_fc)
 
-PISA_summary_simplified <- PISA_summary %>% 
-  select(drugid, drug_name, gene_symbol, fc, p_value,score,log10_p, log2_fc) %>%
-  # nest_by(drugid, drug_name, gene_symbol) %>% 
-  # ungroup()
-  group_by(drugid, drug_name, gene_symbol) %>% 
-  slice_min(p_value) %>% 
-  ungroup()
+# PISA_summary_simplified <- PISA_summary %>% 
+#   select(drugid, drug_name, gene_symbol, fc, p_value,score,log10_p, log2_fc) %>%
+#   # nest_by(drugid, drug_name, gene_symbol) %>% 
+#   # ungroup()
+#   group_by(drugid, drug_name, gene_symbol) %>% 
+#   slice_min(p_value) %>% 
+#   ungroup()
+
 
 prism_drh_pred20 <- prism_drh_predictions %>% 
   select(one_of(c("BROAD_ID", senvalid_20drugs$drugid))) %>% 
@@ -188,16 +194,188 @@ prism_drh_pred20 <- prism_drh_predictions %>%
 prism_unsupervised_pred20 <- prism_unsupervised %>% 
   select(one_of(c("target", senvalid_20drugs$drugid))) %>% 
   pivot_longer(cols= 2:21,names_to="drug_id", values_to="unsup_pred_score")
+```
+
+
+```{r}
+# log2(TPM+1) psedo count
+exp_seq_kuramochi <- read_csv("~/cluster_scratch/ces_21q1_io/exp_seq_tidy.csv") %>% 
+  filter(DepMap_ID== 'ACH-000524') %>% 
+  pivot_longer(cols = - DepMap_ID, names_to= "gene", values_to="exp_tpm_rsem") 
+
+exp_seq_kuramochi %>% 
+  filter(gene %in% unique(PISA_summary$gene_symbol)) %>% 
+  ggplot()+
+  geom_histogram(aes(exp_tpm_rsem))+
+  xlab("log2(TPM+1)")
+exp_gene_c2 <- exp_seq_kuramochi%>% 
+  filter(exp_tpm_rsem>2) %>% 
+  pull(gene)
+```
+
+
+```{r}
+tmp <- full_join(
+  prism_drh_pred20, 
+  PISA_summary  %>% 
+    select(drug_name, gene_symbol, drugid, score),
+  by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
+  filter(!is.na(drug_name)) %>% 
+  nest_by(drug_id, drug_name) %>% 
+  ungroup() %>% 
+  mutate(cor= map_dbl(.x = data, 
+                      .f = function(df){
+                        df= df %>% filter(_c2)
+                        cor(df$sup_pred_score, df$score, use = "complete.obs")}))
+
+tmp1 <- full_join(
+  prism_unsupervised_pred20, 
+  PISA_summary  %>% 
+    select(drug_name, gene_symbol, drugid, score),
+  by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
+  filter(!is.na(drug_name)) %>% 
+  nest_by(drug_id, drug_name) %>% 
+  ungroup() %>% 
+  mutate(cor= map_dbl(.x = data, 
+                      .f = function(df){
+                        df= df %>% filter(exp_gene_c2)
+                        cor(df$unsup_pred_score, df$score, use = "complete.obs")}))
+```
+
+Check PISA result with expression
+```{r}
+
+
+#filter out the non expressing genes from PISA as they are false positive result.
+# use threshold 2 for log2(TPM+1) play with this threshold to get better results.
+
+
+# in general pisa result is not correlated with gene expression
+inner_join(exp_seq_kuramochi, PISA_summary, by=c("gene"= "gene_symbol")) %>% 
+  nest_by(drug_name, drugid) %>% 
+  ungroup() %>% 
+  mutate(cor= map_dbl(.x = data, 
+                      .f = function(df){cor(df$exp_tpm_rsem, df$score, use = "complete.obs")})) %>% 
+  select(-data) %>%
+  mutate(cor= round(cor,2)) %>% 
+  arrange(desc(cor)) %>% 
+  View()
+
+#however there is still false positive result which should be removed.
+
+inner_join(exp_seq_kuramochi,  <- , by=c("gene"= "gene_symbol")) %>% 
+  mutate(exp_status= (exp_tpm_rsem>2)) %>% 
+  ggplot(aes(exp_status, log10(score)))+
+  geom_violin()+
+  ggpubr::stat_compare_means(method = "t.test")
+
 
 ```
 
 
-run a correlation analysis, correlation analysis is not a good way to estimate consistency
+check whether PISA result recapulate putative targets
 ```{r}
-tmp <- full_join(
+pisa_drh <- prism_target_binary %>% 
+  filter(drug %in% prism_drh_pred20$drug_id) %>% 
+  left_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol"))
+
+t.test(pisa_drh$score, PISA_summary$score)
+
+prism_target_binary %>% 
+  mutate(binding_score=1) %>% 
+  filter(drug %in% prism_drh_pred20$drug_id) %>% 
+  right_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
+  mutate(putative= !(is.na(binding_score))) %>% 
+  ggplot(aes(putative, log10(score)))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
+ 
+pisa_dtc <- prism_target_dtc %>% 
+  filter(drug %in% prism_drh_pred20$drug_id) %>% 
+  left_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol"))
+
+cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
+
+pisa_dtc %>% 
+  drop_na() %>% 
+  ggplot(aes(score, binding_score))+
+  geom_point()+
+  ylab("dtc_score")+
+  xlab("pisa_score")
+
+# only one drug are widely avaliable BMS-387032
+
+prism_target_dtc %>% 
+  filter(drug == "BRD-K43389698") %>%
+  # filter(drug %in% pisa_dtc$drug) %>%  
+  right_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
+  mutate(putative= case_when(binding_score>0.4~ "yes",
+                             (binding_score <= 0.4)|(is.na(binding_score))~ "no")) %>% 
+  ggplot(aes(putative, log10(score)))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
+
+cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
+
+cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "kendall")
+
+# whether the primary targets are  prioritized in PISA result
+# cannot do enrichment analysis since there are too little
+```
+
+what if I filter out false positive PISA result?
+```{r}
+PISA_summary_expfiltered <- PISA_summary %>% filter(gene_symbol %in% exp_gene_c2) 
+pisa_drh <- prism_target_binary %>% 
+  filter(drug %in% prism_drh_pred20$drug_id) %>% 
+  left_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol"))
+
+t.test(pisa_drh$score, PISA_summary_expfiltered$score)
+
+prism_target_binary %>% 
+  mutate(binding_score=1) %>% 
+  filter(drug %in% prism_drh_pred20$drug_id) %>% 
+  right_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
+  mutate(putative= !(is.na(binding_score))) %>% 
+  ggplot(aes(putative, log10(score)))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
+  
+pisa_dtc <- prism_target_dtc %>% 
+  filter(drug %in% prism_drh_pred20$drug_id) %>% 
+  left_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol"))
+
+cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
+
+pisa_dtc %>% 
+  drop_na() %>% 
+  ggplot(aes(score, binding_score))+
+  geom_point()+
+  ylab("dtc_score")+
+  xlab("pisa_score")
+
+# only one drug are widely avaliable BMS-387032
+
+prism_target_dtc %>% 
+  filter(drug == "BRD-K43389698") %>%
+  # filter(drug %in% pisa_dtc$drug) %>%  
+  right_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
+  mutate(putative= case_when(binding_score>0.4~ "yes",
+                             (binding_score <= 0.4)|(is.na(binding_score))~ "no")) %>% 
+  ggplot(aes(putative, log10(score)))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
+
+cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
+
+cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "kendall")
+
+tmp2 <- full_join(
   prism_drh_pred20, 
-  PISA_summary_simplified  %>% 
-    select(drug_name, gene_symbol, drugid, score),
+  PISA_summary_expfiltered  %>% 
+    # filter(log2_fc>0) %>%
+    select(drug_name, gene_symbol, drugid, score)
+  ,
   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
   filter(!is.na(drug_name)) %>% 
   nest_by(drug_id, drug_name) %>% 
@@ -205,9 +383,23 @@ tmp <- full_join(
   mutate(cor= map_dbl(.x = data, 
                       .f = function(df){cor(df$sup_pred_score, df$score, use = "complete.obs")}))
 
-tmp1 <- full_join(
+tmp2_filtered <- full_join(
+  prism_drh_pred20, 
+  PISA_summary_expfiltered  %>% 
+    filter(log2_fc>0) %>%
+    select(drug_name, gene_symbol, drugid, score)
+  ,
+  by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
+  filter(!is.na(drug_name)) %>% 
+  nest_by(drug_id, drug_name) %>% 
+  ungroup() %>% 
+  mutate(cor= map_dbl(.x = data, 
+                      .f = function(df){cor(df$sup_pred_score, df$score, use = "complete.obs")}))
+
+tmp3 <- full_join(
   prism_unsupervised_pred20, 
-  PISA_summary_simplified  %>% 
+  PISA_summary_expfiltered  %>% 
+        filter(log2_fc>0) %>% 
     select(drug_name, gene_symbol, drugid, score),
   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
   filter(!is.na(drug_name)) %>% 
@@ -217,52 +409,56 @@ tmp1 <- full_join(
                       .f = function(df){cor(df$unsup_pred_score, df$score, use = "complete.obs")}))
 ```
 
-first threshold
+Whether the top predicted targets are prioritized in the pisa result vector?
 ```{r}
-PISA_sig1 <- PISA_summary_simplified  %>% 
-  filter(p_value < 0.001) 
+# generate pathway object
+generate_pathway <- function(df= prism_drh_pred20, gene_number= 30){
+  
+  res <- df %>% 
+  rename("score"=ends_with("score")) %>% 
+  group_by(drug_id) %>% 
+  slice_max(n= gene_number,order_by=score) %>% 
+  ungroup() %>% 
+  select(drug_id, target) %>% 
+  nest_by(drug_id,.key= "genelist") %>% ungroup() %>% 
+  mutate(genelist= map(.x = genelist, ~.x$target)) 
+  res1 <- res$genelist
+  names(res1) <- res$drug_id
 
-PISA_sig2 <- PISA_summary_simplified  %>%
-  filter(p_value < 0.001) %>%
-  # filter(fc<0.5|fc>1.5)
-  filter(log2_fc>0.5|log2_fc< (-0.5))
+  candidate_gene <- df %>% 
+    select(target) %>% 
+    distinct() %>% 
+    pull(target)
+  res2 <- map(1:100, function(i){
+    set.seed(i)
+    res= sample(candidate_gene, size = gene_number)
+    return(res)} )
+  names(res2) <- paste("geneset_rdm", 1:100, sep= "_")
+  res3 <- c(res1, res2)
+  return(res3)
+}
 
-PISA_sig1 %>% count(drugid)
-# PISA_sig2 %>% count(drug_id)
-# 
-# PISA_sig %>% 
-#   count(drug_name)
+# generate 99 random pathways to be shared for all the drugs
+# the total number of pathways for each drug will be 101.
+prism_drh_pred20_pathway50 <- generate_pathway(prism_drh_pred20, 50)
+prism_unsupervised_pathway50 <- generate_pathway(prism_unsupervised_pred20, 50)
+```
 
-# whether these genes are prioritized? For each drug run a GSEA to see whether the target list are prioritized in the supervised and unsupervised list
 
-#https://www.gsea-msigdb.org/gsea/doc/GSEAUserGuideTEXT.htm#_Gene_Sets
-
-PISA_pathways <- PISA_sig1 %>% 
-  select(drug_name, gene_symbol) %>% 
-  nest_by(drug_name,.key= "genelist") %>% ungroup() %>% 
-  mutate(genelist= map(.x = genelist, ~.x$gene_symbol)) 
-
-PISA_pathways1 <- PISA_pathways$genelist
-names(PISA_pathways1) <- PISA_pathways$drug_name
-
-sup_pathways <- prism_drh_pred20 %>%
-  inner_join(senvalid_20drugs %>% select(Drug_name, drugid))
-
-  nest_by(drug_name,.key= "genelist") %>% ungroup() %>% 
-  mutate(genelist= map(.x = genelist, ~.x$gene_symbol)) 
-
-# writeGmtPathways(PISA_pathways1, "./fig_res/pisa_pathway.gmt")
-
+```{r}
+save.image("~/cluster_wrk/drug_moa/noncancer_drug_validation/tmp.RData")
+library(future)
 plan(multisession)
-res <- tmp %>%
+res2 <- tmp %>%
   mutate(pathway_res=
            furrr::future_map(
              .x= data,
              .f= function(df){
-                df <- df %>% select(1:2) %>% drop_na()
+                df <- df %>% select(c(1,3)) %>% drop_na()
                 rank <- df %>% pull(2)
                 names(rank) <-  df %>% pull(1)
-                fgseaRes <- fgsea(PISA_pathways1, rank)#, minSize  = 15,maxSize=1000)
+                # pathway= 
+                fgseaRes <- fgsea(prism_drh_pred20_pathway50, rank,scoreType = "pos")
                 fgseaRes <- fgseaRes %>% arrange(pval)
                 return(fgseaRes)}
              ,
@@ -270,39 +466,1062 @@ res <- tmp %>%
              ))
 
 plan(sequential)
+res2_flat <- res2 %>% select(-data) %>% unnest(pathway_res) %>% 
+  mutate(matched_pathway= (drug_id==pathway)
 
-  
-  
-  
+res2_flat %>% 
+  ggplot(aes(matched_pathway, ES))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
+         
+
 plan(multisession)
-   
-res1 <- tmp1 %>% 
-  mutate(pathway_res= 
+res3 <- tmp %>%
+  mutate(pathway_res=
            furrr::future_map(
              .x= data,
              .f= function(df){
-                df <- df %>% select(1:2) %>% drop_na() 
+                df <- df %>% select(c(1,3)) %>% drop_na()
                 rank <- df %>% pull(2)
                 names(rank) <-  df %>% pull(1)
-                fgseaRes <- fgsea(PISA_pathways1, rank)#, minSize  = 15,maxSize=1000)
+                fgseaRes <- fgsea(prism_unsupervised_pathway50, rank,scoreType = "pos")
                 fgseaRes <- fgseaRes %>% arrange(pval)
-                return(fgseaRes)
-                }
+                return(fgseaRes)}
              ,
              .options = furrr::furrr_options(seed = TRUE)
              ))
 plan(sequential)
 
-res_flat <- res %>% select(-data) %>% unnest(pathway_res) %>% filter(drug_name==pathway)
-res1_flat <- res1 %>% select(-data) %>% unnest(pathway_res) %>% filter(drug_name==pathway)
+res3_flat <- res3 %>% select(-data) %>% unnest(pathway_res) %>% 
+  mutate(matched_pathway= (drug_id==pathway))
+
+res3_flat %>% 
+  ggplot(aes(matched_pathway, ES))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
 ```
 
-How about the other way around?
-Use top predicted genes as the gene list and consider the pisa result as the ranked list
+
 ```{r}
+plan(multisession)
+res4 <- tmp2 %>%
+  mutate(pathway_res=
+           furrr::future_map(
+             .x= data,
+             .f= function(df){
+                df <- df %>% select(c(1,3)) %>% drop_na()
+                rank <- df %>% pull(2)
+                names(rank) <-  df %>% pull(1)
+                # pathway= 
+                fgseaRes <- fgsea(prism_drh_pred20_pathway50, rank,scoreType = "pos")
+                fgseaRes <- fgseaRes %>% arrange(pval)
+                return(fgseaRes)}
+             ,
+             .options = furrr::furrr_options(seed = TRUE)
+             ))
 
+plan(sequential)
+res4_flat <- res4 %>% select(-data) %>% unnest(pathway_res) %>% 
+  mutate(matched_pathway= (drug_id==pathway))
+
+res4_flat %>% 
+  ggplot(aes(matched_pathway, ES))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
+         
+
+plan(multisession)
+res5 <- tmp2 %>%
+  mutate(pathway_res=
+           furrr::future_map(
+             .x= data,
+             .f= function(df){
+                df <- df %>% select(c(1,3)) %>% drop_na()
+                rank <- df %>% pull(2)
+                names(rank) <-  df %>% pull(1)
+                fgseaRes <- fgsea(prism_unsupervised_pathway50, rank,scoreType = "pos")
+                fgseaRes <- fgseaRes %>% arrange(pval)
+                return(fgseaRes)}
+             ,
+             .options = furrr::furrr_options(seed = TRUE)
+             ))
+plan(sequential)
+
+res5_flat <- res5 %>% select(-data) %>% unnest(pathway_res) %>% 
+  mutate(matched_pathway= (drug_id==pathway))
+
+res5_flat %>% 
+  ggplot(aes(matched_pathway, ES))+
+  geom_boxplot()+
+  ggpubr::stat_compare_means(method = "t.test")
 ```
 
+
+```{r}
+# PISA_summary_augmented= PISA_summary %>% 
+#   mutate(exp_status= gene_symbol %in% exp_gene_c2) %>%
+#   mutate(score1= log10_p*abs(log2_fc)*(p_value<0.05)) %>%
+#   mutate(score2= p_adj*abs(log2_fc)) %>%
+#   mutate(score3= p_adj*(p_adj<0.1)*abs(log2_fc) )%>%
+#   mutate(score4= abs(log2_fc)*(p_value<0.05)) %>% 
+#   mutate(score5= (p_adj<0.25)*abs(log2_fc) ) %>%
+#   mutate(score6= (p_value<0.05) ) %>% 
+#   mutate(score7= (p_adj<0.25) ) %>% 
+#   mutate(score8= (p_adj<0.20) ) %>% 
+#   mutate(score9= (p_adj<0.15) ) %>% 
+#   mutate(score10= (p_adj<0.1) ) %>% 
+#   mutate(score11= (p_adj<0.05) ) %>% 
+#   mutate(score12= (p_value<0.05)& (abs(log2_fc)>0.322)) %>% 
+#   mutate(score13= (p_adj<0.25)& (abs(log2_fc)>0.322)) %>% 
+#   mutate(score14= (p_adj<0.20)& (abs(log2_fc)>0.322) ) %>% 
+#   mutate(score15= (p_adj<0.15)& (abs(log2_fc)>0.322) ) %>% 
+#   mutate(score16= (p_adj<0.1)& (abs(log2_fc)>0.322) ) %>% 
+#   mutate(score17= (p_adj<0.05)& (abs(log2_fc)>0.322) ) %>% 
+#   mutate(score18= (p_value<0.05)& (abs(log2_fc)>0.3785)) %>% 
+#   mutate(score19= (p_adj<0.25)& (abs(log2_fc)>0.3785)) %>% 
+#   mutate(score20= (p_adj<0.20)& (abs(log2_fc)>0.3785) ) %>% 
+#   mutate(score21= (p_adj<0.15)& (abs(log2_fc)>0.3785) ) %>% 
+#   mutate(score22= (p_adj<0.1)& (abs(log2_fc)>0.3785) ) %>% 
+#   mutate(score23= (p_adj<0.05)& (abs(log2_fc)>0.3785) ) %>% 
+#   mutate(score24= (p_adj<0.25)& (abs(log2_fc)>0.3785)) %>% 
+#   mutate(score25= (p_adj<0.20)& (abs(log2_fc)>0.3785) ) %>% 
+#   mutate(score26= (p_adj<0.15)& (abs(log2_fc)>0.3785) ) %>% 
+#   mutate(score27= (p_adj<0.1)& (abs(log2_fc)>0.3785) ) %>% 
+#   mutate(score28= (p_adj<0.05)& (abs(log2_fc)>0.3785) ) 
+
+# use the continues value to calculate correlation,
+# use the binary value to calculate ROC-AUC.
+# generate random predictions to form null distribution of ROC-AUCs.
+# tmp4 <- full_join(
+#   prism_drh_pred20, 
+#   PISA_summary_augmented  %>% 
+#     # filter(log2_fc<0) %>%
+#     filter(exp_status==1) %>%
+#     select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score23)
+#   ,
+#   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
+#   filter(!is.na(drug_name)) %>% 
+#   nest_by(exp_id,drug_id, drug_name) %>% 
+#   ungroup() %>% 
+#   mutate(cor= map_dbl(.x = data,
+#                       .f = function(df){cor(df$sup_pred_score, df$score, use = "complete.obs")})) %>%
+#   mutate(cor1= map_dbl(.x = data,
+#                       .f = function(df){cor(df$sup_pred_score, df$score1, use = "complete.obs")})) %>%
+#   mutate(cor2= map_dbl(.x = data,
+#                       .f = function(df){cor(df$sup_pred_score, df$score2, use = "complete.obs")})) %>%
+#   mutate(cor3= map_dbl(.x = data,
+#                       .f = function(df){cor(df$sup_pred_score, df$score3, use = "complete.obs")})) %>%
+#   mutate(cor4= map_dbl(.x = data,
+#                       .f = function(df){cor(df$sup_pred_score, df$score4, use = "complete.obs")})) %>%
+#   mutate(cor5= map_dbl(.x = data,
+#                       .f = function(df){cor(df$sup_pred_score, df$score5, use = "complete.obs")})) %>%
+#   mutate(auc6= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score6), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc7= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score7), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc8= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score8), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc9= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score9), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#   mutate(auc10= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score10), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#   mutate(auc11= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score11), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#     mutate(auc12= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score12), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc13= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score13), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc14= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score14), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc15= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score15), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#   mutate(auc16= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score16), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#   mutate(auc17= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score17), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#     mutate(auc18= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score18), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc19= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score19), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc20= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score20), sup_pred_score, event_level = "second")$.estimate})) %>%  
+#   mutate(auc21= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score21), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#   mutate(auc22= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score22), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#   mutate(auc23= map_dbl(.x = data, 
+#                        .f = function(df){roc_auc(df, truth = as_factor(score23), sup_pred_score, event_level = "second")$.estimate})) %>% 
+#%>% 
+  # mutate(prauc6= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score6), sup_pred_score, event_level = "second")$.estimate})) %>%  
+  # mutate(prauc7= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score7), sup_pred_score, event_level = "second")$.estimate})) %>%  
+  # mutate(prauc8= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score8), sup_pred_score, event_level = "second")$.estimate})) %>%  
+  # mutate(prauc9= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score9), sup_pred_score, event_level = "second")$.estimate})) %>% 
+  # mutate(prauc10= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score10), sup_pred_score, event_level = "second")$.estimate})) %>% 
+  # mutate(prauc11= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score11), sup_pred_score, event_level = "second")$.estimate})) %>% 
+  #   mutate(prauc12= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score12), sup_pred_score, event_level = "second")$.estimate})) %>%  
+  # mutate(prauc13= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score13), sup_pred_score, event_level = "second")$.estimate})) %>%  
+  # mutate(prauc14= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score14), sup_pred_score, event_level = "second")$.estimate})) %>%  
+  # mutate(prauc15= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score15), sup_pred_score, event_level = "second")$.estimate})) %>% 
+  # mutate(prauc16= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score16), sup_pred_score, event_level = "second")$.estimate})) %>% 
+  # mutate(prauc17= map_dbl(.x = data, 
+  #                      .f = function(df){pr_auc(df, truth = as_factor(score17), sup_pred_score, event_level = "second")$.estimate}))
+```
+
+
+```{r}
+PISA_summary_augmented= PISA_summary %>%
+  mutate(exp_status= gene_symbol %in% exp_gene_c2) %>%
+  # filter(exp_status==1) %>%
+  mutate(score1= p_adj*abs(log2_fc)) %>%
+  mutate(score2= (p_value<0.05) ) %>%
+  mutate(score3= (p_value<0.01) ) %>%
+  mutate(score4= (p_value<0.005) ) %>%
+  mutate(score5= (p_value<0.001) ) %>%
+  mutate(score6= (p_value<0.0001) ) %>%
+  mutate(score7= (p_adj<0.25) ) %>%
+  mutate(score8= (p_adj<0.20) ) %>%
+  mutate(score9= (p_adj<0.15) ) %>%
+  mutate(score10= (p_adj<0.1) ) %>%
+  nest_by(exp_id,drug_id, drug_name) %>%
+  ungroup() %>%
+  mutate(data= map(.x= data,function(df){
+      df_row <- nrow(df) 
+      df %>% 
+        arrange(desc(score)) %>% 
+        mutate(score11= score>nth(score,n = 51)) %>% 
+        mutate(score12= score>nth(score,n = 101)) %>%
+        mutate(score13= score>nth(score,n = 201)) %>%
+        mutate(score14= score>nth(score,n = 301)) %>%
+        mutate(score15= score>nth(score,n = df_row*(0.01))) %>%
+        mutate(score16= score>nth(score,n = df_row*(0.05))) %>%
+        mutate(score17= score>nth(score,n = df_row*(0.1))) })) %>%
+  unnest(data)
+```
+
+supervised prediction accuracy
+```{r}
+TMP <- PISA_summary_augmented  %>%
+  select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+  # filter(exp_status==1) %>%
+  full_join(prism_drh_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+  filter(!is.na(drug_name)) %>%
+  nest_by(exp_id,drugid, drug_name) %>%
+  ungroup() %>% 
+  mutate(res =map(data,function(df) {
+    df <- df %>% 
+      drop_na() %>% 
+      select(score,score1:score17) %>% 
+      summarise_all(sum)})) %>% 
+  select(-data) %>% 
+  unnest(res)
+# summary(TMP)
+# we can see when filter with a fixed threshold, supervised prediction is only prioritizing
+# several of genes, the result of which is not persuasive
+
+TMP1 <- PISA_summary_augmented  %>%
+  select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+  filter(exp_status==1) %>%
+  full_join(prism_unsupervised_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+  filter(!is.na(drug_name)) %>%
+  nest_by(exp_id,drugid, drug_name) %>%
+  ungroup() %>% 
+  mutate(res =map(data,function(df) {
+    df <- df %>% 
+      drop_na() %>% 
+      select(score2:score17) %>% 
+      summarise_all(sum)})) %>% 
+  select(-data) %>% 
+  unnest(res)
+# summary(TMP1)
+```
+
+
+```{r}
+# use the 30 binary columns as filter for spearman/pearson correlation.
+# use nth to filter top PISA score and score 1 directly for spearman/pearson correlation.
+tmp4 <- PISA_summary_augmented  %>%
+  select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+  filter(exp_status==1) %>%
+  full_join(prism_drh_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+  filter(!is.na(drug_name)) %>%
+  nest_by(exp_id,drugid, drug_name) %>%
+  ungroup() %>% 
+  mutate(cor= map_dbl(
+    .x = data,
+    .f = function(df){
+      cor(df$sup_pred_score, df$score, use = "complete.obs",method = "pearson")})) %>%
+  mutate(cor1= map_dbl(
+    .x = data,
+    .f = function(df){
+      cor(df$sup_pred_score, df$score2, use = "complete.obs",method = "pearson")})) %>%
+  mutate(cor2= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score2)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+               ) }
+    )) %>%
+  mutate(cor7= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score7)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+               ) }
+    )) %>%
+  mutate(cor8= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score8)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+               ) }
+    )) %>% 
+  mutate(cor13= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score13)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor14= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score14)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor15= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score15)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor16= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score16)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor17= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score17)
+      tryCatch(
+        expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+        error= function(err) NA
+               ) }
+    ))# %>% 
+  # select(-data)
+# summary(tmp4)
+# tapply(tmp4$cor7, tmp4$exp_id, summary)
+```
+get pvalue
+```{r}
+tmp6 <- PISA_summary_augmented  %>%
+  select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+  filter(exp_status==1) %>%
+  full_join(prism_drh_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+  filter(!is.na(drug_name)) %>%
+  nest_by(exp_id,drugid, drug_name) %>%
+  ungroup() %>% 
+  mutate(cor_res= map(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score17)
+      tryCatch(
+        expr = 
+          cor.test(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson") %>%
+          tidy() %>% select(estimate, p.value,parameter) ,
+        error= function(err) NA
+               ) }
+    )) %>% 
+  select(-data) %>% 
+  unnest(cor_res)
+
+# with a very unstringent PISA threshold examined whether supervised pred recover PISA
+# we found 3 drugs.
+# Top drug.
+```
+
+
+```{r}
+prism_drh_pred20_rdm_idx <- map(
+  .x= 1:100,
+  .f= function(x){
+    seed=x
+    ridx=sample(1:6020)
+  }
+  )
+
+tmp4_rdm <- map(
+  .x= 1:100,
+  .f= function(x){
+    idx <- prism_drh_pred20_rdm_idx[[x]]
+    prism_drh_pred20_rdm <- prism_drh_pred20 %>% 
+    mutate(sup_pred_score= prism_drh_pred20$sup_pred_score[idx])
+    tmp4 <- PISA_summary_augmented  %>%
+      select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+      filter(exp_status==1) %>%
+      full_join(prism_drh_pred20_rdm, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+      filter(!is.na(drug_name)) %>%
+      nest_by(exp_id,drugid, drug_name) %>%
+      ungroup() %>% 
+      mutate(cor= map_dbl(
+        .x = data,
+        .f = function(df){
+          cor(df$sup_pred_score, df$score, use = "complete.obs",method = "pearson")})) %>%
+      mutate(cor1= map_dbl(
+        .x = data,
+        .f = function(df){
+          cor(df$sup_pred_score, df$score2, use = "complete.obs",method = "pearson")})) %>%
+      mutate(cor2= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score2)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+                   ) }
+        )) %>%
+      mutate(cor7= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score7)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+                   ) }
+        )) %>%
+      mutate(cor8= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score8)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+                   ) }
+        )) %>% 
+      mutate(cor13= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score13)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+          ) }
+      )) %>% 
+      mutate(cor14= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score14)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor15= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score15)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+          ) }
+      )) %>% 
+      mutate(cor16= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score16)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+          ) }
+      )) %>% 
+      mutate(cor17= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score17)
+          tryCatch(
+            expr = cor(df$sup_pred_score, df$score, use = "complete.obs", method= "pearson"),
+            error= function(err) NA
+                   ) }
+        )) %>% 
+      select(-data)
+    
+    
+  }              
+                )
+```
+
+
+Unsupervised prediction
+```{r}
+tmp5 <- PISA_summary_augmented  %>%
+  select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+  # filter(exp_status==1) %>%
+  full_join(prism_unsupervised_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+  filter(!is.na(drug_name)) %>%
+  nest_by(exp_id,drugid, drug_name) %>%
+  ungroup() %>% 
+  mutate(cor= map_dbl(
+    .x = data,
+    .f = function(df){
+      cor(df$unsup_pred_score, df$score, use = "complete.obs",method = "spearman")})) %>%
+  mutate(cor1= map_dbl(
+    .x = data,
+    .f = function(df){
+      cor(df$unsup_pred_score, df$score2, use = "complete.obs",method = "spearman")})) %>%
+  mutate(cor2= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score2)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor3= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score3)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%  
+  mutate(cor4= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score4)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor5= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score5)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor6= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score6)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor7= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score7)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor8= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score8)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor9= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score9)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor10= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score10)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%  
+  mutate(cor11= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score11)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor12= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score12)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor13= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score13)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor14= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score14)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>%
+  mutate(cor15= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score15)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor16= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score16)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  mutate(cor17= map_dbl(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score17)
+      tryCatch(
+        expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+        error= function(err) NA
+      ) }
+  )) %>% 
+  select(-data)
+summary(tmp5)
+tapply(tmp5$cor11, tmp5$exp_id, summary) #top 50 pisa targets
+
+tmp7 <- PISA_summary_augmented  %>%
+  select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+  # filter(exp_status==1) %>%
+  full_join(prism_unsupervised_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+  filter(!is.na(drug_name)) %>%
+  nest_by(exp_id,drugid, drug_name) %>%
+  ungroup() %>% 
+  mutate(cor_res= map(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score11)
+      tryCatch(
+        expr = 
+          cor.test(df$unsup_pred_score, df$score, use = "complete.obs", method= "pearson") %>%
+          tidy() %>% select(estimate, p.value,parameter) ,
+        error= function(err) NA
+               ) }
+    )) %>% 
+  select(-data) %>% 
+  unnest(cor_res)
+```
+
+```{r}
+tmp7 <- PISA_summary_augmented  %>%
+  select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+  filter(exp_status==1) %>%
+  full_join(prism_unsupervised_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+  filter(!is.na(drug_name)) %>%
+  nest_by(exp_id,drugid, drug_name) %>%
+  ungroup() %>% 
+  mutate(cor_res= map(
+    .x = data,
+    .f = function(df){
+      df= df %>% filter(score15)
+      tryCatch(
+        expr = 
+          cor.test(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman") %>%
+          tidy() %>% select(estimate, p.value,parameter) ,
+        error= function(err) NA
+               ) }
+    )) %>% 
+  select(-data) %>% 
+  unnest(cor_res)
+```
+
+with score 11, can unsupervised pred really correlated better with PISA better than the random?
+generate 100 random prism_unsupervised_pred20
+```{r}
+prism_unsupervised_pred20_rdm <- map(
+  .x= 1:100,
+  .f= function(x){
+    seed=x
+    ridx=sample(1:212460)
+
+  }
+  )
+
+# plan(multisession,workers=2)
+tmp5_rdm <- map(
+  .x= 1:100,
+  # .options = furrr::furrr_options(seed=1),
+  .f= function(df){
+    df <- prism_unsupervised_pred20_rdm[[i]]
+    res <-  PISA_summary_augmented  %>%
+      select(exp_id,drug_name, gene_symbol, drugid,exp_status,score, score1:score17) %>% 
+      # filter(exp_status==1) %>%
+      full_join(df, by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
+      filter(!is.na(drug_name)) %>%
+      nest_by(exp_id,drugid, drug_name) %>%
+      ungroup() %>% 
+      mutate(cor= map_dbl(
+        .x = data,
+        .f = function(df){
+          cor(df$unsup_pred_score, df$score, use = "complete.obs",method = "spearman")})) %>%
+      mutate(cor1= map_dbl(
+        .x = data,
+        .f = function(df){
+          cor(df$unsup_pred_score, df$score2, use = "complete.obs",method = "spearman")})) %>%
+      mutate(cor2= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score2)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor3= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score3)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor4= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score4)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor5= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score5)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor6= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score6)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor7= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score7)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor8= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score8)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor9= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score9)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor10= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score10)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor11= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score11)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor12= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score12)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor13= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score13)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor14= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score14)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor15= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score15)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor16= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score16)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      mutate(cor17= map_dbl(
+        .x = data,
+        .f = function(df){
+          df= df %>% filter(score17)
+          tryCatch(
+            expr = cor(df$unsup_pred_score, df$score, use = "complete.obs", method= "spearman"),
+            error= function(err) NA
+          ) }
+      )) %>%
+      select(-data)
+    
+  }              
+                )
+# plan(sequential)
+```
+
+
+
+gene-level is not working well.
+let's try pathway level instead
+
+get pathway for pisa
+```{r}
+library(fgsea)
+
+pathway_go <- gmtPathways("~/cluster_scratch/prior/c5.go.v7.4.symbols.gmt")
+pathway_kegg <- gmtPathways("~/cluster_scratch/prior/c2.cp.kegg.v7.4.symbols.gmt")
+prism_go <- read_csv("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/GO_df_prism.csv")
+prism_kegg <- read_csv("~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/pathways_df_prism.csv")
+
+plan(multisession,workers=5)
+PISA_pathway <- PISA_summary_augmented %>% 
+   filter(exp_status==1) %>%
+  select(exp_id,drug_name, drugid, gene_symbol, drugid,exp_status,score, score2,log10_p) %>% 
+  filter(!is.na(drug_name)) %>% 
+  nest_by(exp_id,drugid, drug_name) %>% 
+  ungroup() %>% 
+  mutate(kegg_scorebased =  furrr::future_map(
+    .options = furrr::furrr_options(seed = 1),
+    .x = data,
+    .f = function(x){
+      df <- df %>% select(target,score) %>% drop_na()
+      rank <- df$score
+      names(rank) <-  df$target
+      fgseaRes <- fgsea(pathway_kegg, rank, minSize=15, maxSize=500) %>% 
+        filter(pval<0.05)
+      return(fgseaRes)} )) %>% 
+  mutate(kegg_score2based=  furrr::future_map(
+    .options = furrr::furrr_options(seed = 1),
+    .x = data,
+    .f = function(x){
+      df <- df %>% select(target,score2) %>% drop_na()
+      rank <- df$score2
+      names(rank) <-  df$target
+      fgseaRes <- fgsea(pathway_kegg, rank, minSize=15, maxSize=500) %>% 
+        filter(pval<0.05)
+      return(fgseaRes)})) %>%
+  mutate(kegg_pbased=  furrr::future_map(
+    .options = furrr::furrr_options(seed = 1),
+    .x = data,
+    .f = function(x){
+      df <- df %>% select(target,log10_p) %>% drop_na()
+      rank <- df$score2
+      names(rank) <-  df$target
+      fgseaRes <- fgsea(pathway_kegg, rank, minSize=15, maxSize=500) %>% 
+        filter(pval<0.05)
+      return(fgseaRes)})) %>%
+  mutate(go_scorebased=  furrr::future_map(
+    .options = furrr::furrr_options(seed = 1),
+    .x = data,
+    .f = function(x){
+      df <- df %>% select(target,score) %>% drop_na()
+      rank <- df$score
+      names(rank) <-  df$target
+      fgseaRes <- fgsea(pathway_go, rank, minSize=15, maxSize=500) %>% 
+        filter(pval<0.05)
+      return(fgseaRes)})) %>%
+  mutate(go_score2based=  furrr::future_map(
+    .options = furrr::furrr_options(seed = 1),
+    .x = data,
+    .f = function(x){
+      df <- df %>% select(target,score2) %>% drop_na()
+      rank <- df$score2
+      names(rank) <-  df$target
+      fgseaRes <- fgsea(pathway_go, rank, minSize=15, maxSize=500) %>% 
+        filter(pval<0.05)
+      return(fgseaRes)})) %>% 
+  mutate(go_score2based=  furrr::future_map(
+    .options = furrr::furrr_options(seed = 1),
+    .x = data,
+    .f = function(x){
+      df <- df %>% select(target,log10_p) %>% drop_na()
+      rank <- df$score2
+      names(rank) <-  df$target
+      fgseaRes <- fgsea(pathway_go, rank, minSize=15, maxSize=500) %>% 
+        filter(pval<0.05)
+      return(fgseaRes)}))
+plan(sequential)  
+```
+
+
+lets get the overlapping go and kegg pathways for ess_sig and pisa
+```{r}
+# n=319 for 16 drugs
+prism_go <- prism_go %>% 
+  filter(drug %in% PISA_pathway$drugid)
+
+#n= 45 for 14 drugs 
+prism_kegg <- prism_kegg %>% 
+  filter(drug %in% PISA_pathway$drugid)
+```
+
+
+```{r}
+# n= 1033 for 20 drugs
+PISA_sig_GO <- PISA_pathway %>% 
+  select(exp_id,drugid,drug_name, go_scorebased) %>%
+  unnest(go_scorebased) %>%
+  # select(drugid, go_score2based) %>% 
+  # unnest(go_score2based) %>% 
+  filter(padj<0.05) %>%
+  inner_join(prism_go %>% select(drug, pathway),
+                   by=c("drugid"="drug", "pathway"="pathway"))
+# n= 205 for 20 drugs
+PISA_sig_KEGG <- PISA_pathway %>% 
+  select(exp_id,drugid,drug_name, kegg_scorebased) %>%
+  unnest(kegg_scorebased) %>%
+  # select(drugid, go_score2based) %>% 
+  # unnest(go_score2based) %>% 
+  filter(pval<0.05) %>%
+  inner_join(prism_kegg %>% select(drug, pathway),
+                   by=c("drugid"="drug", "pathway"="pathway"))
+
+
+PISA_sig_GO2 <- PISA_pathway %>% 
+  select(exp_id,drugid,drug_name, go_score2based) %>%
+  unnest(go_score2based) %>%
+  # select(drugid, go_score2based) %>% 
+  # unnest(go_score2based) %>% 
+  filter(padj<0.05) %>% 
+  inner_join(prism_go %>% select(drug, pathway), 
+                   by=c("drugid"="drug", "pathway"="pathway"))
+
+PISA_sig_KEGG2 <- PISA_pathway %>% 
+  select(exp_id,drugid,drug_name, kegg_score2based) %>%
+  unnest(kegg_score2based) %>%
+  # select(drugid, go_score2based) %>% 
+  # unnest(go_score2based) %>% 
+  filter(padj<0.05) %>% 
+  inner_join(prism_kegg %>% select(drug, pathway), 
+                   by=c("drugid"="drug", "pathway"="pathway"))
+```
+
+save an RData for Jing
+```{r}
+supervised_pred <- prism_drh_pred20
+unsupervised_pred <- prism_unsupervised_pred20
+PISA <- PISA_summary %>% 
+  mutate(exp_status= gene_symbol %in% exp_gene_c2)
+PISA_supervised <- tmp4 
+PISA_unsupervised <- tmp5
+save(supervised_pred,unsupervised_pred, PISA, PISA_supervised,PISA_unsupervised, 
+     file = "~/cluster_wrk/drug_moa/noncancer_drug_validation/res_to_Jing.RData")
+```
 
 
 
