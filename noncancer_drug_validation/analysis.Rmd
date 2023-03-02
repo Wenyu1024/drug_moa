@@ -24,28 +24,25 @@ rm(return_acc_estimate_cv)
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_ConSenSig.RData")
 
 cell_line_info <- data.table::fread("~/cluster_scratch/depmap_21q1/sampleinfo")
-targetpanel_dtc <- data.table::fread("~/cluster_scratch/prior/DTC_data_all.csv",
-                                 select = c("gene_names")) %>% distinct() %>% pull(gene_names)
+# targetpanel_dtc <- data.table::fread("~/cluster_scratch/prior/DTC_data_all.csv",
+#                                  select = c("gene_names")) %>% distinct() %>% pull(gene_names)
 
 cell_line_info <- data.table::fread("~/cluster_scratch/depmap_21q1/sampleinfo")
 
-targetpanel_drh <- read_tsv("~/cluster_scratch/prior/repurposing_drugs_20200324.txt") %>% 
-  select(-disease_area, -indication) %>% 
-  drop_na() %>% 
-  separate_rows(target) %>% 
-  distinct() 
-
-targetpanel_drh_genelevel <- targetpanel_drh %>% 
-  select(pert_iname, target) %>% 
-  group_by(target) %>% 
-  summarise(drug= paste(pert_iname,collapse = ","))
+# targetpanel_drh <- read_tsv("~/cluster_scratch/prior/repurposing_drugs_20200324.txt") %>% 
+#   select(-disease_area, -indication) %>% 
+#   drop_na() %>% 
+#   separate_rows(target) %>% 
+#   distinct() 
+# 
+# targetpanel_drh_genelevel <- targetpanel_drh %>% 
+#   select(pert_iname, target) %>% 
+#   group_by(target) %>% 
+#   summarise(drug= paste(pert_iname,collapse = ","))
 cellline_hgsoc <- cell_line_info %>% 
   filter(primary_disease== "Ovarian Cancer") %>% 
   filter(Subtype== "Adenocarcinoma, high grade serous")
-```
 
-
-```{r}
 res_prism2_long <- res_prism2
 res_prism2 <- res_prism2_long %>%
   select(-variance) %>% 
@@ -89,43 +86,39 @@ prism_good_fitted_drugs_dtcannotated <- prism_good_fitted_drugs %>%
 #   arrange(BROAD_ID ) %>% 
 #   filter(is.na(moa))
 
-save(list = c("prism_data", "prism_target_binary", "prism_target_dtc"), file= "./fig_res/putative_targetinfo.RData")
-```
-
-get hgsoc sensitivity for all 63 noncancer drugs
-```{r}
-prism_63_sen <- prism_data %>% 
-  filter(BROAD_ID %in%  prism_good_fitted_nononcologydrugs) %>% 
-  select(BROAD_ID ,sensitivity) %>% 
-  unnest(cols=sensitivity) %>% 
-  drop_na()
+# save(list = c("prism_data", "prism_target_binary", "prism_target_dtc"), file= "./fig_res/putative_targetinfo.RData")
 
 
-# list auc of HGSOC, and the number of sen HGSOC cells for that drugs
-prism_63_sen_hgsoc <- full_join(
-    x= prism_63_sen %>% filter(depmap_id %in% cellline_hgsoc$DepMap_ID),
-    y= cellline_hgsoc %>% select(DepMap_ID, cell_line_name), 
-    by=c("depmap_id"= "DepMap_ID")
-  ) %>% 
-  select(-ec50) %>% 
-  # filter(auc< 0.8) %>%
-  group_by(BROAD_ID) %>% 
-  summarise(n_total= n(),n_0.8= sum(auc<0.8)  ) %>% 
-  drop_na() %>% 
-  ungroup() %>% 
-  full_join(
-  y = prism_63_sen %>% filter(depmap_id == "ACH-000524")
+# get hgsoc sensitivity for all 63 noncancer drugs
+# prism_63_sen <- prism_data %>% 
+#   filter(BROAD_ID %in%  prism_good_fitted_nononcologydrugs) %>% 
+#   select(BROAD_ID ,sensitivity) %>% 
+#   unnest(cols=sensitivity) %>% 
+#   drop_na()
+# 
+# 
+# # list auc of HGSOC, and the number of sen HGSOC cells for that drugs
+# prism_63_sen_hgsoc <- full_join(
+#     x= prism_63_sen %>% filter(depmap_id %in% cellline_hgsoc$DepMap_ID),
+#     y= cellline_hgsoc %>% select(DepMap_ID, cell_line_name), 
+#     by=c("depmap_id"= "DepMap_ID")
+#   ) %>% 
+#   select(-ec50) %>% 
+#   # filter(auc< 0.8) %>%
+#   group_by(BROAD_ID) %>% 
+#   summarise(n_total= n(),n_0.8= sum(auc<0.8)  ) %>% 
+#   drop_na() %>% 
+#   ungroup() %>% 
+#   full_join(
+#   y = prism_63_sen %>% filter(depmap_id == "ACH-000524")
     )
 # write_csv(prism_63_sen_hgsoc, path = "~/cluster_wrk/drug_moa/predicting_prism/prism_63_sen_hgsoc.csv")
 
 # tmp <- prism_data %>% filter(BROAD_ID %in% prism_good_fitted_nononcologydrugs) %>% 
 #   filter(!(BROAD_ID  %in% prism_good_fitted_drugs_drhannotated )) %>%  select(BROAD_ID, moa)
-```
 
+# Now use the 268 drugs as the training set to predict the targets for the drugs of interest
 
-
-Now use the 268 drugs as the training set to predict the targets for the drugs of interest
-```{r}
 # source("~/cluster_wrk/drug_moa/supervised_target_pred/function/get_target_pred_supervised.R")
 # source('~/cluster_wrk/drug_moa/supervised_target_pred/function/return_acc_estimate_loocv.R')
 # prism_drh_predictions <- get_predictions(
@@ -144,7 +137,7 @@ Now use the 268 drugs as the training set to predict the targets for the drugs o
 # write_csv(prism_drh_predictions, "./fig_res/prism312_drh_predictions.csv")
 # write_csv(prism_unsupervised,path = "./fig_res/prism312_unsupervised.csv")
 ```
-y
+
 
 ```{r}
 rm(list= ls())
@@ -159,6 +152,7 @@ PISA_summary <- read_csv( "~/cluster_wrk/sen_tar_validation/data/inputdata/pisa_
 # setdiff(senvalid_20drugs$Drug_name, unique(PISA_summary$drug_name))
 # setdiff(unique(PISA_summary$drug_name),senvalid_20drugs$Drug_name)
 
+# Note for drug gene binding with more than one value, the one with lowest p-value is selected.
 PISA_summary <- PISA_summary %>% 
   janitor::clean_names() %>% 
   select(-one_of(c("biological_process", "cellular_component", "molecular_function"))) %>% 
@@ -172,9 +166,9 @@ PISA_summary <- PISA_summary %>%
 
 cor(PISA_summary$log10_padj, PISA_summary$log10_p,use = "complete.obs")
 
-hist(PISA_summary$log2_fc)
-hist(PISA_summary$log10_p)
-hist(PISA_summary$log10_padj)
+# hist(PISA_summary$log2_fc)
+# hist(PISA_summary$log10_p)
+# hist(PISA_summary$log10_padj)
 
 prism_drh_pred20 <- prism_drh_predictions %>% 
   select(one_of(c("BROAD_ID", senvalid_20drugs$drugid))) %>% 
@@ -184,20 +178,16 @@ prism_drh_pred20 <- prism_drh_predictions %>%
 prism_unsupervised_pred20 <- prism_unsupervised %>% 
   select(one_of(c("target", senvalid_20drugs$drugid))) %>% 
   pivot_longer(cols= 2:21,names_to="drug_id", values_to="unsup_pred_score")
-```
+# write_csv(PISA_summary, "./fig_res/PISA_summary.csv")
 
 
-```{r}
+# get gene expression for kuramochi cell line
+
 # log2(TPM+1) psedo count
 exp_seq_kuramochi <- read_csv("~/cluster_scratch/ces_21q1_io/exp_seq_tidy.csv") %>% 
   filter(DepMap_ID== 'ACH-000524') %>% 
   pivot_longer(cols = - DepMap_ID, names_to= "gene", values_to="exp_tpm_rsem") 
 
-exp_seq_kuramochi %>% 
-  filter(gene %in% unique(PISA_summary$gene_symbol)) %>% 
-  ggplot()+
-  geom_histogram(aes(exp_tpm_rsem))+
-  xlab("log2(TPM+1)")
 exp_gene_c2 <- exp_seq_kuramochi%>% 
   filter(exp_tpm_rsem>2) %>% 
   pull(gene)
@@ -231,75 +221,24 @@ Check PISA result with expression
 
 check whether PISA result recapulate putative targets
 ```{r}
-pisa_drh <- prism_target_binary %>% 
-  filter(drug %in% prism_drh_pred20$drug_id) %>% 
-  left_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol"))
-
-t.test(pisa_drh$score, PISA_summary$score)
-
-prism_target_binary %>% 
-  mutate(binding_score=1) %>% 
-  filter(drug %in% prism_drh_pred20$drug_id) %>% 
-  right_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
-  mutate(putative= !(is.na(binding_score))) %>% 
-  ggplot(aes(putative, log10(score)))+
-  geom_boxplot()+
-  ggpubr::stat_compare_means(method = "t.test")
- 
-pisa_dtc <- prism_target_dtc %>% 
-  filter(drug %in% prism_drh_pred20$drug_id) %>% 
-  left_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol"))
-
-cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
-
-pisa_dtc %>% 
-  drop_na() %>% 
-  ggplot(aes(score, binding_score))+
-  geom_point()+
-  ylab("dtc_score")+
-  xlab("pisa_score")
-
-# only one drug are widely avaliable BMS-387032
-
-prism_target_dtc %>% 
-  filter(drug == "BRD-K43389698") %>%
-  # filter(drug %in% pisa_dtc$drug) %>%  
-  right_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
-  mutate(putative= case_when(binding_score>0.4~ "yes",
-                             (binding_score <= 0.4)|(is.na(binding_score))~ "no")) %>% 
-  ggplot(aes(putative, log10(score)))+
-  geom_boxplot()+
-  ggpubr::stat_compare_means(method = "t.test")
-
-cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
-
-cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "kendall")
-
-# whether the primary targets are  prioritized in PISA result
-# cannot do enrichment analysis since there are too little
-```
-
-what if I filter out false positive PISA result?
-```{r}
-# PISA_summary_expfiltered <- PISA_summary %>% filter(gene_symbol %in% exp_gene_c2) 
 # pisa_drh <- prism_target_binary %>% 
 #   filter(drug %in% prism_drh_pred20$drug_id) %>% 
-#   left_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol"))
+#   left_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol"))
 # 
-# t.test(pisa_drh$score, PISA_summary_expfiltered$score)
+# t.test(pisa_drh$score, PISA_summary$score)
 # 
 # prism_target_binary %>% 
 #   mutate(binding_score=1) %>% 
 #   filter(drug %in% prism_drh_pred20$drug_id) %>% 
-#   right_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
+#   right_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
 #   mutate(putative= !(is.na(binding_score))) %>% 
 #   ggplot(aes(putative, log10(score)))+
 #   geom_boxplot()+
 #   ggpubr::stat_compare_means(method = "t.test")
-#   
+#  
 # pisa_dtc <- prism_target_dtc %>% 
 #   filter(drug %in% prism_drh_pred20$drug_id) %>% 
-#   left_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol"))
+#   left_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol"))
 # 
 # cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
 # 
@@ -315,7 +254,7 @@ what if I filter out false positive PISA result?
 # prism_target_dtc %>% 
 #   filter(drug == "BRD-K43389698") %>%
 #   # filter(drug %in% pisa_dtc$drug) %>%  
-#   right_join(PISA_summary_expfiltered, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
+#   right_join(PISA_summary, by= c("drug"="drugid", "target"= "gene_symbol")) %>% 
 #   mutate(putative= case_when(binding_score>0.4~ "yes",
 #                              (binding_score <= 0.4)|(is.na(binding_score))~ "no")) %>% 
 #   ggplot(aes(putative, log10(score)))+
@@ -325,218 +264,12 @@ what if I filter out false positive PISA result?
 # cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "pearson")
 # 
 # cor.test(pisa_dtc$score, pisa_dtc$binding_score, use="complete.obs", method = "kendall")
+# 
+# # whether the primary targets are  prioritized in PISA result
+# # cannot do enrichment analysis since there are too little
 ```
 
-
-```{r}
-# tmp <- full_join(
-#   prism_drh_pred20, 
-#   PISA_summary  %>% 
-#     select(drug_name, gene_symbol, drugid, score),
-#   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
-#   filter(!is.na(drug_name)) %>% 
-#   nest_by(drug_id, drug_name) %>% 
-#   ungroup() %>% 
-#   mutate(cor= map_dbl(.x = data, 
-#                       .f = function(df){
-#                         df= df %>% filter(_c2)
-#                         cor(df$sup_pred_score, df$score, use = "complete.obs")}))
-# 
-# tmp1 <- full_join(
-#   prism_unsupervised_pred20, 
-#   PISA_summary  %>% 
-#     select(drug_name, gene_symbol, drugid, score),
-#   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
-#   filter(!is.na(drug_name)) %>% 
-#   nest_by(drug_id, drug_name) %>% 
-#   ungroup() %>% 
-#   mutate(cor= map_dbl(.x = data, 
-#                       .f = function(df){
-#                         df= df %>% filter(exp_gene_c2)
-#                         cor(df$unsup_pred_score, df$score, use = "complete.obs")}))
-# 
-# 
-# tmp2 <- full_join(
-#   prism_drh_pred20, 
-#   PISA_summary_expfiltered  %>% 
-#     # filter(log2_fc>0) %>%
-#     select(drug_name, gene_symbol, drugid, score)
-#   ,
-#   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
-#   filter(!is.na(drug_name)) %>% 
-#   nest_by(drug_id, drug_name) %>% 
-#   ungroup() %>% 
-#   mutate(cor= map_dbl(.x = data, 
-#                       .f = function(df){cor(df$sup_pred_score, df$score, use = "complete.obs")}))
-# 
-# tmp2_filtered <- full_join(
-#   prism_drh_pred20, 
-#   PISA_summary_expfiltered  %>% 
-#     filter(log2_fc>0) %>%
-#     select(drug_name, gene_symbol, drugid, score)
-#   ,
-#   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
-#   filter(!is.na(drug_name)) %>% 
-#   nest_by(drug_id, drug_name) %>% 
-#   ungroup() %>% 
-#   mutate(cor= map_dbl(.x = data, 
-#                       .f = function(df){cor(df$sup_pred_score, df$score, use = "complete.obs")}))
-# 
-# tmp3 <- full_join(
-#   prism_unsupervised_pred20, 
-#   PISA_summary_expfiltered  %>% 
-#         filter(log2_fc>0) %>% 
-#     select(drug_name, gene_symbol, drugid, score),
-#   by=c("drug_id"="drugid", "target"="gene_symbol")) %>% 
-#   filter(!is.na(drug_name)) %>% 
-#   nest_by(drug_id, drug_name) %>% 
-#   ungroup() %>% 
-#   mutate(cor= map_dbl(.x = data, 
-#                       .f = function(df){cor(df$unsup_pred_score, df$score, use = "complete.obs")}))
-```
-
-Whether the top predicted targets are prioritized in the pisa result vector?
-```{r}
-# # generate pathway object
-# generate_pathway <- function(df= prism_drh_pred20, gene_number= 30){
-#   
-#   res <- df %>% 
-#   rename("score"=ends_with("score")) %>% 
-#   group_by(drug_id) %>% 
-#   slice_max(n= gene_number,order_by=score) %>% 
-#   ungroup() %>% 
-#   select(drug_id, target) %>% 
-#   nest_by(drug_id,.key= "genelist") %>% ungroup() %>% 
-#   mutate(genelist= map(.x = genelist, ~.x$target)) 
-#   res1 <- res$genelist
-#   names(res1) <- res$drug_id
-# 
-#   candidate_gene <- df %>% 
-#     select(target) %>% 
-#     distinct() %>% 
-#     pull(target)
-#   res2 <- map(1:100, function(i){
-#     set.seed(i)
-#     res= sample(candidate_gene, size = gene_number)
-#     return(res)} )
-#   names(res2) <- paste("geneset_rdm", 1:100, sep= "_")
-#   res3 <- c(res1, res2)
-#   return(res3)
-# }
-# 
-# # generate 99 random pathways to be shared for all the drugs
-# # the total number of pathways for each drug will be 101.
-# prism_drh_pred20_pathway50 <- generate_pathway(prism_drh_pred20, 50)
-# prism_unsupervised_pathway50 <- generate_pathway(prism_unsupervised_pred20, 50)
-# 
-# save.image("~/cluster_wrk/drug_moa/noncancer_drug_validation/tmp.RData")
-# library(future)
-# plan(multisession)
-# res2 <- tmp %>%
-#   mutate(pathway_res=
-#            furrr::future_map(
-#              .x= data,
-#              .f= function(df){
-#                 df <- df %>% select(c(1,3)) %>% drop_na()
-#                 rank <- df %>% pull(2)
-#                 names(rank) <-  df %>% pull(1)
-#                 # pathway= 
-#                 fgseaRes <- fgsea(prism_drh_pred20_pathway50, rank,scoreType = "pos")
-#                 fgseaRes <- fgseaRes %>% arrange(pval)
-#                 return(fgseaRes)}
-#              ,
-#              .options = furrr::furrr_options(seed = TRUE)
-#              ))
-# 
-# plan(sequential)
-# res2_flat <- res2 %>% select(-data) %>% unnest(pathway_res) %>% 
-#   mutate(matched_pathway= (drug_id==pathway)
-# 
-# res2_flat %>% 
-#   ggplot(aes(matched_pathway, ES))+
-#   geom_boxplot()+
-#   ggpubr::stat_compare_means(method = "t.test")
-#          
-# 
-# plan(multisession)
-# res3 <- tmp %>%
-#   mutate(pathway_res=
-#            furrr::future_map(
-#              .x= data,
-#              .f= function(df){
-#                 df <- df %>% select(c(1,3)) %>% drop_na()
-#                 rank <- df %>% pull(2)
-#                 names(rank) <-  df %>% pull(1)
-#                 fgseaRes <- fgsea(prism_unsupervised_pathway50, rank,scoreType = "pos")
-#                 fgseaRes <- fgseaRes %>% arrange(pval)
-#                 return(fgseaRes)}
-#              ,
-#              .options = furrr::furrr_options(seed = TRUE)
-#              ))
-# plan(sequential)
-# 
-# res3_flat <- res3 %>% select(-data) %>% unnest(pathway_res) %>% 
-#   mutate(matched_pathway= (drug_id==pathway))
-# 
-# res3_flat %>% 
-#   ggplot(aes(matched_pathway, ES))+
-#   geom_boxplot()+
-#   ggpubr::stat_compare_means(method = "t.test")
-# 
-# plan(multisession)
-# res4 <- tmp2 %>%
-#   mutate(pathway_res=
-#            furrr::future_map(
-#              .x= data,
-#              .f= function(df){
-#                 df <- df %>% select(c(1,3)) %>% drop_na()
-#                 rank <- df %>% pull(2)
-#                 names(rank) <-  df %>% pull(1)
-#                 # pathway= 
-#                 fgseaRes <- fgsea(prism_drh_pred20_pathway50, rank,scoreType = "pos")
-#                 fgseaRes <- fgseaRes %>% arrange(pval)
-#                 return(fgseaRes)}
-#              ,
-#              .options = furrr::furrr_options(seed = TRUE)
-#              ))
-# 
-# plan(sequential)
-# res4_flat <- res4 %>% select(-data) %>% unnest(pathway_res) %>% 
-#   mutate(matched_pathway= (drug_id==pathway))
-# 
-# res4_flat %>% 
-#   ggplot(aes(matched_pathway, ES))+
-#   geom_boxplot()+
-#   ggpubr::stat_compare_means(method = "t.test")
-#          
-# 
-# plan(multisession)
-# res5 <- tmp2 %>%
-#   mutate(pathway_res=
-#            furrr::future_map(
-#              .x= data,
-#              .f= function(df){
-#                 df <- df %>% select(c(1,3)) %>% drop_na()
-#                 rank <- df %>% pull(2)
-#                 names(rank) <-  df %>% pull(1)
-#                 fgseaRes <- fgsea(prism_unsupervised_pathway50, rank,scoreType = "pos")
-#                 fgseaRes <- fgseaRes %>% arrange(pval)
-#                 return(fgseaRes)}
-#              ,
-#              .options = furrr::furrr_options(seed = TRUE)
-#              ))
-# plan(sequential)
-# 
-# res5_flat <- res5 %>% select(-data) %>% unnest(pathway_res) %>% 
-#   mutate(matched_pathway= (drug_id==pathway))
-# 
-# res5_flat %>% 
-#   ggplot(aes(matched_pathway, ES))+
-#   geom_boxplot()+
-#   ggpubr::stat_compare_means(method = "t.test")
-```
-
-
+Join PISA result with prediction result
 ```{r}
 PISA_summary_augmented= PISA_summary %>%
   mutate(exp_status= gene_symbol %in% exp_gene_c2) %>%
@@ -548,172 +281,71 @@ PISA_summary_augmented= PISA_summary %>%
   full_join(prism_unsupervised_pred20, by=c("drugid"="drug_id", "gene_symbol"="target")) %>% 
   filter(!is.na(exp_id))
 
-PISA_summary_augmented_drug_level <- PISA_summary_augmented %>% 
-  nest_by(drug_id,drug_name,drugid, exp_id) %>% 
+PISA_summary_augmented_drug_level <- PISA_summary_augmented %>%
+  nest_by(drug_id,drug_name,drugid, exp_id) %>%
   ungroup()
 ```
 
 
-
-evaluate sample number
 ```{r}
+# evaluate sample number
+
 # list the number of observations for all the drugs under different threshold
-cor_res_num_sup <- tibble(score_type=1:3) %>% 
-  mutate(res= map(
-  .x=1:3, 
-  .f= function(x){
-    # x=1
-    df= PISA_summary_augmented %>% 
-      select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,one_of(paste0("score", x)),"sup_pred_score")
-    colnames(df)[which(colnames(df)==(paste0("score", x)))] <- "score"
-  
-    df1 <- df %>% 
-      nest_by(exp_id,drug_id, drug_name) %>%
-      ungroup() %>%
-      mutate(data= map(
-        .x= data,
-        .f = function(df2){
-          df_row <- nrow(df2) 
-          df2 %>%
-            arrange(desc(score)) %>%
-            # filter(exp_status) %>%
-            mutate(scoreb1= score>nth(score,n = df_row*(0.05))) %>% 
-            mutate(scoreb2= score>nth(score,n = df_row*(0.1))) %>%  
-            mutate(scoreb3= score>nth(score,n = df_row*(0.15))) %>% 
-            mutate(scoreb4= score>nth(score,n = df_row*(0.2))) %>%  
-            mutate(scoreb5= score>nth(score,n = df_row*(0.25))) %>% 
-            mutate(scoreb6= score>nth(score,n = df_row*(0.3))) %>%
-            mutate(scoreb7= score>nth(score,n = df_row*(0.4))) %>%
-            mutate(scoreb8= score>nth(score,n = df_row*(0.5))) %>%
-            mutate(scoreb0= T) %>% 
-            pivot_longer(cols= scoreb1:scoreb0, names_to="threshold_type", values_to= "binaryvalue") %>% 
-            nest_by(threshold_type) %>% 
-            ungroup() %>%
-            mutate(res= map(data, .f=function(df){
-              df1= df %>%
-                filter(binaryvalue) 
-              
-              num_sup=  tryCatch(
-                  expr = df1 %>% select(sup_pred_score,score) %>% drop_na() %>% nrow(),
-                  error= function(err) NA)
-              
-              res= tibble(cor_type= c("cor_sup"), corobs=c(num_sup))
-              
-              return(res)
-              
-            })) %>%
-            select(-data) %>%
-            unnest(res)
-        })) %>% 
-      unnest(data)
-    }
-  )) %>% 
-  unnest(res) %>% 
-  filter(score_type==3) %>% 
-  pivot_wider(names_from=threshold_type,values_from=corobs)
-
-cor_res_num_unsup <- tibble(score_type=1:3) %>% 
-  mutate(res= map(
-  .x=1:3, 
-  .f= function(x){
-    # x=1
-    df= PISA_summary_augmented %>% 
-      select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,one_of(paste0("score", x)), "unsup_pred_score")
-    colnames(df)[which(colnames(df)==(paste0("score", x)))] <- "score"
-  
-    df1 <- df %>% 
-      nest_by(exp_id,drug_id, drug_name) %>%
-      ungroup() %>%
-      mutate(data= map(
-        .x= data,
-        .f = function(df2){
-          df_row <- nrow(df2) 
-          df2 %>%
-            arrange(desc(score)) %>%
-            # filter(exp_status) %>%
-            mutate(scoreb1= score>nth(score,n = df_row*(0.05))) %>% 
-            mutate(scoreb2= score>nth(score,n = df_row*(0.03))) %>%  
-            mutate(scoreb3= score>nth(score,n = df_row*(0.025))) %>% 
-            mutate(scoreb4= score>nth(score,n = df_row*(0.02))) %>%  
-            mutate(scoreb5= score>nth(score,n = df_row*(0.01))) %>% 
-            mutate(scoreb6= score>nth(score,n = df_row*(0.005))) %>%
-            mutate(scoreb0= T) %>% 
-            pivot_longer(cols= scoreb1:scoreb0, names_to="threshold_type", values_to= "binaryvalue") %>% 
-            nest_by(threshold_type) %>% 
-            ungroup() %>%
-            mutate(res= map(data, .f=function(df){
-              df1= df %>%
-                filter(binaryvalue) 
-              
-              num_unsup=  tryCatch(
-                  expr = df1 %>% select(unsup_pred_score,score) %>% drop_na() %>% nrow(),
-                  error= function(err) NA)
-              
-              res= tibble(cor_type= c("cor_unsup"), corobs=c( num_unsup))
-              
-              return(res)
-              
-            })) %>%
-            select(-data) %>%
-            unnest(res)
-        })) %>% 
-      unnest(data)
-    }
-  )) %>% 
-  unnest(res) %>% 
-  filter(score_type==3) %>% 
-  pivot_wider(names_from=threshold_type,values_from=corobs)
-
-
-cor_res_sigbased_num <- tibble(score_type=1:3) %>% 
-  mutate(res= map(
-  .x=1:3, 
-  .f= function(x){
-    # x=1
-    df= PISA_summary_augmented %>% 
-      select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,p_adj,one_of(paste0("score", x)),"sup_pred_score", "unsup_pred_score")
-    colnames(df)[which(colnames(df)==(paste0("score", x)))] <- "score"
-  
-    df1 <- df %>% 
-      nest_by(exp_id,drug_id, drug_name) %>%
-      ungroup() %>%
-      mutate(data= map(
-        .x= data,
-        .f = function(df2){
-          df_row <- nrow(df2) 
-          df2 %>%
-            mutate(scoreb0= (p_value<0.05)) %>% #7
-            mutate(scoreb1= (p_adj<0.25)) %>% 
-            pivot_longer(cols= scoreb0:scoreb1, names_to="threshold_type", values_to= "binaryvalue") %>% 
-            nest_by(threshold_type) %>% 
-            ungroup() %>%
-            mutate(res= map(data, .f=function(df){
-              df1= df %>%
-                filter(binaryvalue)
-              
-              num_sup=  tryCatch(
-                  expr = df1 %>% select(sup_pred_score,score) %>% drop_na() %>% nrow(),
-                  error= function(err) NA)
-              
-              num_unsup=  tryCatch(
-                  expr = df1 %>% select(unsup_pred_score,score) %>% drop_na() %>% nrow(),
-                  error= function(err) NA)
-              
-              res= tibble(cor_type= c("cor_sup","cor_unsup"), corobs=c(num_sup, num_unsup))
-              
-              return(res)
-              
-            })) %>%
-            select(-data) %>%
-            unnest(res)
-        })) %>% 
-      unnest(data)
-    }
-  )) %>% 
-  unnest(res) %>% 
-  filter(score_type==3) %>% 
-  filter(cor_type=="cor_sup") %>% 
-  pivot_wider(names_from=threshold_type,values_from=corobs)
+# cor_res_num_sup <- tibble(score_type=1:3) %>% 
+#   mutate(res= map(
+#   .x=1:3, 
+#   .f= function(x){
+#     # x=1
+#     df= PISA_summary_augmented %>% 
+#       select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,one_of(paste0("score", x)),"sup_pred_score")
+#     colnames(df)[which(colnames(df)==(paste0("score", x)))] <- "score"
+#   
+#     df1 <- df %>% 
+#       nest_by(exp_id,drug_id, drug_name) %>%
+#       ungroup() %>%
+#       mutate(data= map(
+#         .x= data,
+#         .f = function(df2){
+#           df_row <- nrow(df2) 
+#           df2 %>%
+#             arrange(desc(score)) %>%
+#             # filter(exp_status) %>%
+#             mutate(scoreb1= score>nth(score,n = df_row*(0.05))) %>% 
+#             mutate(scoreb2= score>nth(score,n = df_row*(0.1))) %>%  
+#             mutate(scoreb3= score>nth(score,n = df_row*(0.15))) %>% 
+#             mutate(scoreb4= score>nth(score,n = df_row*(0.2))) %>%  
+#             mutate(scoreb5= score>nth(score,n = df_row*(0.25))) %>% 
+#             mutate(scoreb6= score>nth(score,n = df_row*(0.3))) %>%
+#             mutate(scoreb6= score>nth(score,n = df_row*(0.35))) %>%
+#             mutate(scoreb7= score>nth(score,n = df_row*(0.4))) %>%
+#             mutate(scoreb6= score>nth(score,n = df_row*(0.45))) %>%
+#             mutate(scoreb8= score>nth(score,n = df_row*(0.5))) %>%
+#             mutate(scoreb0= T) %>% 
+#             pivot_longer(cols= scoreb1:scoreb0, names_to="threshold_type", values_to= "binaryvalue") %>% 
+#             nest_by(threshold_type) %>% 
+#             ungroup() %>%
+#             mutate(res= map(data, .f=function(df){
+#               df1= df %>%
+#                 filter(binaryvalue) 
+#               
+#               num_sup=  tryCatch(
+#                   expr = df1 %>% select(sup_pred_score,score) %>% drop_na() %>% nrow(),
+#                   error= function(err) NA)
+#               
+#               res= tibble(cor_type= c("cor_sup"), corobs=c(num_sup))
+#               
+#               return(res)
+#               
+#             })) %>%
+#             select(-data) %>%
+#             unnest(res)
+#         })) %>% 
+#       unnest(data)
+#     }
+#   )) %>% 
+#   unnest(res) %>% 
+#   filter(score_type==1) %>% 
+#   pivot_wider(names_from=threshold_type,values_from=corobs)
 ```
 
 score rank based filtering
@@ -724,7 +356,6 @@ cor_res_sup <- tibble(score_type=1:3) %>%
   mutate(res= map(
   .x=1:3, 
   .f= function(x){
-    # x=1
     df= PISA_summary_augmented %>% 
       select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,one_of(paste0("score", x)),"sup_pred_score")
     colnames(df)[which(colnames(df)==(paste0("score", x)))] <- "score"
@@ -738,16 +369,18 @@ cor_res_sup <- tibble(score_type=1:3) %>%
           df_row <- nrow(df2) 
           df2 %>%
             arrange(desc(score)) %>%
-            mutate(scoreb1= score>nth(score,n = df_row*(0.05))) %>% 
-            mutate(scoreb2= score>nth(score,n = df_row*(0.1))) %>%  
-            mutate(scoreb3= score>nth(score,n = df_row*(0.15))) %>% 
-            mutate(scoreb4= score>nth(score,n = df_row*(0.2))) %>%  
-            mutate(scoreb5= score>nth(score,n = df_row*(0.25))) %>% 
-            mutate(scoreb6= score>nth(score,n = df_row*(0.3))) %>%
-            mutate(scoreb7= score>nth(score,n = df_row*(0.4))) %>%
-            mutate(scoreb8= score>nth(score,n = df_row*(0.5))) %>%
-            mutate(scoreb0= T) %>% 
-            pivot_longer(cols= scoreb1:scoreb0, names_to="threshold_type", values_to= "binaryvalue") %>%
+            mutate(score_0.05= score>nth(score,n = df_row*(0.05))) %>%
+            mutate(score_0.1= score>nth(score,n = df_row*(0.1))) %>%
+            mutate(score_0.15= score>nth(score,n = df_row*(0.15))) %>%
+            mutate(score_0.2= score>nth(score,n = df_row*(0.2))) %>%
+            mutate(score_0.25= score>nth(score,n = df_row*(0.25))) %>%
+            mutate(score_0.3= score>nth(score,n = df_row*(0.3))) %>%
+            mutate(score_0.35= score>nth(score,n = df_row*(0.35))) %>%
+            mutate(score_0.4= score>nth(score,n = df_row*(0.4))) %>%
+            mutate(score_0.45= score>nth(score,n = df_row*(0.45))) %>%
+            mutate(score_0.50= score>nth(score,n = df_row*(0.5))) %>%
+            mutate(score_1= T) %>% 
+            pivot_longer(cols= score_0.05:score_1, names_to="threshold_type", values_to= "binaryvalue") %>%
             nest_by(threshold_type) %>% 
             ungroup() %>%
             mutate(res= map(data, .f=function(df){
@@ -765,816 +398,765 @@ cor_res_sup <- tibble(score_type=1:3) %>%
         })) %>% 
       unnest(data)
     }
-  )) %>% unnest(res)
+  )) %>% unnest(res) %>% 
+  mutate(threshold_prop= as.numeric(str_split(threshold_type,"_",n = 2,simplify = T)[,2]))
 
   
-cor_res1_sup <- cor_res_sup %>% 
-  mutate(across(c(threshold_type),as.factor)) 
+# cor_res1_sup <- cor_res_sup %>% 
+#   mutate(across(c(threshold_type),as.factor)) 
+# rm(cor_res_sup)
+# levels(cor_res1_sup$threshold_type) <- c(1,0.05*1:10)
+# cor_res1_sup$threshold_type <- fct_relevel(cor_res1_sup$threshold_type, "1", after = Inf)
+# cor_res1_sup <- cor_res1_sup %>% 
+#   mutate(threshold_prop= as.numeric(levels(threshold_type))[as.numeric(threshold_type)]) 
 
-levels(cor_res1_sup$threshold_type) <- c(1,0.05, 0.1, 0.15, 0.2, 0.25,0.3,0.4, 0.5)
-cor_res1_sup$threshold_type <- fct_relevel(cor_res1_sup$threshold_type, "1", after = Inf)
-cor_res1_sup <- cor_res1_sup %>% 
-  mutate(threshold_prop= as.numeric(levels(threshold_type))[as.numeric(threshold_type)]) #%>%
-  # mutate(score_type_num= as.numeric(str_split(score_type,pattern  = "core", n = 2,simplify = T)[,2]))
-
-# cor_res1_sup %>% 
-#   # group_by(threshold_type,score_type,exp_id) %>% 
-#   # summarise(median_corvalue=median(corvalue, na.rm = T)) %>% 
-#   # ungroup() %>% 
+# cor_res1_sup %>%
+#   # group_by(threshold_type,score_type,exp_id) %>%
+#   # summarise(median_corvalue=median(corvalue, na.rm = T)) %>%
+#   # ungroup() %>%
 #   ggplot(aes(x= threshold_type,y= corvalue))+
 #   geom_boxplot()+
 #   geom_hline(yintercept=0)+
 #   facet_grid(cols = vars(score_type),scale= "free_y")
-# 
-# tmp <- cor_res1_sup %>% 
-#   group_by(threshold_type,score_type) %>%
-#   summarise(mean_corvalue=mean(corvalue, na.rm = T), median_corvalue=median(corvalue, na.rm = T)) %>%
-#   ungroup() 
+cor_res_sup_gridlevel <- cor_res_sup %>%
+  select( -threshold_type,-cor_type) %>%
+  nest_by(score_type, threshold_prop) %>%
+  ungroup() %>% 
+  mutate(mean_corvalue=map_dbl(data, .f=function(x){round(mean(x$corvalue,na.rm=T),4)})) %>%
+  arrange(desc(mean_corvalue))
 ```
 
-unsupervised prediction
 ```{r}
-cor_res_unsup <- tibble(score_type=1:3) %>% 
-  mutate(res= map(
-  .x=1:3, 
-  .f= function(x){
-    # x=1
-    df= PISA_summary_augmented %>% 
-      select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,one_of(paste0("score", x)),"unsup_pred_score")
-    colnames(df)[which(colnames(df)==(paste0("score", x)))] <- "score"
-  
-    df1 <- df %>% 
-      nest_by(exp_id,drug_id, drug_name) %>%
-      ungroup() %>%
-      mutate(data= map(
-        .x= data,
-        .f = function(df2){
-          df_row <- nrow(df2) 
-          df2 %>%
-            arrange(desc(score)) %>%
-            mutate(scoreb1= score>nth(score,n = df_row*(0.05))) %>% 
-            mutate(scoreb2= score>nth(score,n = df_row*(0.03))) %>%  
-            mutate(scoreb3= score>nth(score,n = df_row*(0.025))) %>% 
-            mutate(scoreb4= score>nth(score,n = df_row*(0.02))) %>%  
-            mutate(scoreb5= score>nth(score,n = df_row*(0.01))) %>% 
-            mutate(scoreb6= score>nth(score,n = df_row*(0.005))) %>%
-            mutate(scoreb0= T) %>% 
-            pivot_longer(cols= scoreb1:scoreb0, names_to="threshold_type", values_to= "binaryvalue") %>%
-            nest_by(threshold_type) %>% 
-            ungroup() %>%
-            mutate(res= map(data, .f=function(df){
-              df1= df %>%
-                filter(binaryvalue) 
-
-              cor_unsup=  tryCatch(
-                  expr = cor(df1$unsup_pred_score, df1$score, use = "complete.obs", method= "pearson"),
-                  error= function(err) NA)
-              res= tibble(cor_type= c("cor_unsup"), corvalue=c(cor_unsup))
-              return(res)
-            })) %>%
-            select(-data) %>%
-            unnest(res)
-        })) %>% 
-      unnest(data)
-    }
-  )) %>% unnest(res)
-
-  
-cor_res1_unsup <- cor_res_unsup %>% 
-  mutate(across(c(threshold_type),as.factor)) 
-
-levels(cor_res1_unsup$threshold_type) <- c(1,0.05, 0.03, 0.025, 0.02, 0.01,0.005)
-cor_res1_unsup$threshold_type <- fct_relevel(cor_res1_unsup$threshold_type, "1", after = Inf)
-cor_res1_unsup <- cor_res1_unsup %>% 
-  mutate(threshold_prop= as.numeric(levels(threshold_type))[as.numeric(threshold_type)]) #%>%
-
-# cor_res1_unsup %>% 
-#   ggplot(aes(x= threshold_type,y= corvalue))+
-#   geom_boxplot()+
-#   geom_hline(yintercept=0)+
-#   facet_grid(cols = vars(score_type),scale= "free_y")
-# 
-# tmp1 <- cor_res1_unsup %>%
-#   group_by(threshold_type,score_type) %>%
-#   summarise(mean_corvalue=mean(corvalue, na.rm = T), median_corvalue=median(corvalue, na.rm = T)) %>%
-#   ungroup()
-```
-
-significance base filtering
-```{r}
-# cor_res_sigbased <- tibble(score_type=1:3) %>%
+# auc_res_sup <- tibble(score_type=1:3) %>% 
 #   mutate(res= map(
-#   .x=1:3,
+#   .x=1:3, 
 #   .f= function(x){
-# 
-#     df= PISA_summary_augmented %>%
-#       select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,p_adj,
-#              one_of(paste0("score", x)),"sup_pred_score", "unsup_pred_score")
+#     df= PISA_summary_augmented %>% 
+#       select(exp_id, drug_name, drug_id, gene_symbol,exp_status,p_value,one_of(paste0("score", x)),"sup_pred_score")
 #     colnames(df)[which(colnames(df)==(paste0("score", x)))] <- "score"
-# 
-#     df1 <- df %>%
-#       nest_by(exp_id,drug_id, drug_name) %>%
-#       ungroup() %>%
-#       mutate(data= map(
-#         .x= data,
-#         .f = function(df2){
-#           df_row <- nrow(df2)
-#           df2 %>%
-#             mutate(scoreb0= (p_value<0.05)) %>% #7
-#             mutate(scoreb1= (p_adj<0.25)) %>%
-#             pivot_longer(cols= scoreb0:scoreb1, names_to="threshold_type", values_to= "binaryvalue") %>%
-#             nest_by(threshold_type) %>%
-#             ungroup() %>%
-#             mutate(res= map(data, .f=function(df){
-#               df1= df %>%
-#                 filter(binaryvalue)
-#                 # filter(exp_status) %>%
-#               cor_sup=  tryCatch(
-#                   expr = cor(df1$sup_pred_score, df1$score, use = "complete.obs", method= "pearson"),
-#                   error= function(err) NA)
-#               cor_unsup=  tryCatch(
-#                   expr = cor(df1$unsup_pred_score, df1$score, use = "complete.obs", method= "pearson"),
-#                   error= function(err) NA)
-#               res= tibble(cor_type= c("cor_sup","cor_unsup"), corvalue=c(cor_sup, cor_unsup))
-#               return(res)
-#             })) %>%
-#             select(-data) %>%
-#             unnest(res)
-#         })) %>%
-#       unnest(data)
-#     }
-#   )) %>%
-#   unnest(res) %>%
-#   mutate(across(c(score_type, exp_id, drug_id, drug_name, cor_type,threshold_type),as.factor))
-# 
-# 
-# tmp <- cor_res_sigbased %>%
-#     group_by(threshold_type,score_type,cor_type) %>%
-#   summarise(mean_corvalue=mean(corvalue, na.rm = T), 
-#             median_corvalue=median(corvalue, na.rm = T)) %>%
-#   ungroup() 
 #   
-# 
-# cor_res_sigbased %>%
-#   ggplot(aes(x= threshold_type,y= corvalue))+
-#   geom_boxplot()+
-#   geom_hline(yintercept = 0)+
-#   facet_grid(rows = vars(cor_type), cols = vars(score_type),scale= "free_y")
+#     df1 <- df %>% 
+#       nest_by(exp_id,drug_id, drug_name) %>%
+#       ungroup() %>% 
+#       mutate(valid_data= map(data, function(x){
+#         x1= x %>% drop_na() %>% 
+#           arrange(desc(score)) %>% 
+#           slice(1:74) %>% 
+#           mutate(truth= factor(score>nth(score,10)))
+#       }))
+#     return(df1)
+#     }
+#   )) %>% 
+#   unnest(res) %>% 
+#   select(-data) %>% 
+#   # slice(1:3) %>%
+#   mutate(auc= map_dbl(
+#     valid_data,
+#     
+#     .f= function(x){
+#       tryCatch(
+#                   expr = roc_auc(data= x, truth= truth, sup_pred_score,event_level="second") %>% pull(.estimate),
+#                   error= function(err) NA)
+#       }
+#                   )) %>% 
+#   select(-valid_data) %>% 
+#   nest_by(score_type) %>% 
+#   ungroup() %>% 
+#   mutate(mean_auc=map(data,function(x){mean((x$auc), na.rm = T)}))
 ```
-
 
 generate random prediction based on permutation
 ```{r}
 # set.seed(1234)
+# uniform distribtion
+# prism_drh_pred20_rdm_uni <- tibble(sample_id=1:1000) %>%
+# mutate(sample_df= map(
+# .x= 1:1000,
+# .f= function(x){
+# set.seed(x)
+# idx <- runif(6020, min = 0,max = 1)
+# prism_drh_pred20_rdm <- prism_drh_pred20 %>%
+# mutate(sup_pred_score= idx)}
+# ))
+# normal distribution
+# prism_drh_pred20_rdm_norm <- tibble(sample_id=1:10000) %>%
+# mutate(sample_df= map(
+# .x= 1:10000,
+# .f= function(x){
+# set.seed(x)
+# idx <- rnorm(6020, mean = 0,sd = 1)
+# prism_drh_pred20_rdm <- prism_drh_pred20 %>%
+# mutate(sup_pred_score= idx)}
+# ))
+# permutation
 # prism_drh_pred20_rdm_idx <- map(
-#   .x= 1:10000,
-#   .f= function(x){
-#     seed=x
-#     ridx=sample(1:6020)
-#   }
-#   )
-# 
-# prism_drh_pred20_rdm <- tibble(sample_id=1:1000) %>% 
-#   mutate(sample_df= map(
-#     .x= 1:1000,
-#     .f= function(x){
-#       idx <- prism_drh_pred20_rdm_idx[[x]]
-#       prism_drh_pred20_rdm <- prism_drh_pred20 %>% 
-#         mutate(sup_pred_score= prism_drh_pred20$sup_pred_score[idx])} 
-#     ))        
-# 
-# prism_unsup_pred20_rdm_idx <- map(
-#   .x= 1:1000,
-#   .f= function(x){
-#     seed=x
-#     ridx=sample(1:212460)
-#   }
-#   )
-# 
-# prism_unsup_pred20_rdm <- tibble(sample_id=1:1000) %>% 
-#   mutate(sample_df= map(
-#     .x= 1:1000,
-#     .f= function(x){
-#       idx <- prism_unsup_pred20_rdm_idx[[x]]
-#       prism_unsup_pred20_rdm <- prism_unsupervised_pred20 %>%
-#         mutate(unsup_pred_score= prism_unsupervised_pred20$unsup_pred_score[idx])} 
-#     ))    
-# 
-# # a function to get random corr object given a fixed score_type, threshold_type and number of permutations
-# # perm_num=10
-# # score_type=1
-# # threshold_prop=0.25
-# 
-# get_cor_res_rdm <- function(perm_num, score_type, threshold_prop,cor_type= "cor_unsup"){
-#   tibble(sample_df_idx=1:perm_num) %>% 
+# .x= 1:1000,
+# .f= function(x){
+# seed=x
+# ridx=sample(1:6020)
+# }
+# )
+# prism_drh_pred20_rdm_perm <- tibble(sample_id=1:1000) %>%
+# mutate(sample_df= map(
+# .x= 1:1000,
+# .f= function(x){
+# idx <- prism_drh_pred20_rdm_idx[[x]]
+# prism_drh_pred20_rdm <- prism_drh_pred20 %>%
+# mutate(sup_pred_score= prism_drh_pred20$sup_pred_score[idx])}
+# ))
+# rm(prism_drh_pred20_rdm_idx)
+
+```
+
+
+```{r}
+# get_cor_res_rdm <- function(perm_num, score_type, threshold_prop,cor_type= "cor_sup",rdm_pred){
+#   
+#   tibble(sample_df_idx=1:perm_num) %>%
 #   mutate(res= map(
-#   .x=sample_df_idx, 
+#   .x=sample_df_idx,
 #   .f= function(x){
 #     PISA_summary_augmented_rdm <-  PISA_summary %>%
 #       mutate(score_new= case_when(
 #         score_type==1~ log10_p*abs(log2_fc),
 #         score_type==2~ log10_p,
 #         score_type==3~ abs(log2_fc)
-#         )) %>% 
-#       full_join(prism_drh_pred20_rdm$sample_df[[x]], 
+#         )) %>%
+#       full_join(rdm_pred$sample_df[[x]],
 #                 by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
-#       full_join(prism_unsup_pred20_rdm$sample_df[[x]], 
-#                 by=c("drugid"="drug_id", "gene_symbol"="target")) %>%
-#       filter(!is.na(exp_id)) %>% 
-#       select(exp_id:gene_symbol,drugid,p_value,score_new,sup_pred_score,unsup_pred_score)
-#     
-#     df= PISA_summary_augmented_rdm %>% 
+#       filter(!is.na(exp_id)) %>%
+#       select(exp_id:gene_symbol,drugid,p_value,score_new,sup_pred_score)
+# 
+#     df= PISA_summary_augmented_rdm %>%
 #       nest_by(exp_id,drug_id, drug_name) %>%
-#       ungroup() 
-#     
+#       ungroup()
+# 
 #     df1 <- df %>%
 #       mutate(data= map(
 #         .x= data,
 #         .f = function(df2){
-#           df_row <- nrow(df2) 
+#           df_row <- nrow(df2)
 #           score_threshold= nth(x = sort(df2$score_new,decreasing = T),
 #                                n = df_row*(threshold_prop))
 #           scoreb1= df2$score_new > score_threshold
-#         
+# 
 #           df2 <- filter(df2, scoreb1)
-#           
+# 
 #           if(cor_type== "cor_sup"){
 #             cor_value=  tryCatch(
 #               expr = cor(df2$sup_pred_score, df2$score_new,
 #                          use = "complete.obs", method= "pearson"),
 #               error= function(err) NA)}
 # 
-#           if(cor_type== "cor_unsup"){ 
-#             cor_value=  tryCatch(
-#               expr = cor(df2$unsup_pred_score, df2$score_new,
-#                          use = "complete.obs", method= "pearson"),
-#               error= function(err) NA)
-#             }
-# 
-#           
 #           res= tibble(cor_type= cor_type, corvalue=cor_value )
 #           return(res)
-#             })) %>% 
+#             })) %>%
 #       unnest(data)
 #     }
-#   )) %>% 
-#   mutate(mean_cor=map_dbl(res, .f= function(df){mean(df$corvalue, na.rm = T)})) %>% 
-#   mutate(median_cor=map_dbl(res, .f= function(df){median(df$corvalue, na.rm = T)})) 
+#   )) %>%
+#   mutate(mean_cor=map_dbl(res, .f= function(df){mean(df$corvalue, na.rm = T)})) %>%
+#   mutate(median_cor=map_dbl(res, .f= function(df){median(df$corvalue, na.rm = T)}))
 # }
 # 
+# get_cor_res_rdm_perm <-function(perm_num, score_type, threshold_prop,cor_type= "cor_sup"){get_cor_res_rdm(perm_num, score_type, threshold_prop,cor_type,rdm_pred = prism_drh_pred20_rdm_perm)}
+# 
+# get_cor_res_rdm_uni <-function(perm_num, score_type, threshold_prop,cor_type= "cor_sup"){get_cor_res_rdm(perm_num, score_type, threshold_prop,cor_type,rdm_pred= prism_drh_pred20_rdm_uni)}
+# 
+# get_cor_res_rdm_norm <-function(perm_num, score_type, threshold_prop,cor_type= "cor_sup"){get_cor_res_rdm(perm_num, score_type, threshold_prop,cor_type,rdm_pred= prism_drh_pred20_rdm_norm)}
+# 
+# # tictoc::tic()
+# # tmp <- get_cor_res_rdm(10, 1,0.25, rdm_pred= prism_drh_pred20_rdm_norm )
+# # tictoc::toc()
+# # 
 # tictoc::tic()
-# cor_res_rdm_perm_score3_prop0.25 <- get_cor_res_rdm(1000, 3,0.025, cor_type= "cor_unsup" )
+# tmp <- get_cor_res_rdm_norm(10, 1,0.25 )
 # tictoc::toc()
 # 
-# #get overall p-value and mean estimates for the following grid.
 # tictoc::tic()
 # plan(multisession,workers=6)
-# par_grid_sup <- expand_grid( 
+# par_grid_perm <- expand_grid(
 #   perm_num=1000,
 #   score_type=c(1,2,3),
-#   threshold_prop=c(0.05*1:10, 1)) %>% 
-#   # slice(1:6) %>% 
+#   threshold_prop=c(0.05*1:10, 1)) %>%
+#   # slice(1:6) %>%
 #   mutate(res= future_pmap(
-#     .l = list(perm_num, score_type, threshold_prop), 
-#     .f = get_cor_res_rdm,
+#     .l = list(perm_num, score_type, threshold_prop),
+#     .f = get_cor_res_rdm_perm,
 #     .options = furrr_options(seed=0000)
-#           )) 
+#           ))
 # plan(sequential)
+# # save(list = c("par_grid_perm"), file = "~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_all.RData")
 # tictoc::toc()
 # 
-# # changed the default parameter of the function to generate the null distribution for unsupervised predictions
-# save(list=c("PISA_summary", "get_cor_res_rdm", 
-#             "prism_unsup_pred20_rdm", "prism_drh_pred20_rdm"),
-#      file="./fig_res/null_dist_input.RData")
+# # perm 457s 6 cores 6 grids
+# # norm 468 6 cores 6 grids
+# 
+# # 2200 sec 
 # tictoc::tic()
-# plan(multicore,workers= 6)
-# par_grid_unsup <- expand_grid( 
-#   perm_num=10,
+# plan(multisession,workers=6)
+# par_grid_uni <- expand_grid(
+#   perm_num=1000,
 #   score_type=c(1,2,3),
-#   threshold_prop=c(1,0.05, 0.03, 0.025, 0.02, 0.01,0.005)) %>% 
+#   threshold_prop=c(0.05*1:10, 1)) %>%
+#   # slice(1:6) %>%
 #   mutate(res= future_pmap(
-#     .l = list(perm_num, score_type, threshold_prop), 
-#     .f = get_cor_res_rdm,
+#     .l = list(perm_num, score_type, threshold_prop),
+#     .f = get_cor_res_rdm_uni,
 #     .options = furrr_options(seed=0000)
-#           )) 
+#           ))
+# # save(list = c("par_grid_perm", "par_grid_uni"), file = "~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_all.RData")
+# tictoc::toc()
+# 
+# tictoc::tic()
+# plan(multisession,workers=6)
+# par_grid_norm <- expand_grid(
+#   perm_num=10000,
+#   score_type=c(1,2,3),
+#   threshold_prop=c(0.05*1:10, 1)) %>%
+#   # slice(1:6) %>%
+#   mutate(res= future_pmap(
+#     .l = list(perm_num, score_type, threshold_prop),
+#     .f = get_cor_res_rdm_norm,
+#     .options = furrr_options(seed=0000)
+#           ))
+# 
 # plan(sequential)
 # tictoc::toc()
-# getwd()
-# save(list = c("par_grid_sup"), file = "~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_sup.RData")
-# save(list = c("par_grid_sup"), file = "~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_unsup.RData")
+# # save(list = c("par_grid_perm", "par_grid_uni","par_grid_norm"), file = "~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_all_1000.RData")
+# 
+# # 20544 sec
+# tictoc::tic()
+# plan(multisession,workers=6)
+# par_grid_norm1 <- expand_grid(
+#   perm_num=10000,
+#   score_type=c(1,2,3),
+#   threshold_prop=c(0.05*1:10, 1)) %>%
+#   # slice(1:6) %>%
+#   mutate(res= future_pmap(
+#     .l = list(perm_num, score_type, threshold_prop),
+#     .f = get_cor_res_rdm_norm,
+#     .options = furrr_options(seed=0000)
+#           ))
+# 
+# plan(sequential)
+# tictoc::toc()
+# save("par_grid_norm1", file = "~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_norm_10000.RData")
 ```
+
 
 calculate overall p-value and drug specific p-values
 ```{r}
-load("~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_sup.RData")
-load("~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_unsup.RData")
+load("~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_all_1000.RData")
+load("~/cluster_scratch/forward_modelling/noncancer_drugtarget_validation/null_dist_norm_10000.RData")
+# floating point issue.
+par_grid_perm$threshold_prop <- round(par_grid_perm$threshold_prop,2)
+par_grid_uni$threshold_prop <- round(par_grid_uni$threshold_prop,2)
+par_grid_norm$threshold_prop <- round(par_grid_norm$threshold_prop,2)
+par_grid_norm1$threshold_prop <- round(par_grid_norm1$threshold_prop,2)
 
-overall_sup <- cor_res1_sup %>% 
-  select( -threshold_type) %>% 
-  nest_by(score_type, threshold_prop) %>% 
-  ungroup() %>% 
-  inner_join(par_grid_sup, by=c("threshold_prop", "score_type")) %>% 
-  mutate(median_real= map(data, .f= function(x){median(x$corvalue,na.rm = T)})) %>% 
-  mutate(mean_real= map(data, .f= function(x){mean(x$corvalue,na.rm = T)})) %>% 
-  mutate(median_perm_vector=map(res, .f= function(x){x %>% pull(median_cor)})) %>% 
-  mutate(mean_perm_vector=map(res, .f= function(x){x %>% pull(mean_cor)}))  %>% 
-  mutate(median_perm= map_dbl(median_perm_vector, mean)) %>%
-  mutate(meam_perm= map_dbl(mean_perm_vector, mean)) %>%
-  mutate(p_mean=pmap_dbl(.l = list(mean_real, mean_perm_vector,perm_num), 
-                         .f= function(x,y,z){sum(y>x)/z})) %>% 
-  mutate(p_median=pmap_dbl(.l= list(median_real, median_perm_vector,perm_num), 
-                           .f= function(x,y,z){sum(y>x)/z})) %>% 
-  unnest(median_real) %>% 
-  unnest(mean_real) %>% 
-  arrange(p_mean) %>% 
-  select(-median_perm_vector, -mean_perm_vector,-data, -res)
-# write_csv(overall_sup, "./fig_res/foverall_p_value_supervised_prediction.csv")
+get_p_twoside <- function(x,y,z=1000){sum( abs(y)>=abs(x), na.rm = T )/z}
+get_p_twoside1 <- function(x,y,z=10000){sum( abs(y)>=abs(x), na.rm = T )/z}
 
-overall_unsup <- cor_res1_unsup %>% 
-  select( -threshold_type) %>% 
-  nest_by(score_type, threshold_prop) %>% 
-  ungroup() %>% 
-  inner_join(par_grid_unsup, by=c("threshold_prop", "score_type")) %>% 
-  mutate(median_real= map(data, .f= function(x){median(x$corvalue,na.rm = T)})) %>% 
-  mutate(mean_real= map(data, .f= function(x){mean(x$corvalue,na.rm = T)})) %>% 
-  mutate(median_perm_vector=map(res, .f= function(x){x %>% pull(median_cor)})) %>% 
-  mutate(mean_perm_vector=map(res, .f= function(x){x %>% pull(mean_cor)}))  %>% 
-  mutate(median_perm= map_dbl(median_perm_vector, mean)) %>%
-  mutate(meam_perm= map_dbl(mean_perm_vector, mean)) %>%
-  mutate(p_mean=pmap_dbl(.l = list(mean_real, mean_perm_vector,perm_num), 
-                         .f= function(x,y,z){sum(y>x)/z})) %>% 
-  mutate(p_median=pmap_dbl(.l= list(median_real, median_perm_vector,perm_num), 
-                           .f= function(x,y,z){sum(y>x)/z})) %>% 
-  unnest(median_real) %>% 
-  unnest(mean_real) %>% 
-  arrange(p_mean) %>% 
-  select(-median_perm_vector, -mean_perm_vector,-data, -res)
-# write_csv(overall_unsup, "./fig_res/foverall_p_value_unsupervised_prediction.csv")
+overall_sup <- cor_res_sup_gridlevel %>%
+  arrange(score_type,threshold_prop) %>% 
+  inner_join(
+    par_grid_perm %>% mutate(score_type=as.numeric(score_type)) %>% select(-perm_num), 
+    by=c("threshold_prop", "score_type")) %>% 
+  rename(data_perm=res) %>% 
+  inner_join(
+    par_grid_uni %>% mutate(score_type=as.numeric(score_type))%>% select(-perm_num), 
+    by=c("threshold_prop", "score_type")) %>%   
+  rename(data_uni=res) %>% 
+  inner_join(
+    par_grid_norm %>% mutate(score_type=as.numeric(score_type))%>% select(-perm_num), 
+    by=c("threshold_prop", "score_type")) %>%   
+  rename(data_norm=res) %>%
+  inner_join(
+    par_grid_norm1 %>% mutate(score_type=as.numeric(score_type))%>% select(-perm_num), 
+    by=c("threshold_prop", "score_type")) %>%   
+  rename(data_norm1=res) %>% 
+  mutate(mean_real= map_dbl(data, .f= function(x){mean(x$corvalue,na.rm = T)})) %>%
+  mutate(mean_perm_vector=map(data_perm, .f= function(x){x %>% pull(mean_cor)}))  %>%
+  mutate(mean_uni_vector=map(data_uni, .f= function(x){x %>% pull(mean_cor)}))  %>%
+  mutate(mean_norm_vector=map(data_norm, .f= function(x){x %>% pull(mean_cor)}))  %>%
+  mutate(mean_norm_vector1=map(data_norm1, .f= function(x){x %>% pull(mean_cor)}))  %>%
+  # mutate(perm_num= 1000) %>% 
+  mutate(mean_perm= map_dbl(mean_perm_vector, mean)) %>%
+  mutate(mean_uni= map_dbl(mean_uni_vector, mean)) %>%
+  mutate(mean_norm= map_dbl(mean_norm_vector, mean)) %>%
+  mutate(mean_norm1= map_dbl(mean_norm_vector1, mean)) %>%
+  mutate(p_perm=map2_dbl(mean_real, mean_perm_vector,
+                         .f= get_p_twoside)) %>%
+  mutate(p_uni=map2_dbl(mean_real, mean_uni_vector,
+                         .f= get_p_twoside)) %>%
+  mutate(p_norm=map2_dbl(mean_real, mean_norm_vector,
+                       .f= get_p_twoside)) %>% 
+  mutate(p_norm1=map2_dbl(mean_real, mean_norm_vector1,
+                       .f= get_p_twoside1)) %>% 
+  arrange(p_norm)
+
+tmp <- overall_sup %>% 
+  select(!starts_with("data")) %>% 
+  select(!contains("vector"))
+
+# write_csv(tmp, "./fig_res/foverall_p_value_supervised_prediction.csv")
 ```
 
-get drug specific p-value
+get drug specific p-value (dist is not preseverd for drug level)
 ```{r}
-drugspecfic_sup <- inner_join(
-  x= cor_res1_sup %>% 
-    select( -threshold_type, -cor_type) #%>% 
-    # filter(score_type==1, threshold_prop== 0.25 )
+get_drugspecific_sig <- function(null_dist,p_fun=get_p_twoside){
+  drugspecfic_sup_norm <- inner_join(
+  x= cor_res_sup %>%
+    select( -threshold_type, -cor_type) 
   ,
-  y= par_grid_sup %>% 
-    # filter(score_type==1, threshold_prop==0.25) %>% 
-    unnest(res) %>% 
-    unnest(res) %>% 
-    select(drug_id, drug_name,score_type, threshold_prop, corvalue)%>% 
-    nest_by(drug_id, drug_name,score_type, threshold_prop) %>% 
-    ungroup() %>% 
-    mutate(cor_null= map(data, ~.x$corvalue)) %>% 
+  y= null_dist %>%
+    unnest(res) %>%
+    unnest(res) %>%
+    select(drug_id, drug_name,score_type, threshold_prop, corvalue)%>%
+    nest_by(drug_id, drug_name,score_type, threshold_prop) %>%
+    ungroup() %>%
+    mutate(cor_null= map(data, ~.x$corvalue)) %>%
     select(-data),
   by= c("drug_id", "drug_name","score_type", "threshold_prop")
-) %>% 
-  mutate(mean_perm= map_dbl(cor_null,~mean(.x,na.rm = T))) %>% 
-  mutate(p_perm= map2_dbl(corvalue, cor_null, 
-                          .f=function(x,y){sum(y>x,na.rm = T)/length(na.omit(y))})) 
-
-all_sup <- drugspecfic_sup %>% 
-  select(-cor_null) %>% 
-  nest_by(score_type, threshold_prop) %>% 
+) %>%
+  mutate(mean_null= map_dbl(cor_null,~mean(.x,na.rm = T))) %>%
+  mutate(p_null= map2_dbl(corvalue, cor_null,
+                          .f=p_fun)) %>%
+  
+  arrange(p_null) %>% 
+  select(-cor_null) %>%
+  nest_by(score_type, threshold_prop) %>%
   ungroup() %>% 
-  inner_join(overall_sup,by=c("score_type", "threshold_prop")) %>% 
-  arrange(p_mean) %>% 
   mutate(data= map(.x = data, .f= function(x){
-                     x$p_adj <- p.adjust(x$p_perm,method="fdr")
-                     x= as_tibble(x) %>% arrange(p_adj)
-                     return(x)}
-                   ))
+                 x$p_adj <- p.adjust(x$p_null,method="fdr")
+                 x= as_tibble(x) %>% arrange(p_adj)
+                 return(x)}
+               ))
+}
+
+all_sup <- overall_sup %>% 
+  select(!starts_with("data")) %>%
+  select(!ends_with("vector")) %>%
+  select(!ends_with("vector1")) %>%
+  inner_join(get_drugspecific_sig(null_dist = par_grid_norm) %>% rename(data_norm=data),by=c("score_type", "threshold_prop")) %>%
+  inner_join(get_drugspecific_sig(null_dist = par_grid_norm1,p_fun=get_p_twoside1) %>% rename(data_norm1=data),by=c("score_type", "threshold_prop")) %>%
+  inner_join(get_drugspecific_sig(null_dist = par_grid_uni) %>% rename(data_uni=data),by=c("score_type", "threshold_prop")) %>%
+  inner_join(get_drugspecific_sig(null_dist = par_grid_perm) %>% rename(data_perm=data),by=c("score_type", "threshold_prop")) # %>% 
 ```
 
-
-```{r}
-drugspecfic_unsup <- inner_join(
-  x= cor_res1_unsup %>% 
-    select( -threshold_type, -cor_type) #%>% 
-    # filter(score_type==1, threshold_prop== 0.25 )
-  ,
-  y= par_grid_unsup %>% 
-    # filter(score_type==1, threshold_prop==0.25) %>% 
-    unnest(res) %>% 
-    unnest(res) %>% 
-    select(drug_id, drug_name,score_type, threshold_prop, corvalue)%>% 
-    nest_by(drug_id, drug_name,score_type, threshold_prop) %>% 
-    ungroup() %>% 
-    mutate(cor_null= map(data, ~.x$corvalue)) %>% 
-    select(-data),
-  by= c("drug_id", "drug_name","score_type", "threshold_prop")
-) %>% 
-  mutate(mean_perm= map_dbl(cor_null,~mean(.x,na.rm = T))) %>% 
-  mutate(p_perm= map2_dbl(corvalue, cor_null, 
-                          .f=function(x,y){sum(y>x,na.rm = T)/length(na.omit(y))})) 
-
-all_unsup <- drugspecfic_unsup %>% 
-  select(-cor_null) %>% 
-  nest_by(score_type, threshold_prop) %>% 
-  ungroup() %>% 
-  inner_join(overall_unsup,by=c("score_type", "threshold_prop")) %>% 
-  arrange(p_mean) %>% 
-  mutate(data= map(.x = data, .f= function(x){
-                     x$p_adj <- p.adjust(x$p_perm,method="fdr")
-                     x= as_tibble(x) %>% arrange(p_adj)
-                     return(x)}
-                   ))
-
-# save(all_sup,all_unsup,PISA_summary_augmented_drug_level, prism_target_dtc, prism_target_binary, file = "file_to_jing_20221230.RData")
-```
 
 
 overall comparison
 ```{r}
-overall_sup <- cor_res1_sup %>% 
-  select( -threshold_type) %>% 
-  nest_by(score_type, threshold_prop) %>% 
-  ungroup() %>% 
-  inner_join(par_grid_sup, by=c("threshold_prop", "score_type")) %>% 
-  mutate(median_real= map(data, .f= function(x){median(x$corvalue,na.rm = T)})) %>% 
-  mutate(mean_real= map(data, .f= function(x){mean(x$corvalue,na.rm = T)})) %>% 
-  mutate(median_perm_vector=map(res, .f= function(x){x %>% pull(median_cor)})) %>% 
-  mutate(mean_perm_vector=map(res, .f= function(x){x %>% pull(mean_cor)}))  %>% 
-  mutate(median_perm= map_dbl(median_perm_vector, mean)) %>%
-  mutate(meam_perm= map_dbl(mean_perm_vector, mean)) %>%
-  mutate(p_mean=pmap_dbl(.l = list(mean_real, mean_perm_vector,perm_num), 
-                         .f= function(x,y,z){sum(y>x)/z})) %>% 
-  mutate(p_median=pmap_dbl(.l= list(median_real, median_perm_vector,perm_num), 
-                           .f= function(x,y,z){sum(y>x)/z})) %>% 
-  unnest(median_real) %>% 
-  unnest(mean_real) %>% 
-  arrange(p_mean)
+# withdraw druglevel dist from the null_dist object
+plot_dist_from_all_sup <- function(st, tp, null_type, null_df){
+  tmp <- overall_sup %>%
+    filter(score_type==st & threshold_prop==tp) %>% 
+    select(mean_corvalue, mean_real, ends_with(null_type) )
 
-tmp <- overall_sup %>% 
-  slice(1) %>% 
-  select(res) %>% 
-  unnest(cols = c(res))
-
-dens <- density(tmp$mean_cor)
-data <- tibble(x = dens$x, y = dens$y) %>% 
-    mutate(variable = case_when(
-      (x >0.0823) ~ "On",
-      TRUE ~ "off"))
-
-overall_plot <- ggplot(data, aes(x, y)) + geom_line() +
-  geom_area(data = filter(data, variable == 'On'), fill = 'grey') +
-  geom_vline(xintercept = -1.710127e-03, lty= 2, color= "black")+
-  geom_vline(xintercept = 0.0823, lty= 2, color= "red")+
-  theme_classic()+
-  xlab("Pearson correlation")+
-  ylab("")+
-  ggtitle("Overall, P-value = 0.019")
-
-# showing the same plot with FDR value as heading, highlight how predictions has been improved compraring to random predictions.
-
-tmp1 <- drugspecfic_sup %>% filter(score_type==1) %>% filter(threshold_prop== 0.25) %>% 
-  arrange(p_perm) %>% 
-  inner_join(all_sup[[3]][[1]] %>% select(drug_id, p_adj)) %>% 
-  filter(p_adj<0.25)
-
-dist_plot= map(1:7, function(i){
-  dens <- density(tmp1$cor_null[[i]])
-  data <- tibble(x = dens$x, y = dens$y) %>% 
-    mutate(variable = case_when(
-      (x > (tmp1$corvalue[i]) ) ~ "On",
-      TRUE ~ "off"))
-  if(round(tmp1$p_adj[i],digits = 2)==0){
-          title= paste0(tmp1$drug_name[i],", ","FDR < 0.01")
-  } 
-  if(round(tmp1$p_adj[i],digits = 2)!=0){
-      title= paste0(tmp1$drug_name[i]," ","FDR = ",round(tmp1$p_adj[i],digits = 2))
-  }   
-
-  ggplot(data, aes(x, y)) + geom_line() +
+  dens <- density(tmp %>% unnest(one_of(paste0("data_",null_type)))  %>% pull(mean_cor))
+  data <- tibble(x = dens$x, y = dens$y) %>%
+      mutate(variable = case_when(
+        (x > tmp$mean_real) ~ "On",
+        TRUE ~ "off"))
+  # 
+  overall_plot <- ggplot(data, aes(x, y)) + geom_line() +
     geom_area(data = filter(data, variable == 'On'), fill = 'grey') +
-    geom_vline(xintercept = tmp1$mean_perm[i], lty= 2, color= "black")+
-    geom_vline(xintercept = tmp1$corvalue[i], lty= 2, color= "red")+
+    geom_vline(xintercept = unlist(tmp[1,4]), lty= 2, color= "black")+
+    geom_vline(xintercept = unlist(tmp[1,1]), lty= 2, color= "red")+
     theme_classic()+
     xlab("Pearson correlation")+
     ylab("")+
-    ggtitle(label = title)
+    ggtitle(paste0("Overall, P-value =", unlist(tmp[1,5])))
   
-})
-ggarrange(overall_plot,dist_plot[[1]],dist_plot[[2]],dist_plot[[3]],dist_plot[[4]],
-          dist_plot[[5]],dist_plot[[6]],dist_plot[[7]],
-          ncol = 4,nrow=2,common.legend = T)
-```
-
-
-
-Case study
-```{r}
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Podophyllotoxin") %>% 
-  select(-unsup_pred_score) %>%
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  slice(1:37) 
-
-tmp %>%   
-  ggplot(aes(x=score1, y=sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:3), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()+
-  ggtitle("Podophyllotoxin")
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Fluvastatin") %>% 
-  select(-unsup_pred_score) %>%
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  slice(1:37) %>% 
-  arrange(desc(sup_pred_score))
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("Fluvastatin")
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Pitavastatin") %>% 
-  select(-unsup_pred_score) %>%
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  slice(1:37) %>% 
-  arrange(desc(sup_pred_score))
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("Pitavastatin")
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Harringtonine") %>% 
-  select(-unsup_pred_score) %>%
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  slice(1:37) %>% 
-  arrange(desc(sup_pred_score))
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("Harringtonine")
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Lanatoside-C") %>% 
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  arrange(desc(sup_pred_score))
-
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-    geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("Lanatoside-C")
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="BMS-387032") %>% 
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  arrange(desc(sup_pred_score))
-
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-    geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("BMS-387032")
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Digoxin") %>% 
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  arrange(desc(sup_pred_score))
-
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("Digoxin")
-
-
-# https://www.medchemexpress.com/QNZ.html?utm_source=google&utm_medium=CPC&utm_campaign=Europe&utm_term=HY-13812&utm_content=EVP4593&gclid=Cj0KCQiAiJSeBhCCARIsAHnAzT86KKIJGKdt8CsIYdASuLsH1Ii8jeRGGYhJ9poZmm32vuy-3lU2PdsaArsSEALw_wcB
-
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="EVP4593") %>% 
-  arrange(desc(score1)) %>% 
-  drop_na() %>%
-  arrange(desc(sup_pred_score))
-
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:3), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:2), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("EVP4593")
-
-
-# <!-- https://www.medchemexpress.com/narasin.html -->
-
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Narasin") %>% 
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  arrange(desc(sup_pred_score))
-
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("Narasin")
-```
-
-
-```{r}
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="Oligomycin-A") %>% 
-  arrange(desc(score1)) %>% 
-  # drop_na() %>% 
-  arrange(desc(sup_pred_score))
-
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("Oligomycin-A")
-```
-
-```{r}
-tmp <- PISA_summary_augmented %>% 
-  filter(drug_name=="JIB04") %>% 
-  arrange(desc(score1)) %>% 
-  drop_na() %>% 
-  arrange(desc(sup_pred_score))
-
-
-tmp %>%   
-  ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
-  geom_point()+
-  geom_text(data=tmp %>% slice(1:5), color="red")+
-  geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
-  xlab("PISA score")+
-  ylab("Supervised predicion score")+
-  theme_classic()  +
-  ggtitle("JIB04")
-```
-now lets see if our unsupervised predictions give better predictions on PISA top50 genes's
-neighbours
-```{r}
-annotate_feature_matrix_par <- function(network, drug_gene_matrix, target_source) {
-  library(igraph)
-  graph_network <- graph_from_data_frame(network,directed = F)
-  graph_node_list <- names(V(graph_network))
-  n= nrow(drug_gene_matrix)
-  m= ncol(drug_gene_matrix)-1
-  drug_list <- drug_gene_matrix$drug
-  gene_list <- colnames(drug_gene_matrix)[-1]
-  target_list <- unique(target_source$target)
-  drug_with_target <- unique(target_source$drug)
+  # showing the same plot with FDR value as heading, highlight how predictions has been improved compraring to random predictions.
   
-  NA_drugs_idx <- (1:n)[!(drug_list %in%  drug_with_target)]# index drug without target
-  NA_genes_idx <- (1:m)[!(gene_list %in% c(target_list, graph_node_list))] # index genes that are neither in targetlist or in networknodelist
-  remaining_drugs_idx <- setdiff(1:n, NA_drugs_idx)
-  remaining_genes_idx <- setdiff(1:m, NA_genes_idx)
+  tmp1 <- all_sup %>% 
+    filter(score_type==st & threshold_prop== tp) %>% 
+    select(one_of(paste0("data_", null_type))) %>% 
+    unnest(one_of(paste0("data_", null_type))) %>% 
+    arrange(p_adj) %>% 
+    # inner_join(all_sup1[[3]][[1]] %>% select(drug_id, p_adj)) %>% 
+    filter(p_adj<0.25)
   
+  null_df1 <- null_df %>% 
+    filter(score_type==st & threshold_prop== tp) %>% 
+    select(-ends_with("cor")) %>% 
+    unnest(res) %>%  unnest(res) %>% 
+    select(drug_id,sample_df_idx, corvalue ) %>% 
+    filter(drug_id %in% tmp1$drug_id) %>% 
+    nest_by(drug_id)
+  drug_level_all <- inner_join(tmp1, null_df1)
+    
+  dist_plot <-  map(1:nrow(drug_level_all), function(i){
+    dens <- density(drug_level_all$data[[i]] %>% pull(corvalue))
+    data <- tibble(x = dens$x, y = dens$y) %>% 
+      mutate(variable = case_when(
+        (x > (drug_level_all$corvalue[i]) ) ~ "On",
+        TRUE ~ "off"))
+    if(round(drug_level_all$p_adj[i],digits = 2)==0){
+            title= paste0(tolower(drug_level_all$drug_name[i]),", ","FDR < 0.01")
+    } 
+    if(round(drug_level_all$p_adj[i],digits = 2)!=0){
+        title= paste0(tolower(drug_level_all$drug_name[i])," ","FDR = ",round(drug_level_all$p_adj[i],digits = 2))
+    }   
   
-  #use character matrix to store result.
-  res <- matrix(nrow = n, ncol = m)
-  colnames(res) <- gene_list
-  row.names(res) <- drug_list
+    ggplot(data, aes(x, y)) + geom_line() +
+      geom_area(data = filter(data, variable == 'On'), fill = 'grey') +
+      geom_vline(xintercept = drug_level_all$mean_null[i], lty= 2, color= "black")+
+      geom_vline(xintercept = drug_level_all$corvalue[i], lty= 2, color= "red")+
+      theme_classic()+
+      xlab("Pearson correlation")+
+      ylab("")+
+      ggtitle(label = title)
+    
+  })
   
-  
-  if (length(NA_drugs_idx)!=0){  res[NA_drugs_idx,] <- "NA_drug"}
-  if (length(NA_genes_idx)!=0){  res[,NA_genes_idx] <- "NA_gene"}
-  print(length(remaining_genes_idx))
-  # print(length(remaining_drugs_idx))
-  # print(remaining_drugs_idx)
-  
-  w <-   future_map(
-    .x= remaining_drugs_idx, 
-    .f= function(remaining_drugs_idx){
-              
-      drug_name= drug_list[remaining_drugs_idx]
-      target_specific <- target_source %>% filter(drug== drug_name) %>% pull(target)
-      res0 <- NULL
-      for (gene_i in remaining_genes_idx) {
-        # print(gene_i)
-        gene_name <- gene_list[gene_i]
-        
-        if (gene_name %in% target_specific) { 
-          res0 <- c(res0,"Target")} 
-        else if (!(gene_name %in% graph_node_list)) {
-          res0 <- c(res0,"NA_gene")}  
-        else if(length(intersect(target_specific, graph_node_list)) == 0) {
-          res0 <- c(res0,"NA_target_network")} 
-        else {
-          tmp <- distances(graph_network, 
-                           v = match(gene_name, graph_node_list), 
-                           to = na.omit(match(target_specific, graph_node_list ))
-          )
-          tmp1 <- min(tmp)
-          if (is.infinite(tmp1)){tmp1 <- "Not Connected"}
-          tmp1 <- as.character(tmp1)
-          res0 <- c(res0,tmp1)
-        }
-        # print(res0)
-      }
-      return(res0)
-      } 
-    )
-  
-  for(i in  1:length(remaining_drugs_idx)){
-    idx <- remaining_drugs_idx[i]
-    res[idx, remaining_genes_idx] <- w[[i]]
-    # print(idx)
-    # print(w[[i]])
-  }
-  
-  res <-   res %>%
-    as_tibble(rownames = NA) %>%
-    rownames_to_column(var = "drug")
-  
-  return(res)
+  fig <- ggpubr::ggarrange(
+    overall_plot,dist_plot[[1]],dist_plot[[2]],
+    dist_plot[[3]],dist_plot[[4]], dist_plot[[5]],
+            ncol = 3, nrow=2, common.legend = T)
+  return(fig)  
 }
 ```
 
 
-```{r}
-PPI_old <- read_csv( "~/cluster_scratch/prior/PPI/PPI_old_simplified.csv" ) 
-pisa_binary50 <- PISA_summary_augmented_drug_level %>% 
-  mutate(data= map(data, function(x){x %>% arrange(desc(score1)) %>%  slice(1:50) %>% select(gene_symbol)})) %>% 
-  unnest(data) %>% select(drugid,gene_symbol) %>% 
-  rename(drug=drugid, target=gene_symbol)
-  
-# plan(multisession)
-# noncancerdrug_PPI <-   annotate_feature_matrix_par(
-#     network = PPI_old,
-#     
-#     drug_gene_matrix = 
-#       prism_unsupervised_pred20 %>% 
-#       pivot_wider(id_cols = drug_id, names_from=target, values_from= unsup_pred_score) %>% 
-#       rename(drug=drug_id),
-#     
-#     target_source=  pisa_binary50
-#   )
-# plan(sequential)
+```{r,fig.height=5.5,fig.width=9}
+fig <- plot_dist_from_all_sup(st = 1,tp = 0.25,null_type="norm1", null_df= par_grid_norm1)
+fig
+ggsave(dpi = 500,fig,filename = "./fig_res/fig7a.png",units = "in", height = 4,width = 8)
+ggsave(fig,filename = "./fig_res/fig7a.pdf",units = "in", height = 5.5,width = 9)
+```
 
-noncancerdrug_PPI_pred <- noncancerdrug_PPI %>% 
-  pivot_longer(cols = -drug, names_to = "gene",values_to= "degree") %>% 
-  inner_join(prism_unsupervised_pred20,by= c("drug"="drug_id", "gene"= "target"))
+Case study
+```{r}
+PISA_summary_augmented_drug_level_withsig <- PISA_summary_augmented_drug_level  %>% 
+  inner_join(all_sup %>% filter(score_type==1 & threshold_prop==0.25) %>% select(data_norm1) %>% unnest(data_norm1)) %>% 
+  arrange(p_adj)
+```
+
+
+report the top hit concordancy
+```{r}
+tmp <- PISA_summary_augmented_drug_level_withsig %>% 
+  select(drug_id, drug_name, exp_id,drugid, data,corvalue,p_null, p_adj) %>%
+  mutate(data= map(data, 
+                   function(df){
+                     df %>% 
+                       select(gene_symbol, score1, sup_pred_score) %>% 
+                       drop_na() %>% 
+                       mutate(pisa_score_rank=rank(-score1,ties.method = "random")) %>% 
+                       mutate(sup_score_rank=rank(-sup_pred_score,ties.method = "random")) %>% 
+                       arrange(desc(sup_pred_score)) %>% 
+                       slice(1:10) %>% 
+                       filter(pisa_score_rank<21)}) 
+           )  %>% 
+  mutate(n_hit= map_int(data,nrow)) %>% 
+  slice(1:5) %>% select(drug_name, data) %>% unnest(data) %>% 
+  select(-score1, -sup_pred_score,-pisa_score_rank) %>% 
+  mutate(color="Top Predicted target") %>% 
+  arrange(drug_name, sup_score_rank) %>% 
+  mutate(text= case_when(
+    gene_symbol=="HMGCR" ~ T,
+    drug_name=="Podophyllotoxin" ~ T,
+    TRUE ~ F
+    ))
+
+tmp1 <- anti_join(
+  expand_grid(sup_score_rank= 1:10, 
+    drug_name= unique(tmp$drug_name),
+    gene_symbol=NA, 
+    color="Top PISA target",
+    text= F
+    ),
+  tmp,
+   by=c("drug_name","sup_score_rank")
+  ) %>% bind_rows(tmp) %>% 
+  arrange(drug_name, sup_score_rank)%>% 
+  mutate(drug_name=tolower(drug_name))
+```
+
+
+```{r}
+fig <- ggplot(tmp1 , aes(x = sup_score_rank, y= drug_name, fill= color)) + 
+  geom_tile(color = "black")+
+  # scale_x_discrete()+
+  scale_x_continuous(breaks= 1:10)+
+  # geom_text(aes(x = sup_score_rank, label= sup_score_rank),y=-1, )+
+  geom_text(data = tmp1 %>% filter(text),
+            mapping = aes(x = sup_score_rank, y= drug_name, label= gene_symbol),
+            size=2)+
+  
+  theme_classic()+
+  scale_fill_manual(values = c("gray","white"),labels= c("Top PISA target", "Top Predicted target"))+
+  xlab("Rank of predicted gene")+
+  ylab("")+
+  guides(fill = guide_legend(nrow = 1,ncol = 2,title = element_blank()))+
+  theme(legend.position="top", 
+        axis.ticks.x = element_blank(),axis.line.x=element_blank(),
+        axis.ticks.y =element_blank() ,axis.line.y=element_blank())
+
+fig
+ggsave(dpi = 500,fig,filename = "./fig_res/fig7b.png",units = "in", height = 2,width = 4)
+# ggsave(fig,filename = "./fig_res/fig7a.pdf",units = "in", height = 5.5,width = 9)
+```
+
+
+
+concordant
+```{r,fig.width=3, fig.height=3}
+# tmp <- PISA_summary_augmented %>% 
+#   filter(drug_name=="Podophyllotoxin") %>% 
+#   select(-unsup_pred_score) %>%
+#   arrange(desc(score1)) %>% 
+#   drop_na() %>% 
+#   slice(1:37) #25%
+# 
+# fig1 <- tmp %>%   
+#   ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
+#   geom_point(shape=2)+
+#   geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:3), color="#E64B35FF")+
+#   xlab("PISA score")+
+#   ylab("Supervised predicion score")+
+#   theme_classic() +
+#   xlim(c(0,4))+
+#   ggtitle("Podophyllotoxin")
+# 
+# fig1
+```
+
+
+```{r}
+# tmp <- PISA_summary_augmented %>% 
+#   filter(drug_name=="Pitavastatin") %>% 
+#   select(-unsup_pred_score) %>%
+#   arrange(desc(score1)) %>% 
+#   drop_na() %>% 
+#   slice(1:37) %>% 
+#   arrange(desc(sup_pred_score))
+
+# tmp %>%   
+#   ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
+#   geom_point()+
+#   geom_text(data=tmp %>% slice(1:5), color="red")+
+#   geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
+#   xlab("PISA score")+
+#   ylab("Supervised predicion score")+
+#   theme_classic()  +
+#   ggtitle("Pitavastatin")
+# 
+# tmp <- PISA_summary_augmented %>% 
+#   filter(drug_name=="Pitavastatin") %>% 
+#   select(-unsup_pred_score) %>%
+#   arrange(desc(score1)) %>% 
+#   drop_na() %>% 
+#   slice(1:37) %>% 
+#   arrange(desc(sup_pred_score))
+```
+
+
+
+```{r,fig.width=3,fig.height=3}
+# https://www.medchemexpress.com/QNZ.html?utm_source=google&utm_medium=CPC&utm_campaign=Europe&utm_term=HY-13812&utm_content=EVP4593&gclid=Cj0KCQiAiJSeBhCCARIsAHnAzT86KKIJGKdt8CsIYdASuLsH1Ii8jeRGGYhJ9poZmm32vuy-3lU2PdsaArsSEALw_wcB
+
+
+# tmp <- PISA_summary_augmented %>%
+#   filter(drug_name=="EVP4593") %>%
+#   arrange(desc(score1)) %>%
+#   drop_na() %>%
+#   arrange(desc(sup_pred_score))
+# 
+# tmp %>%
+#   ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
+#   geom_point(shape=2)+
+#   geom_text(data=tmp %>% slice(1:3), color="#E64B35FF",position=position_jitter(height = 0.2))+
+#   geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:2), color="#E64B35FF")+
+#   xlab("PISA score")+
+#   ylab("Supervised predicion score")+
+#   theme_classic()  +
+#   xlim(c(-0.20,3))+
+#   ylim(c(0,1.2))+
+#   ggtitle("EVP4593")
+#   # theme(plot.margin = margin(2, 2, 2, 2, "cm"))
+```
+
+
+```{r,fig.width=3,fig.height=3}
+# tmp <- PISA_summary_augmented %>%
+#   filter(drug_name=="Nanchangmycin") %>%
+#   arrange(desc(score1)) %>%
+#   drop_na() %>%
+#   arrange(desc(sup_pred_score))
+# 
+# tmp %>%
+#   ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
+#   geom_point(shape=2,check_overlap =T)+
+#   geom_text(data=tmp %>% slice(1:3), color="#E64B35FF")+
+#   geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1), color="red")+
+#   xlab("PISA score")+
+#   ylab("Supervised predicion score")+
+#   theme_classic()  +
+#   xlim(c(-0.2,1.5))+
+#   ggtitle("Nanchangmycin")
+#   # theme(plot.margin = margin(2, 2, 2, 2, "cm"))
+```
+
+```{r}
+# tmp <- PISA_summary_augmented %>%
+#   filter(drug_name=="Thiostrepton") %>%
+#   arrange(desc(score1)) %>%
+#   drop_na() %>%
+#   arrange(desc(sup_pred_score))
+# 
+# tmp %>%
+#   ggplot(aes(x=score1, y= sup_pred_score,label= gene_symbol))+
+#   geom_point(shape=2,check_overlap =T)+
+#   geom_text(data=tmp %>% slice(1:5), color="#E64B35FF")+
+#   geom_text(data=tmp %>%  arrange(desc(score1)) %>%  slice(1:5), color="red")+
+#   xlab("PISA score")+
+#   ylab("Supervised predicion score")+
+#   theme_classic()  
+```
+
+now lets see if our unsupervised predictions give better predictions on PISA top50 genes's
+neighbours
+```{r}
+# annotate_feature_matrix_par <- function(network, drug_gene_matrix, target_source) {
+#   library(igraph)
+#   graph_network <- graph_from_data_frame(network,directed = F)
+#   graph_node_list <- names(V(graph_network))
+#   n= nrow(drug_gene_matrix)
+#   m= ncol(drug_gene_matrix)-1
+#   drug_list <- drug_gene_matrix$drug
+#   gene_list <- colnames(drug_gene_matrix)[-1]
+#   target_list <- unique(target_source$target)
+#   drug_with_target <- unique(target_source$drug)
+# 
+#   NA_drugs_idx <- (1:n)[!(drug_list %in%  drug_with_target)]# index drug without target
+#   NA_genes_idx <- (1:m)[!(gene_list %in% c(target_list, graph_node_list))] # index genes that are neither in targetlist or in networknodelist
+#   remaining_drugs_idx <- setdiff(1:n, NA_drugs_idx)
+#   remaining_genes_idx <- setdiff(1:m, NA_genes_idx)
+# 
+# 
+#   #use character matrix to store result.
+#   res <- matrix(nrow = n, ncol = m)
+#   colnames(res) <- gene_list
+#   row.names(res) <- drug_list
+# 
+# 
+#   if (length(NA_drugs_idx)!=0){  res[NA_drugs_idx,] <- "NA_drug"}
+#   if (length(NA_genes_idx)!=0){  res[,NA_genes_idx] <- "NA_gene"}
+#   print(length(remaining_genes_idx))
+#   # print(length(remaining_drugs_idx))
+#   # print(remaining_drugs_idx)
+# 
+#   w <-   future_map(
+#     .x= remaining_drugs_idx,
+#     .f= function(remaining_drugs_idx){
+# 
+#       drug_name= drug_list[remaining_drugs_idx]
+#       target_specific <- target_source %>% filter(drug== drug_name) %>% pull(target)
+#       res0 <- NULL
+#       for (gene_i in remaining_genes_idx) {
+#         # print(gene_i)
+#         gene_name <- gene_list[gene_i]
+# 
+#         if (gene_name %in% target_specific) {
+#           res0 <- c(res0,"Target")}
+#         else if (!(gene_name %in% graph_node_list)) {
+#           res0 <- c(res0,"NA_gene")}
+#         else if(length(intersect(target_specific, graph_node_list)) == 0) {
+#           res0 <- c(res0,"NA_target_network")}
+#         else {
+#           tmp <- distances(graph_network,
+#                            v = match(gene_name, graph_node_list),
+#                            to = na.omit(match(target_specific, graph_node_list ))
+#           )
+#           tmp1 <- min(tmp)
+#           if (is.infinite(tmp1)){tmp1 <- "Not Connected"}
+#           tmp1 <- as.character(tmp1)
+#           res0 <- c(res0,tmp1)
+#         }
+#         # print(res0)
+#       }
+#       return(res0)
+#       }
+#     )
+# 
+#   for(i in  1:length(remaining_drugs_idx)){
+#     idx <- remaining_drugs_idx[i]
+#     res[idx, remaining_genes_idx] <- w[[i]]
+#     # print(idx)
+#     # print(w[[i]])
+#   }
+# 
+#   res <-   res %>%
+#     as_tibble(rownames = NA) %>%
+#     rownames_to_column(var = "drug")
+# 
+#   return(res)
+# }
 ```
 
 whether top ess-sig pick top pisa targets and its neighbouring genes
 ```{r}
-noncancerdrug_PPI_pred %>% 
-  ggplot(aes(x=degree, y=abs(unsup_pred_score))) +
-  geom_boxplot(outlier.color = NA)
+# PPI_old <- read_csv( "~/cluster_scratch/prior/PPI/PPI_old_simplified.csv" ) 
+# pisa_binary50 <- PISA_summary_augmented_drug_level %>% 
+#   mutate(data= map(data, function(x){x %>% arrange(desc(score1)) %>%  slice(1:50) %>% select(gene_symbol)})) %>% 
+#   unnest(data) %>% select(drugid,gene_symbol) %>% 
+#   rename(drug=drugid, target=gene_symbol)
+#   
+# plan(multisession, workers= 5)
+# noncancerdrug_PPI <-   annotate_feature_matrix_par(
+#     network = PPI_old,
+# 
+#     drug_gene_matrix =
+#       prism_unsupervised_pred20 %>%
+#       pivot_wider(id_cols = drug_id, names_from=target, values_from= unsup_pred_score) %>%
+#       rename(drug=drug_id),
+# 
+#     target_source=  pisa_binary50 
+#   )
+# plan(sequential)
+# 
+# noncancerdrug_PPI_pred <- noncancerdrug_PPI %>% 
+#   pivot_longer(cols = -drug, names_to = "gene",values_to= "degree") %>% 
+#   inner_join(prism_unsupervised_pred20,by= c("drug"="drug_id", "gene"= "target"))
+# 
+# 
+# 
+# 
+# source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/get_drug_frac.R")
+# target_idf <- bind_rows(
+#   map_dfr(
+#     .x = c(50, 100, 200),
+#     .f = ~get_drug_frac(dataset= CTRP_binary_PPIold_data, top_num=.x)) %>%
+#     mutate(dataset= "CTRP"),
+#   map_dfr(.x = c(50, 100, 200),
+#           .f = ~get_drug_frac(dataset= GDSC_binary_PPIold_data, top_num=.x)) %>%
+#     mutate(dataset= "GDSC")
+# ) %>% 
+#   mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")) %>% 
+#   mutate(impdef=recode(impdef, "topneg gene"= "Bottom genes" , "toppos gene"= "Top genes")) 
+# # Bar plot: pos/neg stack, top_n dodge, imptype x axis, dataset facet
+# # seems impossible to both stack and dodge
+# 
+# fig <- target_idf %>%   
+#   ggplot(aes(x= factor(top_n),y = frac, fill= impdef)) +
+#   geom_bar(stat = "identity",position = "stack")+
+#   facet_grid(cols = vars(dataset), rows = vars(imptype))+
+#   xlab("Top N genes ranked by signature value")+
+#   ylab("% drugs") +
+#   scale_fill_manual(values=c("#999999", "#56B4E9"))+
+#   theme_classic()+
+#   guides(fill=guide_legend(title="",nrow = 2,title.position = "top"))+
+#   theme(legend.position = "top")+
+#   theme(
+#     legend.position = c(0.7, 0.4),
+#     # legend.justification = c("left", "middle"),
+#     legend.box.just = "right"
+#     )
+# fig
 ```
 
 

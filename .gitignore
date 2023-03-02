@@ -1,5 +1,6 @@
 .Rproj.user
 .Rhistory
+*.html
 .RData
 .Ruserdata
 predicting_prism/message/
