@@ -1,6 +1,5 @@
 .Rproj.user
 .Rhistory
-*.html
 .RData
 .Ruserdata
 predicting_prism/message/
@@ -15,7 +14,6 @@ sensitivity_fitting/forward_modelling/message/
 *png
 *tiff
 *gmt
-.gitignore
 *fig_res/
 *.gitignore
 

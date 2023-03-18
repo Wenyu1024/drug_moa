@@ -1,29 +1,29 @@
 ---
 title: "Unsupervised target and network analysis for CTRP and GDSC data"
 author: "Wenyu"
-date: "5/11/2021"
+date: "5/11/2023"
 output: html_document
 ---
 
+This notebook explores how gene signatures of drugs help drug mechanism discovery.
+Rendering the notebook with pre-computed input takes around 315 seconds.
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,warning = F, error = F)
 library(tidyverse)
 library(ggsci)
 library(ggpubr)
 ```
 
 
-
-
-### 1 Global analysis of top genes and target
-
+# 1 Target enrichment in top signature genes
 ```{r}
 CTRP_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/CTRP_binary_PPIold_data.csv") 
 GDSC_binary_PPIold_data <- read_csv( "~/cluster_scratch/prior/GDSC_binary_PPIold_data.csv") 
 ```
 
 pick top 50, 100, 200 genes and compare to what percentage of drug the target of which can be prioritized by the top genes
-
+Figure 4A
 ```{r,fig.width=3, fig.height=4}
 source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/get_drug_frac.R")
 target_idf <- bind_rows(
@@ -61,7 +61,6 @@ fig
 ```
 
 quantify and test significance
-
 In contrast, drug targets were much less identified by the top or the bottom genes in the gene expression signatures
 ```{r,fig.width=3, fig.height=4}
 CTRP_binary_PPIold_data %>%
@@ -126,52 +125,8 @@ Table2
 # hypergeometric test whether target is enriched in the top or bottom
 ```
 
-Supplementary figure
-```{r, fig.width=3, fig.height=4}
-network_idf <- bind_rows(
-  get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
-    mutate(dataset= "CTRP") %>%  select(-drug) ,
-  get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
-    mutate(dataset= "GDSC") %>%  select(-drug) ) %>% 
-    mutate(impdef=recode(impdef, "topneg gene"= "Bottom genes" , "toppos gene"= "Top genes")) %>% 
-    mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")) 
-
-fig <- network_idf %>% 
-  group_by(dataset,imptype) %>% 
-  mutate(num= n()) %>% 
-  mutate(anno_type2 = case_when(
-             anno_type2 <1 ~ "Target",
-             between(anno_type2,1,2) ~as.character(anno_type2),
-             anno_type2>2 ~ "over 2")) %>%    
-  ungroup() %>% 
-  group_by(impdef, anno_type2,dataset, imptype) %>% 
-  summarize(perc= n()/num*100) %>% 
-  ungroup() %>% distinct() %>% 
-  mutate(anno_type2= factor(anno_type2,c("Target", "1", "2", "over 2"))) %>% 
-  ggplot(aes(x= anno_type2,y=perc, fill= impdef)) +
-  geom_bar(stat = "identity",position = "stack")+
-  facet_grid(cols = vars(dataset), rows = vars(imptype))+
-  xlab("Gene category by PPI target network")+
-  ylab("% drugs")  +
-    scale_fill_manual(values=c("#999999", "#56B4E9"))+
-    # scale_fill_manual(values=c("#E64B35FF", "#4DBBD5FF"))+
-  theme_classic()+
-  guides(fill=guide_legend(nrow = 1))+
-  theme(legend.title= element_blank(), legend.position = "top")
-  # theme(
-  #   legend.position = c(0.2, 0.90)
-  #   # legend.justification = c("left", "middle"),
-  #   # legend.box.just = "right"
-  #   )
-
-fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure2.png",width = 3,height = 4,dpi = 500,bg= "transparent")
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure2.pdf",width = 3,height = 4,bg= "transparent")
-```
-
-
 ROC and AUC 
-figure 4B-4C
+Figure 4B-4C
 ```{r,fig.height=3.5, fig.width=4}
 source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/plot_ave_roc.R")
 
@@ -196,14 +151,21 @@ plot_ave_roc(
     mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")), 
   addlegend = T)
 dev.off() 
+
+plot_ave_roc(
+  annotated_pred_df = CTRP_binary_PPIold_data %>% 
+    mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")) ,
+  addlegend = T
+  )
+plot_ave_roc(
+  annotated_pred_df = 
+    GDSC_binary_PPIold_data %>% 
+    mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")), 
+  addlegend = T)
 ```
 
 
-The drug level auc here should also correlate with the fitting accuracy (not really)
-but lets check it later
-
-So lets just show the AUC result for the CTRP and GDSC Target
-Supplementary figure 4
+Supplementary figure 3
 ```{r,fig.width=3,fig.height=3}
 load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_method_comparison.RData")
 auc_df <- 
@@ -257,9 +219,52 @@ sig_res1 <- auc_df %>%
                          ))
 ```
 
-### 2 Find one drug for story telling
-From CTRP and GDSC for a list of drugs where unsupervised AUC=1, output their nominal target, their 
-top 5 positive and negative gene so that Huang and I and later check
+
+# 2 Target neigbouring gene enrichment in top signature genes
+Supplementary figure4
+```{r, fig.width=3, fig.height=4}
+network_idf <- bind_rows(
+  get_drug_frac(dataset= CTRP_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
+    mutate(dataset= "CTRP") %>%  select(-drug) ,
+  get_drug_frac(dataset= GDSC_binary_PPIold_data, top_n=50, res_type = "druglevel") %>% 
+    mutate(dataset= "GDSC") %>%  select(-drug) ) %>% 
+    mutate(impdef=recode(impdef, "topneg gene"= "Bottom genes" , "toppos gene"= "Top genes")) %>% 
+    mutate(imptype=recode(imptype, "ConExp-Sig"= "Exp-sig" , "ConSen-Sig"= "Ess-sig")) 
+
+fig <- network_idf %>% 
+  group_by(dataset,imptype) %>% 
+  mutate(num= n()) %>% 
+  mutate(anno_type2 = case_when(
+             anno_type2 <1 ~ "Target",
+             between(anno_type2,1,2) ~as.character(anno_type2),
+             anno_type2>2 ~ "over 2")) %>%    
+  ungroup() %>% 
+  group_by(impdef, anno_type2,dataset, imptype) %>% 
+  summarize(perc= n()/num*100) %>% 
+  ungroup() %>% distinct() %>% 
+  mutate(anno_type2= factor(anno_type2,c("Target", "1", "2", "over 2"))) %>% 
+  ggplot(aes(x= anno_type2,y=perc, fill= impdef)) +
+  geom_bar(stat = "identity",position = "stack")+
+  facet_grid(cols = vars(dataset), rows = vars(imptype))+
+  xlab("Gene category by PPI target network")+
+  ylab("% drugs")  +
+    scale_fill_manual(values=c("#999999", "#56B4E9"))+
+  theme_classic()+
+  guides(fill=guide_legend(nrow = 1))+
+  theme(legend.title= element_blank(), legend.position = "top")
+  # theme(
+  #   legend.position = c(0.2, 0.90)
+  #   # legend.justification = c("left", "middle"),
+  #   # legend.box.just = "right"
+  #   )
+
+fig
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure2.png",width = 3,height = 4,dpi = 500,bg= "transparent")
+ggsave(fig, filename = "~/cluster_wrk/drug_moa/unsupervised_target_exploration/fig_res/supplementary figure2.pdf",width = 3,height = 4,bg= "transparent")
+```
+
+Find one drug for story telling (for figure 4D)
+From CTRP and GDSC for a list of drugs where unsupervised AUC=1, output their nominal target, their top 5 positive and negative gene 
 ```{r}
 ctrp_bestranked_drugs <- ctrp_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
 gdsc_bestranked_drugs <- gdsc_unsupervised_auc %>%  filter(imptype=="ConSen-Sig") %>% filter(AUC == 1) %>% pull(drug)
@@ -292,8 +297,8 @@ tmp4 <- inner_join(tmp, tmp3,by=c("drug"= "DRUG_ID"))
 # write_csv(tmp4, "~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
 ```
 
-Shan asked if I can give a gene-level summary
-```{r}
+a gene-level summary
+```{r,eval=FALSE}
 tmp <- read_csv("~/cluster_wrk/drug_moa/unsupervised_target_exploration/findacase_combined.csv")
 
 top_pos <- 
@@ -442,7 +447,7 @@ example_ctrp_DDR <- pathways_df_ctrp %>%
   select(-drug) %>% 
   rename(REPORTED_MECHANISM=target_or_activity_of_compound) %>% 
   mutate(padj= formatC(padj, format = "e", digits = 2),
-         ES= round(ES,2), NES=roud(NES, 2))
+         ES= round(ES,2), NES=round(NES, 2))
 
 pathways_df_prism <- 
   tibble(drug=feature_imp_ridge_prism_comb1$drug, pathway=prism_kegg) %>% 
@@ -493,4 +498,11 @@ GO_df_prism <-
 write_csv(GO_df_gdsc, "GO_df_gdsc.csv")
 write_csv(GO_df_prism, "GO_df_prism.csv")
 write_csv(GO_df_ctrp, "GO_df_ctrp.csv")
+
+example_gdsc_DDR
 ```
+
+```{r}
+sessionInfo()
+```
+
