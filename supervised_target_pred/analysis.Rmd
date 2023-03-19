@@ -5,19 +5,18 @@ date: "1/15/2021"
 output: html_document
 ---
 
-The aim of this nootbook is to explore whether the extracted model importances from the sen~ess glmnet model can be used in supervised drug target prediction
+This notebook explores the performance of different type of drug signatures for drug target prediction. Rendering the notebook with pre-computed input takes around 110 seconds.
 
-
-## 1 Init
 ```{r, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, fig.pos = 'H')
 library(tidyverse)
 library(tidymodels)
+library(ggsci)
 load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
 source("~/cluster_wrk/drug_moa/supervised_target_pred/function/get_target_pred_supervised.R")
 ```
 
-
+# 1 Dataset exploration
 Check how many drugs are available for supervised target prediction comparison
 The prediction itself is moved to server batch job codes.
 ```{r}
@@ -99,10 +98,9 @@ length(intersect(gdsc_allvalid_list, unique(gdsc_target_dtc$drug))) #104
 ```
 
 
-## 2 Check prediction result 
-### 2.1 Function
-```{r}
+# 2 Visualization of drug target prediction accuracy
 
+```{r}
 get_acc_summary <- function(acc_df){
   acc_df <- acc_df %>% 
     filter(method %in% c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS") )
@@ -119,7 +117,6 @@ get_acc_summary <- function(acc_df){
 
 
 get_acc_violin_plot <- function(acc_df){
-  library(ggsci)
   acc_df <- acc_df %>% 
     filter(method %in% c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS") )
   
@@ -144,8 +141,8 @@ get_acc_violin_plot <- function(acc_df){
 
 ```
 
-### 2.2 CTRP
-```{r}
+
+```{r,eval=FALSE, echo=FALSE,include=F}
 get_acc_summary(acc_df_ctrp_binary_fold_cv)
 # get_acc_summary(acc_df_ctrp_binary_loocv)
 get_acc_summary(acc_df_ctrp_dtcbinary_foldcv)
@@ -155,18 +152,12 @@ get_acc_summary(acc_df_ctrp_dtc_foldcv)
 
 
 fig_ctrp1 <- get_acc_violin_plot(acc_df_ctrp_binary_fold_cv)
-# get_acc_violin_plot(acc_df_ctrp_binary_loocv)
-# get_acc_box_plot(acc_df_ctrp_binary_loocv)
 fig_ctrp2 <- get_acc_violin_plot(acc_df_ctrp_dtcbinary_foldcv)
-# get_acc_violin_plot(acc_df_ctrp_dtcbinary_loocv)
 fig_ctrp3 <- get_acc_violin_plot(acc_df_ctrp_dtc_foldcv)+ ylab(label = "COR")
-# get_acc_violin_plot(acc_df_ctrp_dtc_loocv)
-
-
 ```
 
-### 2.3 GDSC
-```{r}
+
+```{r,eval=FALSE, echo=FALSE,include=F}
 get_acc_summary(acc_df_gdsc_binary_fold_cv)
 # get_acc_summary(acc_df_gdsc_binary_loocv)
 get_acc_summary(acc_df_gdsc_dtcbinary_foldcv)
@@ -182,8 +173,8 @@ fig_gdsc3 <- get_acc_violin_plot(acc_df_gdsc_dtc_foldcv)+ ylab(label = "COR")
 # get_acc_violin_plot(acc_df_gdsc_dtc_loocv)
 ```
 
-### 2.4 PRISM
-```{r}
+
+```{r,eval=FALSE, echo=FALSE,include=F}
 get_acc_summary(acc_df_prism_binary_fold_cv)
 # get_acc_summary(acc_df_prism_binary_loocv)
 get_acc_summary(acc_df_prism_dtcbinary_foldcv)
@@ -200,9 +191,7 @@ get_acc_violin_plot(acc_df_prism_dtc_foldcv)+ ylab(label = "COR")
 ```
 
 
-### 2.5 Output figure preparation
 https://ggplot2.tidyverse.org/reference/label_bquote.html
-
 ```{r}
 acc_df <- 
   bind_rows(acc_df_ctrp_binary_fold_cv %>% mutate(Dataset= "CTRP", TargetType= "Primary")) %>% 
@@ -218,8 +207,6 @@ acc_df$method <-  factor(
   acc_df$method, 
   levels= c("senbased_genesig_comb1", "Consensus_exp_perturb", "structure_ECFP", "structure_MACCS"), 
   labels = c("Ess-sig", "Exp-sig", "Fingerprint-ECFP","Fingerprint-MACCS" ))
-
-
 
 acc_df$facet = factor(
   acc_df$TargetType, 
@@ -268,11 +255,12 @@ sig_res1 <- acc_df %>%
   select(-data) %>% 
   unnest(cols = c(Test_res))
 write_csv(sig_res1, "sig_res1.csv")
+sig_res1
 ```
 
-figure 3a
+Figure 3a
+the significance was added manually using inkscape
 ```{r,fig.width= 3.5,fig.height=5}
-
 stat.test <- sig_res1 %>%
   mutate(comparison= factor(
     sig_res1$comparison,
@@ -295,9 +283,9 @@ stat.test <- sig_res1 %>%
 fig <- acc_df %>% 
   ggplot(mapping=aes(x=method, y=acc, color= method, fill= method)) + 
   geom_violin()+
-  ggpubr::stat_compare_means(
-    aes(group=method),label = "p.signif",vjust = 0.4,
-    method = "t.test",ref.group = "Ess-sig",label.y = 0.75)+
+  # ggpubr::stat_compare_means(
+  #   aes(group=method),label = "p.signif",vjust = 0.4,
+  #   method = "t.test",ref.group = "Ess-sig",label.y = 0.75)+
   stat_summary(
     fun.data = "mean_cl_boot",
     geom = "pointrange",
@@ -319,14 +307,15 @@ fig <- acc_df %>%
 
 fig
 
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3A.pdf",width = 3.5,height = 5,bg='transparent')
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3A.png",width = 3.5,height = 5,bg='transparent')
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3A.pdf",width = 3.5,height = 5,bg='transparent')
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3A.png",width = 3.5,height = 5,bg='transparent')
 ```
 
 
-## 3 Get predictions for the drugs. 
+# 3 Repurposable pair prioritization 
 
-lets still use the leave out method since I am going to 
+Get predictions for the drugs: 
+use the leave out method since I am going to 
 investigate the selectivity of the predicted targets
 
 training drugs: allvalid drugs with targets from binary table
@@ -335,7 +324,7 @@ test_drugs,  allvalid_drugs
 assign the weight of the same drugs to zero in the correlation
 matrix to avoid data leaking.
 
-```{r}
+```{r,eval=FALSE}
 ctrpess_drugbank_predictions <- get_predictions(
   sig_data=feature_imp_ridge_ctrp_comb1,
   train_drugs=intersect(ctrp_drug_list, ctrp_target_binary$drug),
@@ -443,8 +432,6 @@ gdscextended_dtc_predictions <- get_predictions(
 save.image("~/cluster_scratch/forward_modelling/supervisedpredictedtargets.RData")
 ```
 
-
-lets find drugs whose target similiarity and sensitivity similiarity is high showed high similiarity in predicted target space by sensig not the other two types
 
 now prepare sen matrix and target similiarity matrix 
 ```{r}
@@ -758,10 +745,11 @@ sig_res2 <- fig_data %>%
   select(-data) %>% 
   unnest(cols = c(Test_res))
 write_csv(sig_res2, "sig_res2.csv")
-
+sig_res2
 ```
 
-supplementary figure
+Supplementary figure 2
+the significance was added manually using inkscape
 ```{r,fig.width=3.5,fig.height=5}
 # my_comparisons <- list(c("Ess-sig", "Exp-sig"), c("Ess-sig", "Fingerprint-ECFP"), c("Ess-sig", "Fingerprint-MACCS"))
 fig <- fig_data %>% 
@@ -781,13 +769,13 @@ fig <- fig_data %>%
       fill = method, color= method)
          ) +
   geom_violin()+
-  ggpubr::stat_compare_means(
-    aes(group=method),label = "p.signif",
-    method = "wilcox.test",
-    ref.group = 1,label.y=1.1,
-    # comparisons = my_comparisons,
-    # tip.length = 0.01,bracket.size=0.1,
-    vjust = 0.4)+
+  # ggpubr::stat_compare_means(
+  #   aes(group=method),label = "p.signif",
+  #   method = "wilcox.test",
+  #   ref.group = 1,label.y=1.1,
+  #   # comparisons = my_comparisons,
+  #   # tip.length = 0.01,bracket.size=0.1,
+  #   vjust = 0.4)+
   stat_summary(fun.data = "mean_cl_boot", geom = "pointrange",
            colour = "black",size=0.2)+
   theme_classic()+
@@ -798,10 +786,11 @@ fig <- fig_data %>%
   facet_grid(cols = vars(Dataset), rows = vars(TargetType),scales = "free",switch = "y")+
   theme(legend.title = element_blank(),legend.position="top",axis.text.x=element_blank(), axis.title.x=element_blank())
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/supplementary figure1.pdf",width = 3.5,height = 5,bg = 'transparent')
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/supplementary figure1.pdf",width = 3.5,height = 5,bg = 'transparent')
 ```
 
 Figure 3B
+Highlight of three drug pairs is added mannually using inkscape
 ```{r}
 figdata <- pairlevel_comparison_ctrp_drugbank %>%
   filter(target_or_activity_of_compound.x== target_or_activity_of_compound.y) %>%
@@ -891,6 +880,10 @@ fig <- cowplot::plot_grid(p2, legend, rel_heights = c(5, 1),nrow = 2)
 ```{r, fig.width=4,fig.height=6}
 # cowplot::ggdraw(p2)
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3B.pdf",width = 4,height = 6,bg = 'transparent')
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/supervised_target_pred/fig_res/fig 3B.pdf",width = 4,height = 6,bg = 'transparent')
+```
+
+```{r}
+sessionInfo()
 ```
 

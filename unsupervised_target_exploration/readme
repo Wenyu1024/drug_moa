@@ -2,7 +2,7 @@ PPI file is first prepared using get_ppi.R code
 
 Then the prepared PPI files (PPI old) is used to annotate unsupervised prediction: with annotate_feature matrix codes (there are three of them because I want to submit 3 separate jobs to the cluster,
 PPIold ess (run.sh), PPInew ess(run1.sh), PPIold and PPInew exp (run2.sh).
-Later I decided to use only the PPIold.
+Later I decided to use only the PPIold as used in previous publications.
 
 The annotation result is further tidyed by the tidy_annotated_imp.R
 After that, the output are imported in analysis.RMD for exploring and visualization.

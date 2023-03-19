@@ -1,32 +1,26 @@
 ---
 title: "Drug sensitivity prediction forward modellin"
 author: "Wenyu"
-date: "1/15/2021"
+date: "1/15/2023"
 output: html_document
 ---
 
-The aim of this notebook is to explore the prediction accuracy
-of different type of essentiality scores on drug sensitivity.
+This notebook explores the prediction accuracy of different type of essentiality scores on drug sensitivity. The aim is to decide the best option for deriving drug essentiality signatures.
 
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+Rendering the notebook with pre-computed input takes around 1 minutes.
+
+```{r, include=T}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, fig.pos = 'H')
 library(furrr)
 library(tidyverse)
 library(tidymodels)
 ```
 
-checking whether there are failed jobs
-```{r}
-# tmp <- list.files("~/cluster_scratch/forward_modelling/prism_modelres/")
-# tmp1 <- str_extract(string = tmp, pattern = "\\d{1,4}") 
-```
 
 # 1 CTRP
-
-
 Because rmse or mae are influenced by the value, I standardized the AUC before calculation.
 note binarization may lead to only one class (no sensitive cell lines.)
-```{r}
+```{r,eval=FALSE}
 load("~/cluster_scratch/forward_modelling/ctrp_input.RData")
 ctrp_data <- data
 rm(data)
@@ -99,7 +93,7 @@ res_ctrp2 <- res_ctrp1 %>%
 
 
 # 2 GDSC data
-```{r}
+```{r,eval=FALSE}
 #load data
 load("~/cluster_scratch/forward_modelling/gdsc_input.RData")
 gdsc_data <- data
@@ -173,10 +167,10 @@ res_gdsc2new =res_gdsc2
 res_gdsc2new =res_gdsc2new %>% filter(.metric== "spearman coef")
 ```
 
-# 3 prism
+# 3 PRISM
 
 lets check the accuracy
-```{r}
+```{r,eval=FALSE}
 load( file = "~/cluster_scratch/forward_modelling/prism_input.RData")
 prism_data <- data
 rm(data)
@@ -258,7 +252,7 @@ check the failed jobs and generate a list to rerun
 
 
 # 4 cross dataset comparison
-```{r}
+```{r,eval=FALSE}
 combined_performance <- bind_rows(
   res_ctrp1 %>% 
     select(input, .metric, estimate, variance) %>% 
@@ -314,7 +308,7 @@ combined_performance3 <- bind_rows(
 ```
 
 
-```{r}
+```{r,eval=FALSE}
 sig_res <- 
   combined_performance3 %>% 
   nest_by(dataset,.metric) %>% 
@@ -340,7 +334,7 @@ sig_res <-
 
 ```
 
-```{r}
+```{r,eval=FALSE}
 save.image("~/cluster_scratch/forward_modelling/forwardmodelling_all_new.RData")
 ```
 
@@ -356,7 +350,7 @@ combined_performance3 %>%
 
 
 plot for checking
-```{r,fig.width=8,fig.height=12}
+```{r,fig.width=8,fig.height=12,eval=FALSE}
 combined_performance3 %>%   
   ggplot(mapping = aes(x=input, y= estimate, color=input)) +
   geom_boxplot()+
@@ -377,11 +371,11 @@ ddummy = tibble(
   .metric= factor(
     x = c("rmse", "roc_auc"),
     levels = c("rmse", "roc_auc"), 
-    labels = c("RMSE", "ROC-AUC") )
+    labels = c("RMSE", "AUROC") )
 )
 
 fig <- combined_performance3 %>%   
-  filter(dataset !="prism") %>%
+  filter(dataset !="PRISM") %>%
   mutate(input= toupper(input)) %>%
   mutate(dataset= toupper(dataset)) %>% 
   filter(.metric %in% c("rmse", "roc_auc")) %>% 
@@ -405,13 +399,13 @@ fig <- combined_performance3 %>%
   ggsci::scale_fill_npg()
 
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2B.pdf",width = 4,height = 5,bg = "transparent")
-
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2B.png",width = 4,height = 5,dpi = 500,bg = "transparent")
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2B.pdf",width = 4,height = 5,bg = "transparent")
+# 
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2B.png",width = 4,height = 5,dpi = 500,bg = "transparent")
 
 ```
 
-supplementary fig
+supplementary fig 1
 ```{r,fig.width=4,fig.height=8}
 ddummy = tibble(
   input= NA,
@@ -420,11 +414,11 @@ ddummy = tibble(
   .metric= factor(
     x = c("mae","pr_auc", "rsq", "spearman coef"),
     levels = c("mae","pr_auc", "rsq", "spearman coef"), 
-    labels = c("MAE","PRAUC", "R-square", "Spearman COR") )
+    labels = c("MAE","PRAUC", "R-square", "Spearman coef") )
 )
 
 fig <- combined_performance3 %>%   
-  filter(dataset !="prism") %>%
+  filter(dataset !="PRISM") %>%
   mutate(input= toupper(input)) %>%
   mutate(dataset= toupper(dataset)) %>% 
   filter(!(.metric %in% c("rmse",  "roc_auc"))) %>% 
@@ -447,17 +441,17 @@ fig <- combined_performance3 %>%
   scale_y_continuous(labels = formatter(nsmall = 2))+
   ggsci::scale_fill_npg()
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/supplementary figure.pdf",width = 4,height = 8, bg="transparent")
-
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/supplementary figure.png",width = 4,height = 8,dpi = 500,bg="transparent")
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/supplementary figure.pdf",width = 4,height = 8, bg="transparent")
+# 
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/supplementary figure.png",width = 4,height = 8,dpi = 500,bg="transparent")
 ```
 
-figure2d
+Figure2d
 
 ```{r,fig.height=3,fig.width=6}
 plot_df1 <- combined_performance3 %>% 
   filter(.metric=="rmse") %>%
-  filter(dataset !="prism") %>%
+  filter(dataset !="PRISM") %>%
   # filter(dataset !="GDSC") %>%
   mutate(input= toupper(input)) %>%
   mutate(dataset= toupper(dataset)) %>% 
@@ -512,9 +506,9 @@ fig <- plot_df1 %>%
   theme(legend.position="none")
 
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2D.pdf",width = 8,height = 4,bg="transparent")
-
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2D.png",width = 8,height = 4,dpi = 500,bg="transparent")
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2D.pdf",width = 8,height = 4,bg="transparent")
+# 
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2D.png",width = 8,height = 4,dpi = 500,bg="transparent")
 ```
 
 
@@ -562,10 +556,12 @@ roc_auc_diff_drug_level1 <- combined_performance3 %>%
   pivot_wider(names_from = input, values_from= estimate) %>% 
   mutate(ceres_ces_diff= ceres-ces) %>%  
   right_join(y = bind_rows(
-          performance_difference_test_res1 %>% mutate(diff_type= "ceres-ces")
+          performance_difference_test_res1 %>% 
+            mutate(diff_type= "ceres-ces") %>% 
+            mutate(dataset= toupper(dataset)) 
     )) %>%
   filter(.metric== "roc_auc") %>%
-  filter(dataset!="prism") %>% 
+  filter(dataset!="PRISM") %>% 
   arrange(ceres_ces_diff) %>% 
   mutate(ID = fct_reorder(ID, ceres_ces_diff) )
 
@@ -574,10 +570,12 @@ roc_auc_diff_drug_level2 <- combined_performance3 %>%
   pivot_wider(names_from = input, values_from= estimate) %>% 
   mutate(ceres_demeter_diff= ceres- demeter2) %>% 
   right_join(y = bind_rows(
-          performance_difference_test_res2 %>% mutate(diff_type= "ceres-demeter2")
+          performance_difference_test_res2 %>% 
+            mutate(diff_type= "ceres-demeter2") %>% 
+            mutate(dataset= toupper(dataset)) 
     )) %>%
   filter(.metric== "roc_auc") %>%
-  filter(dataset!="prism") %>% 
+  filter(dataset!="PRISM") %>% 
   arrange(ceres_demeter_diff) %>% 
   mutate(ID = fct_reorder(ID, ceres_demeter_diff) )
 
@@ -599,23 +597,26 @@ fig <- plot_df%>%
   facet_grid(rows = vars(diff_type),cols= vars(dataset),scales = "free",switch="y")+
   theme_classic()+
   theme(axis.text.x = element_blank() , axis.title.x = element_blank(), axis.ticks.x = element_blank())+
-  ylab("\U0394AUROC")
+  ylab("\U0394 AUROC")
 
 fig
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2C.pdf",width = 3,height = 4,bg="transparent")
-
-ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2C.png",width = 3,height = 4,dpi = 500,bg="transparent")
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2C.pdf",width = 3,height = 4,bg="transparent")
+# 
+# ggsave(fig, filename = "~/cluster_wrk/drug_moa/sensitivity_fitting/forward_modelling/fig_res/figure2C.png",width = 3,height = 4,dpi = 500,bg="transparent")
 ```
 
 
 ```{r}
-save.image("~/cluster_scratch/forward_modelling/forwardmodelling_paper_result.RData")
-write_csv(sig_res, "sig_res.csv")
-write_csv(sig_res1, "sig_res1.csv")
-write_csv(roc_auc_diff_drug_level1, "roc_auc_diff_drug_level1.csv")
-write_csv(roc_auc_diff_drug_level2, "roc_auc_diff_drug_level2.csv")
+# save.image("~/cluster_scratch/forward_modelling/forwardmodelling_paper_result.RData")
+# write_csv(sig_res, "sig_res.csv")
+# write_csv(sig_res1, "sig_res1.csv")
+# write_csv(roc_auc_diff_drug_level1, "roc_auc_diff_drug_level1.csv")
+# write_csv(roc_auc_diff_drug_level2, "roc_auc_diff_drug_level2.csv")
 ```
 
 
+```{r}
+sessionInfo()
+```
 
 

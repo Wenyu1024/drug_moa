@@ -56,7 +56,7 @@ plot_ave_roc <- function(annotated_pred_df, addlegend= T,label_level= 0){
   perf <- performance(pred,'tpr','fpr')
   pred1 <- prediction(ROCR.conexpsig$predictions, ROCR.conexpsig$labels)
   perf1 <- performance(pred1,'tpr','fpr')
-  plot(perf, avg="vertical", lwd=3, col="E64B35FF",spread.estimate="stderror",plotCI.lwd=2,xlab= "FPR", ylab= "TPR",)
-  plot(perf1, avg="vertical", lwd=3, col="4DBBD5FF",spread.estimate="stderror",plotCI.lwd=2,add=T,xlab= "FPR", ylab= "TPR")
-  if(addlegend== T){legend("bottomright", legend = c("Ess-sig", "Exp-sig"), lty = 1, lwd = 2, col = c("red", "blue"))}
+  plot(perf, avg="vertical", lwd=3, col="#E64B35FF",spread.estimate="stderror",plotCI.lwd=2,xlab= "FPR", ylab= "TPR",)
+  plot(perf1, avg="vertical", lwd=3, col="#4DBBD5FF",spread.estimate="stderror",plotCI.lwd=2,add=T,xlab= "FPR", ylab= "TPR")
+  if(addlegend== T){legend("bottomright", legend = c("Ess-sig", "Exp-sig"), lty = 1, lwd = 2, col = c("#E64B35FF", "#4DBBD5FF"))}
 }

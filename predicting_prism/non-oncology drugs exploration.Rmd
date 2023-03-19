@@ -1,10 +1,14 @@
 ---
-title: "Non-oncology drug exploration"
+title: "Applying gene essentiality signature to explore mechanism of noncancer drugs"
 output: html_document
 ---
 
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+This notebook demonstrates the application of essentiality signaturing method on noncancer drug mechanism discovery. The notebook knitting takes about one minute.
+
+
+# 1 Derive valid gene essentiality signatures for PRISM drugs.
+```{r}
+knitr::opts_chunk$set(echo = TRUE,warning=FALSE, error=FALSE)
 load("~/cluster_scratch/forward_modelling/targetpred_output_simplefiltering.RData")
 rm(get_target_mat)
 rm(no_tunning_weighted_averaging)
@@ -15,7 +19,7 @@ load("~/cluster_scratch/unsupervised_target_pred/unsupervised_target_pred_ConSen
 
 library(tidyverse)
 library(ggsci)
-source("./function/get_drug_frac.R")
+source("~/cluster_wrk/drug_moa/unsupervised_target_exploration/function/get_drug_frac.R")
 prism_sc_drug <- read_csv("~/cluster_scratch/prism/drug_repurposing_scdrugsmeta.csv")
 
 targetpanel_dtc <- data.table::fread("~/cluster_scratch/prior/DTC_data_all.csv",
@@ -36,15 +40,15 @@ targetpanel_drh_genelevel <- targetpanel_drh %>%
 
 length(unique(targetpanel_drh$target))   # 1943 genes
 
-cellline_hgsoc <- cell_line_info %>% 
-  filter(primary_disease== "Ovarian Cancer") %>% 
-  filter(Subtype== "Adenocarcinoma, high grade serous")
+# cellline_hgsoc <- cell_line_info %>% 
+#   filter(primary_disease== "Ovarian Cancer") %>% 
+#   filter(Subtype== "Adenocarcinoma, high grade serous")
 
-senvalid_20drugs <- read_csv("~/cluster_wrk/drug_moa/predicting_prism/res_final.csv")
+# senvalid_20drugs <- read_csv("~/cluster_wrk/drug_moa/predicting_prism/res_final.csv")
 ```
 
 
-Supplementary figure. Plot the model fitness for PRISM drug sensitivity.
+Supplementary figure5. Plot the model fitness for PRISM drug sensitivity.
 ```{r,fig.width=3, fig.height=2}
 res_prism2_long <- res_prism2
 res_prism2 <- res_prism2_long %>%
@@ -57,14 +61,14 @@ res_prism2 <- res_prism2_long %>%
 fig <- res_prism2 %>% 
   ggplot(aes(x= acc_sen))+
   geom_histogram(size=0.1)+
-  geom_vline(xintercept = 0.2, color="red", lty=2)+
+  geom_vline(xintercept = 0.2, color="#E64B35FF", lty=2)+
   theme_classic()+
   xlab("Model Fitness (Spearman COR)")+
   ylab("Number of drugs")
 
 fig
-ggsave(plot = fig, filename = "./fig_res/supplmentary_figure5.pdf",width = 3,height = 2)
-ggsave(plot = fig, filename = "./fig_res/supplmentary_figure5.png",width = 3,height = 2,dpi = 500)
+# ggsave(plot = fig, filename = "./fig_res/supplmentary_figure5.pdf",width = 3,height = 2)
+# ggsave(plot = fig, filename = "./fig_res/supplmentary_figure35.png",width = 3,height = 2,dpi = 500)
 ```
 
 
@@ -105,13 +109,11 @@ prism_good_fitted_drugs_dtcannotated <- prism_good_fitted_drugs %>%
 #   filter(is.na(moa))
 ```
 
-
+# 2 Apply the essentiality signaturing method for noncancer drug target prediction.
 Get supervised and nonsupervised prediction accuracy
 ```{r}
-
 acc_unsupervised_prism268 <- prism_unsupervised_auc %>% 
   filter(drug %in% prism_good_fitted_drugs_drhannotated) 
-
 setwd("~/cluster_wrk/drug_moa/supervised_target_pred/function/")
 source('return_acc_estimate_loocv.R') 
 acc_supervised_prism268 <- return_acc_estimate_cv(
@@ -133,7 +135,6 @@ prism_268_all <- acc_supervised_prism268 %>%
   rename(unsupervised_auc = auc) %>% 
   rename(sample_size= n_forward_modelling) %>% 
   select(drug, name, drug_category,Drug_category, moa,target,phase, supervised_auc, unsupervised_auc,sample_size)
-
 ```
 
 check the median accuracy and significance
@@ -160,6 +161,7 @@ prism_268_all %>%
   t_test(unsupervised_auc~Drug_category)
 ```
 
+Figure 6A
 ```{r,fig.width=3,fig.height=3.6}
 fig <- prism_268_all %>%
   mutate(Drug_category= factor(Drug_category,
@@ -168,8 +170,8 @@ fig <- prism_268_all %>%
   ggplot(aes(x= supervised_auc, y= unsupervised_auc, color= Drug_category)) +
   geom_point(size = 0.5)+
   theme_classic()+
-  ylab("Unsupervised prediction accuracy (AUC)")+
-  xlab("Supervised prediction accuracy (AUC)")+
+  ylab("Signature target enrichment (AUROC)")+
+  xlab("Target prediction accuracy (AUROC)")+
   guides(color= guide_legend(title = "Drug Category"))+
   theme(legend.position="bottom",legend.title = element_blank())+
   # theme(
@@ -180,12 +182,13 @@ fig <- prism_268_all %>%
   ggsci::scale_color_npg()
 fig <- ggExtra::ggMarginal(fig,type= "boxplot",groupColour = T,groupFill = T)
 fig
-ggsave(fig,filename = "./fig_res/fig6a.png",width = 3,height = 3.6,dpi = 500)
-ggsave(fig,filename = "./fig_res/fig6a.pdf",device = "pdf",width = 3,height = 3.6)
+# ggsave(fig,filename = "./fig_res/fig6a.png",width = 3,height = 3.6,dpi = 500)
+# ggsave(fig,filename = "./fig_res/fig6a.pdf",device = "pdf",width = 3,height = 3.6)
 ```
 
 
-
+# 3 Explore the reason for poor drug target prediction accuracy for non cancer drugs.
+Figure 6B
 Showing how target of noncancer drugs overlapped poorly with cancer drugs
 ```{r,fig.width=3,fig.height=3}
 # Distribution of number of drugs with at least one shared target
@@ -216,11 +219,11 @@ fig <- tmp1 %>%
   guides(color= guide_legend(title = "Drug Category"))+
   theme(legend.title = element_blank())
 fig
-ggsave(fig,filename = "./fig_res/fig6b.png",width = 3,height = 3,dpi = 500)
-ggsave(fig,filename = "./fig_res/fig6b.pdf",device = "pdf",width = 3,height = 3)
+# ggsave(fig,filename = "./fig_res/fig6b.png",width = 3,height = 3,dpi = 500)
+# ggsave(fig,filename = "./fig_res/fig6b.pdf",device = "pdf",width = 3,height = 3)
 ```
 
-
+Figure 6c
 ```{r,fig.width=3,fig.height=3}
 fig <- tmp1 %>% 
   mutate(bin= case_when(N_shared<1 ~ "0",
@@ -239,7 +242,7 @@ fig <- tmp1 %>%
              # size= 0.1,
              position = position_dodge(width = 0.9))+
   theme_classic()+
-  ylab("Supervised prediction accuracy (AUC)")+
+  ylab("Target prediction accuracy (AUC)")+
   xlab("Number of drugs with shared targets")+
   guides(fill= guide_legend(title = "prediction method"))
 
@@ -248,6 +251,7 @@ ggsave(fig,filename = "./fig_res/fig6c.png",width = 3,height = 3,dpi = 500)
 ggsave(fig,filename = "./fig_res/fig6c.pdf",device = "pdf",width = 3,height = 3)
 ```
 
+# 4 Explore the similarity of gene essentiality signatures between cancer and noncancer drugs.
 ```{r}
 cancer_drug_category <- prism_268_all %>% 
   filter(Drug_category=="cancer") %>% 
@@ -279,17 +283,16 @@ dimreduction_df <- feature_imp_ridge_prism_comb1 %>%
          umap2="V2") %>% 
   rownames_to_column(var = "drug") %>% 
   inner_join(prism_data %>% select_at(1:4), by= c("drug"= "BROAD_ID")) %>% 
-  mutate(validated= drug %in% senvalid_20drugs$drugid) %>% 
+  # mutate(validated= drug %in% senvalid_20drugs$drugid) %>% 
   mutate(interested= name %in% c("CGS-15943","MRS-1220", 
                                  "domperidone", "pardoprunox",
                                  "sirolimus", "LY2183240", 
                                  "podophyllotoxin","albendazole","parbendazole" ))  %>% 
   mutate(interested2= (moa == "HMGCR inhibitor") ) 
-
-dimreduction_df$moa[dimreduction_df$name== "pardoprunox"] <-  "dopamine receptor agonist"
+# mannually correct the text 
+# dimreduction_df$moa[dimreduction_df$name== "pardoprunox"] <-  "dopamine receptor agonist"
 dimreduction_df$moa[dimreduction_df$name== "podophyllotoxin"] <-  "tubulin polymerization inhibitor"
 dimreduction_df$moa[dimreduction_df$name== "LY2183240"] <-  "FAAH inhibitor"
-
 ```
 
 Figure 6D
@@ -308,10 +311,10 @@ fig <- ggplot()+
       filter(name %in% c("sirolimus", "LY2183240")),
            mapping = aes(x = umap1, y = umap2, label= name) ,color= "black"
            )+
-    ggrepel::geom_text_repel(data =  dimreduction_df %>%
-                               filter(name %in% c("domperidone", "pardoprunox")),
-           mapping = aes(x = umap1, y = umap2, label= name) ,color= "red"
-           )+
+    # ggrepel::geom_text_repel(data =  dimreduction_df %>%
+    #                            filter(name %in% c("domperidone", "pardoprunox")),
+    #        mapping = aes(x = umap1, y = umap2, label= name) ,color= "red"
+    #        )+
     ggrepel::geom_text_repel(data =  dimreduction_df %>%
                                filter(name %in% c("parbendazole", "albendazole", "podophyllotoxin")),
            mapping = aes(x = umap1, y = umap2, label= name) ,color= "deepskyblue4"
@@ -320,7 +323,7 @@ fig <- ggplot()+
                                  filter(name %in% c("CGS-15943", "MRS-1220")),
            mapping = aes(x = umap1, y = umap2, label= name) ,color= "green"
            )+
-    ggrepel::geom_label_repel(data =  dimreduction_df %>%
+    ggrepel::geom_text_repel(data =  dimreduction_df %>%
                                  filter(moa %in% "HMGCR inhibitor"),
            mapping = aes(x = umap1, y = umap2, label= name) ,color= "cornsilk4"
            )+
@@ -331,7 +334,11 @@ fig <- ggplot()+
 
 fig
 
-ggsave(fig,filename = "./fig_res/fig6d.png",width = 9,height = 4.5,dpi = 500)
-ggsave(fig,filename = "./fig_res/fig6d.pdf",device = "pdf",width = 9,height = 4.5)
+# ggsave(fig,filename = "./fig_res/fig6d.png",width = 9,height = 4.5,dpi = 500)
+# ggsave(fig,filename = "./fig_res/fig6d.pdf",device = "pdf",width = 9,height = 4.5)
+```
+
+```{r}
+sessionInfo()
 ```
 
